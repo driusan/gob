@@ -13,7 +13,6 @@ import (
 	"golang.org/x/net/html"
 	"image"
 	"image/color"
-	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -37,12 +36,16 @@ type Page struct {
 
 func convertUnitToPx(basis int, cssString string) int {
 	//fmt.Printf("Attempting to interpret '%s'\n", cssString)
+	if len(cssString) < 2 {
+		return basis
+	}
 	if cssString[len(cssString)-2:] == "px" {
 		val, _ := strconv.Atoi(cssString[0 : len(cssString)-2])
 		return val
 
 	}
-	panic("aaaah")
+	return basis
+	//panic("aaaah")
 }
 func convertUnitToColor(cssString string) (*color.RGBA, error) {
 	//background: rgb(0, 0, 255);
@@ -82,53 +85,6 @@ func extractStyles(n *html.Node) string {
 	return style
 }
 
-func convertNodeToHTMLElement(root *html.Node) (*HTMLElement, error) {
-	switch root.Type {
-	case html.ElementNode:
-		fmt.Printf("Convertin an element %s\n", root.Data)
-		var textContent string
-		var children []*HTMLElement
-		var lastError error
-		for c := root.FirstChild; c != nil; c = c.NextSibling {
-			switch c.Type {
-			case html.ElementNode:
-				newChild, err := convertNodeToHTMLElement(c)
-				if err != nil {
-					lastError = err
-					continue
-				}
-				children = append(children, newChild)
-			case html.TextNode:
-				textContent += c.Data
-			}
-		}
-
-		return &HTMLElement{root, nil, textContent, children}, lastError
-	case html.TextNode:
-		return &HTMLElement{nil, nil, root.Data, nil}, NotAnElement
-	default:
-		return nil, NotAnElement
-	}
-	fmt.Printf("This should not happen.\n")
-	return nil, NotAnElement
-}
-func parseHTML(r io.Reader) (*Page, Stylesheet) {
-	parsedhtml, _ := html.Parse(r)
-	styles := extractStyles(parsedhtml)
-
-	var body *HTMLElement
-	var root = parsedhtml.FirstChild
-	for c := root.FirstChild; c != nil; c = c.NextSibling {
-		if c.Type == html.ElementNode && c.Data == "body" {
-			body, _ = convertNodeToHTMLElement(c)
-			break
-		}
-	}
-	return &Page{body},
-		ParseStylesheet(styles)
-
-}
-
 func realWalkBody(n *HTMLElement, callback func(e *HTMLElement)) {
 	if n == nil {
 		return
@@ -137,7 +93,9 @@ func realWalkBody(n *HTMLElement, callback func(e *HTMLElement)) {
 		callback(n)
 	}
 	for _, c := range n.Children {
-		realWalkBody(c, callback)
+		if val, ok := c.(*HTMLElement); ok {
+			realWalkBody(val, callback)
+		}
 	}
 }
 func (p Page) WalkBody(callback func(*HTMLElement)) {
@@ -173,6 +131,7 @@ func paintWindow(s screen.Screen, w screen.Window, v *Viewport, page *Page, sty 
 	}
 	w.Publish()
 }
+
 func main() {
 	driver.Main(func(s screen.Screen) {
 		w, err := s.NewWindow(nil)

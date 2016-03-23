@@ -30,11 +30,13 @@ func parseBlock(val string) map[StyleAttribute]string {
 		if strings.TrimSpace(attrib) == "" {
 			continue
 		}
-		split := strings.Split(attrib, ":")
-		if len(split) != 2 {
+		idx := strings.Index(attrib, ":")
+		if idx < 0 {
 			panic("Got a bad selector" + attrib)
 		}
-		m[StyleAttribute(strings.TrimSpace(split[0]))] = strings.TrimSpace(split[1])
+		selector := strings.TrimSpace(attrib[0:idx])
+		value := strings.TrimSpace(attrib[idx+1:])
+		m[StyleAttribute(selector)] = value
 
 	}
 	return m
@@ -65,6 +67,7 @@ func ParseStylesheet(val string) Stylesheet {
 func (s CSSSelector) Matches(el *HTMLElement) bool {
 	pieces := strings.Split(string(s), " ")
 	if len(pieces) != 1 {
+		return false
 		panic("I am neither a well coded error handler nor CSS parser. Can't handle complex Stylesheets.")
 	}
 	if s[0] == '.' {
