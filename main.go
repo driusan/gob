@@ -106,13 +106,6 @@ func (p Page) WalkBody(callback func(*HTMLElement)) {
 }
 
 func paintWindow(s screen.Screen, w screen.Window, v *Viewport, page *Page, sty Stylesheet) {
-	page.WalkBody(func(n *HTMLElement) {
-		for _, rule := range sty {
-			if rule.Matches(n) {
-				n.AddStyle(rule)
-			}
-		}
-	})
 
 	// Fill the window background with gray
 	w.Fill(v.Size.Bounds(), background, screen.Src)
@@ -124,6 +117,7 @@ func paintWindow(s screen.Screen, w screen.Window, v *Viewport, page *Page, sty 
 			return
 		}
 		defer b.Release()
+		fmt.Printf("%s", v.Size.Size())
 		page.Body.Render(b.RGBA())
 		w.Upload(image.Point{0, 0}, b, v.Size.Bounds())
 	} else {
@@ -147,6 +141,13 @@ func main() {
 		}
 		parsedhtml, sty := parseHTML(f)
 		f.Close()
+		parsedhtml.WalkBody(func(n *HTMLElement) {
+			for _, rule := range sty {
+				if rule.Matches(n) {
+					n.AddStyle(rule)
+				}
+			}
+		})
 
 		var v Viewport
 		for {

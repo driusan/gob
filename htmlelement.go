@@ -1,7 +1,7 @@
 package main
 
 import (
-	//	"fmt"
+	"fmt"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/basicfont"
 	"golang.org/x/image/math/fixed"
@@ -9,6 +9,7 @@ import (
 	"image"
 	"image/color"
 	"image/draw"
+	"strings"
 )
 
 // A RenderableElement is something that can be rendered to
@@ -19,7 +20,7 @@ type RenderableElement interface {
 
 	// The final width of the element being rendered, including
 	// all borders, margins and padding
-	GetWidthInPx() (int, error)
+	GetWidthInPx(parentWidth int) (int, error)
 
 	// The final height of the element being rendered, including
 	// all borders, margins and padding
@@ -28,6 +29,7 @@ type RenderableElement interface {
 	GetDisplayProp() string
 
 	GetTextContent() string
+	GetBackgroundColor() color.RGBA
 }
 
 // A StyleElement is anything that has CSS rules applied to it. It
@@ -54,14 +56,14 @@ func (e TextElement) Render(dst *image.RGBA) {
 	//fmt.Printf("Writing: %s (%s)\n", e.TextContent, fntDrawer.MeasureString(e.TextContent))
 	fntDrawer.DrawString(e.TextContent)
 }
-func (e TextElement) GetWidthInPx() (int, error) {
+func (e TextElement) GetWidthInPx(parentWidth int) (int, error) {
 	fntDrawer := font.Drawer{
 		nil,
 		nil,
 		basicfont.Face7x13,
 		fixed.P(0, 10),
 	}
-	return int(fntDrawer.MeasureString(e.TextContent+" ") >> 6), nil
+	return int(fntDrawer.MeasureString(e.TextContent) >> 6), nil
 }
 func (e TextElement) GetHeightInPx() (int, error) {
 	return 15, nil
@@ -155,21 +157,21 @@ func (e StyledElement) GetColor() color.RGBA {
 	return *val
 }
 
-func (e HTMLElement) GetWidthInPx() (int, error) {
+func (e HTMLElement) GetWidthInPx(parentWidth int) (int, error) {
 	var calcWidth int
 	for _, child := range e.Children {
-		cW, _ := child.GetWidthInPx()
+		cW, _ := child.GetWidthInPx(parentWidth)
 		if calcWidth < cW {
-			calcWidth += cW
+			calcWidth = cW
 		}
 	}
 	if calcWidth > 0 {
 		return calcWidth, nil
 	}
 	if e.rules == nil {
-		return -1, NoStyles
+		return parentWidth, NoStyles
 	}
-	return e.followCascadeToPx("width", 1000), NoStyles
+	return parentWidth, NoStyles
 }
 func (e HTMLElement) GetHeightInPx() (int, error) {
 	explicitHeight := e.followCascadeToPx("height", -1)
@@ -210,7 +212,7 @@ func (e HTMLElement) GetDisplayProp() string {
 	switch e.Data {
 	case "span", "a":
 		return "inline"
-	case "p", "div":
+	case "p", "div", "h1":
 		fallthrough
 	default:
 		return "block"
@@ -227,42 +229,68 @@ func (e HTMLElement) Render(dst *image.RGBA) {
 	}
 	bg := e.GetBackgroundColor()
 
-	width, err := e.GetWidthInPx()
-	if err == NoStyles {
-		width = imageSize.Max.X
-	}
+	width := imageSize.Max.X
 	if e.Type == html.ElementNode && e.Data == "body" {
-		width = imageSize.Max.X
-		height = imageSize.Max.Y
+		if height < imageSize.Max.Y {
+			height = imageSize.Max.Y
+		} else {
+			fmt.Printf("Should be able to scroll")
+		}
+		b := image.Rectangle{image.Point{0, 0}, image.Point{width, height}}
+		draw.Draw(dst, b, &image.Uniform{bg}, image.ZP, draw.Src)
 	}
 
-	// Draw the background
-	b := image.Rectangle{image.Point{0, 0}, image.Point{width, height}}
-	draw.Draw(dst, b, &image.Uniform{bg}, image.ZP, draw.Src)
+	//fmt.Printf("width, height for %s: %d, %d\n", e.Data, width, height)
 
 	dot := image.Point{0, 0}
+	fntDrawer := font.Drawer{
+		dst,
+		&image.Uniform{e.GetColor()},
+		basicfont.Face7x13,
+		fixed.P(dot.X, 10),
+	}
 	for _, c := range e.Children {
 
-		childWidth, _ := c.GetWidthInPx()
-		childHeight, _ := c.GetHeightInPx()
-		childImage := image.NewRGBA(image.Rectangle{image.ZP, image.Point{width, height}})
-		c.Render(childImage)
-
-		sr := childImage.Bounds()
-
-		r := image.Rectangle{dot, dot.Add(sr.Size())}
-		draw.Draw(dst, r, childImage, sr.Min, draw.Over)
 		switch c.GetDisplayProp() {
 		case "inline":
-			if dot.X+childWidth < imageSize.Max.X {
-				dot.X += childWidth
-			} else {
-				dot.X = 0
-				dot.Y += childHeight
+			// Draw the background
+			//bgChild := c.GetBackgroundColor()
+
+			// draw the content
+			textContent := c.GetTextContent()
+
+			//fmt.Printf("Writing: %s (loc:%s)\n", textContent, fntDrawer.Dot)
+			words := strings.Fields(textContent)
+			for _, word := range words {
+				wordSizeInPx := int(fntDrawer.MeasureString(word) >> 6)
+				if dot.X+wordSizeInPx > width {
+					//fmt.Printf("wordSizeInPx: %d, dot.X: %d, width: %d %s\n", wordSizeInPx, dot.X, width, word)
+					dot.X = 0
+					dot.Y += 15
+					fntDrawer.Dot = fixed.P(dot.X, dot.Y+10)
+				}
+				//b := image.Rectangle{dot, image.Point{width, height}}
+				//  draw.Draw(dst, b, &image.Uniform{bgChild}, dot, draw.Src)
+				fntDrawer.DrawString(word)
+				dot.X = (int(fntDrawer.Dot.X) >> 6) + 5
+				fntDrawer.Dot = fixed.P(dot.X, dot.Y+10)
 			}
 		case "block":
 			fallthrough
 		default:
+			// Draw the background
+			//b := image.Rectangle{image.Point{0, 0}, image.Point{width, height}}
+			//draw.Draw(dst, b, &image.Uniform{bg}, image.ZP, draw.Src)
+
+			// Draw the block itself, and move dot.
+			childHeight, _ := c.GetHeightInPx()
+			childImage := image.NewRGBA(image.Rectangle{image.ZP, image.Point{width, height}})
+			c.Render(childImage)
+
+			sr := childImage.Bounds()
+
+			r := image.Rectangle{dot, dot.Add(sr.Size())}
+			draw.Draw(dst, r, childImage, sr.Min, draw.Over)
 			dot.X = 0
 			dot.Y += childHeight
 		}
