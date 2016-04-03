@@ -24,14 +24,14 @@ func convertNodeToHTMLElement(root *html.Node) (*HTMLElement, error) {
 				children = append(children, newChild)
 			case html.TextNode:
 				if trimmed := strings.TrimSpace(c.Data); trimmed != "" {
-					children = append(children, TextElement{StyledElement{make([]StyleRule, 0)}, trimmed})
+					children = append(children, TextElement{&StyledElement{make([]StyleRule, 0), DefaultFontSize}, trimmed})
 					textContent += trimmed
 				}
 			}
 		}
 
 		rules := make([]StyleRule, 0)
-		return &HTMLElement{root, StyledElement{rules}, textContent, children}, lastError
+		return &HTMLElement{root, StyledElement{rules, DefaultFontSize}, textContent, children}, lastError
 		//	case html.TextNode:
 		//		return &HTMLElement{nil, nil, root.Data, nil}, NotAnElement
 	default:

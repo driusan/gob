@@ -5,11 +5,21 @@ import (
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/basicfont"
 	"golang.org/x/image/math/fixed"
+	"unicode"
+	"unicode/utf8"
+	//	"github.com/golang/freetype"
+	"github.com/golang/freetype/truetype"
 	"golang.org/x/net/html"
+	//"os"
 	"image"
 	"image/color"
 	"image/draw"
+	"io/ioutil"
 	"strings"
+)
+
+const (
+	DefaultFontSize = 16
 )
 
 // A RenderableElement is something that can be rendered to
@@ -24,10 +34,13 @@ type RenderableElement interface {
 
 	// The final height of the element being rendered, including
 	// all borders, margins and padding
-	GetHeightInPx() (int, error)
+	GetHeightInPx(parentWidth int) (int, error)
 
 	GetDisplayProp() string
 
+	GetFontFace(int) font.Face
+	GetFontSize() int
+	SetFontSize(int)
 	GetTextContent() string
 	GetBackgroundColor() color.RGBA
 }
@@ -37,26 +50,18 @@ type RenderableElement interface {
 type StyledElement struct {
 	// The rules that match this element.
 	rules []StyleRule
+
+	fontSize int
 }
 
 // A TextElement is a renderable TextNode from an HTML document.
 type TextElement struct {
-	StyledElement
+	*StyledElement
 	TextContent string
 }
 
 // Rendering a TextElement just draws the string onto its parent.
 func (e TextElement) Render(containerWidth int) *image.RGBA {
-	/*
-		fntDrawer := font.Drawer{
-			nil,
-			&image.Uniform{e.GetColor()},
-			basicfont.Face7x13,
-			fixed.P(0, 10),
-		}
-	*/
-	//fmt.Printf("Writing: %s (%s)\n", e.TextContent, fntDrawer.MeasureString(e.TextContent))
-	//fntDrawer.DrawString(e.TextContent)
 	return nil
 }
 func (e TextElement) GetWidthInPx(parentWidth int) (int, error) {
@@ -68,8 +73,16 @@ func (e TextElement) GetWidthInPx(parentWidth int) (int, error) {
 	}
 	return int(fntDrawer.MeasureString(e.TextContent) >> 6), nil
 }
-func (e TextElement) GetHeightInPx() (int, error) {
-	return 15, nil
+func (e TextElement) GetHeightInPx(parentWidth int) (int, error) {
+	if parentWidth == 0 {
+		return 0, NoStyles
+	}
+	if width, err := e.GetWidthInPx(parentWidth); width > parentWidth && err == nil {
+		// crude approximation of how many lines long this is,
+		// times the font size
+		return e.fontSize * (width / parentWidth), nil
+	}
+	return e.fontSize, nil
 }
 func (e TextElement) GetDisplayProp() string {
 	return "inline"
@@ -77,6 +90,26 @@ func (e TextElement) GetDisplayProp() string {
 
 func (e TextElement) GetTextContent() string {
 	return e.TextContent
+}
+
+func (e *StyledElement) SetFontSize(size int) {
+	e.fontSize = size
+}
+func (e StyledElement) GetFontFace(fsize int) font.Face {
+	fontBytes, _ := ioutil.ReadFile("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+	fnt, _ := truetype.Parse(fontBytes)
+	return truetype.NewFace(fnt,
+		&truetype.Options{
+			Size:    float64(fsize),
+			DPI:     72,
+			Hinting: font.HintingFull})
+
+}
+func (e StyledElement) GetFontSize() int {
+	if e.fontSize == 0 {
+		return DefaultFontSize
+	}
+	return e.fontSize
 }
 
 type HTMLElement struct {
@@ -87,6 +120,15 @@ type HTMLElement struct {
 	Children []RenderableElement
 }
 
+func (e HTMLElement) GetFontSize() int {
+	if e.Type == html.ElementNode {
+		switch e.Data {
+		case "h1":
+			return DefaultFontSize * 2
+		}
+	}
+	return DefaultFontSize
+}
 func (e HTMLElement) GetTextContent() string {
 	return e.TextContent
 }
@@ -153,7 +195,7 @@ func (e StyledElement) GetBackgroundColor() color.RGBA {
 	return *val
 }
 func (e StyledElement) GetColor() color.RGBA {
-	val, err := e.followCascadeToColor("background")
+	val, err := e.followCascadeToColor("color")
 	if err == NoStyles {
 		return color.RGBA{0, 0, 0, 255}
 	}
@@ -176,7 +218,7 @@ func (e HTMLElement) GetWidthInPx(parentWidth int) (int, error) {
 	}
 	return parentWidth, NoStyles
 }
-func (e HTMLElement) GetHeightInPx() (int, error) {
+func (e HTMLElement) GetHeightInPx(parentWidth int) (int, error) {
 	explicitHeight := e.followCascadeToPx("height", -1)
 	if explicitHeight != -1 {
 		return explicitHeight, nil
@@ -184,11 +226,17 @@ func (e HTMLElement) GetHeightInPx() (int, error) {
 
 	var calcHeight int
 	for _, child := range e.Children {
-		cH, _ := child.GetHeightInPx()
-		calcHeight += cH
+		// Cascade the font size down to the children before
+		// calculating the height
+
+		cH, _ := child.GetHeightInPx(parentWidth)
+		if cH < e.GetFontSize() {
+			calcHeight += e.GetFontSize()
+		} else {
+			calcHeight += cH
+		}
 	}
 	if calcHeight > 0 {
-		//fmt.Printf("Calculated height of %d for %s\n", calcHeight, e)
 		return calcHeight, nil
 	}
 
@@ -196,7 +244,6 @@ func (e HTMLElement) GetHeightInPx() (int, error) {
 		return -1, NoStyles
 	}
 	return -2, NoStyles
-	//panic("Could not calculate height of element")
 }
 
 func (e HTMLElement) ContainsBlocks() bool {
@@ -225,10 +272,8 @@ func (e HTMLElement) GetDisplayProp() string {
 
 func (e HTMLElement) Render(containerWidth int) *image.RGBA {
 
-	height, _ := e.GetHeightInPx()
-	width, err := e.GetWidthInPx(containerWidth)
-	if err == NoStyles {
-	}
+	height, _ := e.GetHeightInPx(containerWidth)
+	width, _ := e.GetWidthInPx(containerWidth)
 	width = containerWidth
 	bg := e.GetBackgroundColor()
 	dst := image.NewRGBA(image.Rectangle{image.ZP, image.Point{width, height}})
@@ -247,13 +292,19 @@ func (e HTMLElement) Render(containerWidth int) *image.RGBA {
 	//fmt.Printf("width, height for %s: %d, %d\n", e.Data, width, height)
 
 	dot := image.Point{0, 0}
+	fSize := e.GetFontSize()
+	fontFace := e.GetFontFace(fSize)
+	fmt.Printf("Font metrics: %s\n", fontFace.Metrics())
 	fntDrawer := font.Drawer{
-		dst,
-		&image.Uniform{e.GetColor()},
-		basicfont.Face7x13,
-		fixed.P(dot.X, 10),
+		Dst:  dst,
+		Src:  &image.Uniform{e.GetColor()},
+		Face: fontFace,
+		//basicfont.Face7x13,
+		Dot: fixed.P(dot.X, int(fontFace.Metrics().Ascent)>>6),
 	}
+	//containsBlocks := e.ContainsBlocks()
 	for _, c := range e.Children {
+		c.SetFontSize(fSize)
 
 		switch c.GetDisplayProp() {
 		case "inline":
@@ -262,35 +313,53 @@ func (e HTMLElement) Render(containerWidth int) *image.RGBA {
 
 			// draw the content
 			textContent := c.GetTextContent()
-
-			//fmt.Printf("Writing: %s (loc:%s)\n", textContent, fntDrawer.Dot)
 			words := strings.Fields(textContent)
+			firstRune, _ := utf8.DecodeRuneInString(textContent)
+			if unicode.IsSpace(firstRune) {
+				dot.X += (fSize / 3)
+				fntDrawer.Dot = fixed.P(dot.X, dot.Y+int(fontFace.Metrics().Ascent)>>6)
+			}
 			for _, word := range words {
+				//fntDrawer.Dot = fixed.P(dot.X, dot.Y+int(fontFace.Metrics().Ascent) >> 6 )
 				wordSizeInPx := int(fntDrawer.MeasureString(word) >> 6)
 				if dot.X+wordSizeInPx > width {
-					//fmt.Printf("wordSizeInPx: %d, dot.X: %d, width: %d %s\n", wordSizeInPx, dot.X, width, word)
 					dot.X = 0
-					dot.Y += 15
-					fntDrawer.Dot = fixed.P(dot.X, dot.Y+10)
+					dot.Y += fSize
+					fntDrawer.Dot = fixed.P(dot.X, dot.Y+int(fontFace.Metrics().Ascent)>>6)
 				}
-				//b := image.Rectangle{dot, image.Point{width, height}}
-				//  draw.Draw(dst, b, &image.Uniform{bgChild}, dot, draw.Src)
 				fntDrawer.DrawString(word)
+
+				// If it's the last word in this inline chunk,
+				// only add a space after if the textcontent
+				// ends with space. This is so that space
+				// doesn't get added in things like <span>foo</span>bar
+				/*
+					This doesn't work, because the string is trimmed before it gets here.
+					if widx == len(words)-1 {
+						lastRune, _ := utf8.DecodeLastRuneInString(textContent)
+						if !unicode.IsSpace(lastRune) {
+							fmt.Printf("No space after %s", word)
+							continue
+						}
+					}*/
+
+				// Add a three per em space between words, an em-quad after a period,
+				// and an en-quad after other punctuation
 				switch word[len(word)-1] {
 				case ',', ';', ':', '!', '?':
-					dot.X = (int(fntDrawer.Dot.X) >> 6) + 7
+					dot.X = (int(fntDrawer.Dot.X) >> 6) + (fSize / 2)
 				case '.':
-					dot.X = (int(fntDrawer.Dot.X) >> 6) + 10
+					dot.X = (int(fntDrawer.Dot.X) >> 6) + fSize
 				default:
-					dot.X = (int(fntDrawer.Dot.X) >> 6) + 5
+					dot.X = (int(fntDrawer.Dot.X) >> 6) + (fSize / 3)
 				}
-				fntDrawer.Dot = fixed.P(dot.X, dot.Y+10)
+				fntDrawer.Dot = fixed.P(dot.X, dot.Y+int(fontFace.Metrics().Ascent)>>6)
 			}
 		case "block":
 			fallthrough
 		default:
 			// Draw the block itself, and move dot.
-			childHeight, _ := c.GetHeightInPx()
+			childHeight, _ := c.GetHeightInPx(containerWidth)
 			childImage := image.NewRGBA(image.Rectangle{image.ZP, image.Point{width, height}})
 			childImage = c.Render(width)
 
@@ -300,6 +369,7 @@ func (e HTMLElement) Render(containerWidth int) *image.RGBA {
 			draw.Draw(dst, r, childImage, sr.Min, draw.Over)
 			dot.X = 0
 			dot.Y += childHeight
+			fntDrawer.Dot = fixed.P(dot.X, dot.Y+int(fontFace.Metrics().Ascent)>>6)
 		}
 
 	}
