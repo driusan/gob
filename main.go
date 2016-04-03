@@ -75,6 +75,42 @@ func convertUnitToColor(cssString string) (*color.RGBA, error) {
 		return &color.RGBA{uint8(rint), uint8(gint), uint8(bint), 255}, nil
 
 	}
+	switch cssString {
+	case "maroon":
+		return &color.RGBA{0x80, 0, 0, 255}, nil
+	case "red":
+		return &color.RGBA{0xff, 0, 0, 255}, nil
+	case "orange":
+		return &color.RGBA{0xff, 0xa5, 0, 255}, nil
+	case "yellow":
+		return &color.RGBA{0xff, 0xff, 0, 255}, nil
+	case "olive":
+		return &color.RGBA{0x80, 0x80, 0, 255}, nil
+	case "purple":
+		return &color.RGBA{0x80, 0, 0x80, 255}, nil
+	case "fuchsia":
+		return &color.RGBA{0xff, 0, 0xff, 255}, nil
+	case "white":
+		return &color.RGBA{0xff, 0xff, 0xff, 255}, nil
+	case "lime":
+		return &color.RGBA{0, 0xff, 0, 255}, nil
+	case "green":
+		return &color.RGBA{0, 0x80, 0, 255}, nil
+	case "navy":
+		return &color.RGBA{0, 0, 0x80, 255}, nil
+	case "blue":
+		return &color.RGBA{0, 0, 0xff, 255}, nil
+	case "aqua":
+		return &color.RGBA{0, 0xff, 0xff, 255}, nil
+	case "teal":
+		return &color.RGBA{0, 0x80, 0x80, 255}, nil
+	case "black":
+		return &color.RGBA{0, 0, 0, 255}, nil
+	case "silver":
+		return &color.RGBA{0xc0, 0xc0, 0xc0, 255}, nil
+	case "gray", "grey":
+		return &color.RGBA{0x80, 0x80, 0x80, 255}, nil
+	}
 	return nil, NoStyles
 }
 
