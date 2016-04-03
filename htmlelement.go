@@ -276,16 +276,19 @@ func (e HTMLElement) Render(containerWidth int) *image.RGBA {
 				//b := image.Rectangle{dot, image.Point{width, height}}
 				//  draw.Draw(dst, b, &image.Uniform{bgChild}, dot, draw.Src)
 				fntDrawer.DrawString(word)
-				dot.X = (int(fntDrawer.Dot.X) >> 6) + 5
+				switch word[len(word)-1] {
+				case ',', ';', ':', '!', '?':
+					dot.X = (int(fntDrawer.Dot.X) >> 6) + 7
+				case '.':
+					dot.X = (int(fntDrawer.Dot.X) >> 6) + 10
+				default:
+					dot.X = (int(fntDrawer.Dot.X) >> 6) + 5
+				}
 				fntDrawer.Dot = fixed.P(dot.X, dot.Y+10)
 			}
 		case "block":
 			fallthrough
 		default:
-			// Draw the background
-			//b := image.Rectangle{image.Point{0, 0}, image.Point{width, height}}
-			//draw.Draw(dst, b, &image.Uniform{bg}, image.ZP, draw.Src)
-
 			// Draw the block itself, and move dot.
 			childHeight, _ := c.GetHeightInPx()
 			childImage := image.NewRGBA(image.Rectangle{image.ZP, image.Point{width, height}})
