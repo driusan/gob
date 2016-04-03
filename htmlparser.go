@@ -5,6 +5,7 @@ import (
 	"golang.org/x/net/html"
 	"io"
 	"strings"
+	"Gob/css"
 )
 
 func convertNodeToHTMLElement(root *html.Node) (*HTMLElement, error) {
@@ -43,7 +44,7 @@ func convertNodeToHTMLElement(root *html.Node) (*HTMLElement, error) {
 
 func parseHTML(r io.Reader) (*Page, Stylesheet) {
 	parsedhtml, _ := html.Parse(r)
-	styles := extractStyles(parsedhtml)
+	styles := css.ExtractStyles(parsedhtml)
 
 	var body *HTMLElement
 	var root *html.Node

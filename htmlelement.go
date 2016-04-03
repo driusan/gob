@@ -16,6 +16,7 @@ import (
 	"image/draw"
 	"io/ioutil"
 	"strings"
+	"Gob/css"
 )
 
 const (
@@ -162,7 +163,7 @@ func (e StyledElement) followCascadeToPx(attr string, val int) int {
 		// the rule has this attribute, so convert it and apply
 		// it to the value calculated so far
 		if cssval, ok := rule.Values[StyleAttribute(attr)]; ok {
-			val = convertUnitToPx(val, cssval)
+			val, _ = css.ConvertUnitToPx(val, cssval)
 		}
 	}
 	return val
@@ -178,7 +179,7 @@ func (e StyledElement) followCascadeToColor(attr string) (*color.RGBA, error) {
 		// the rule has this attribute, so convert it and apply
 		// it to the value calculated so far
 		if cssval, ok := rule.Values[StyleAttribute(attr)]; ok {
-			ret, _ = convertUnitToColor(cssval)
+			ret, _ = css.ConvertColorToRGBA(cssval)
 
 		}
 	}
