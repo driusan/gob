@@ -15,8 +15,8 @@ import (
 // A RenderableElement is something that can be rendered to
 // an image.
 type RenderableElement interface {
-	// Draw the element onto dst
-	Render(dst *image.RGBA)
+	// Returns an image representing this element.
+	Render(containerWidth int) *image.RGBA
 
 	// The final width of the element being rendered, including
 	// all borders, margins and padding
@@ -46,15 +46,18 @@ type TextElement struct {
 }
 
 // Rendering a TextElement just draws the string onto its parent.
-func (e TextElement) Render(dst *image.RGBA) {
-	fntDrawer := font.Drawer{
-		dst,
-		&image.Uniform{e.GetColor()},
-		basicfont.Face7x13,
-		fixed.P(0, 10),
-	}
+func (e TextElement) Render(containerWidth int) *image.RGBA {
+	/*
+		fntDrawer := font.Drawer{
+			nil,
+			&image.Uniform{e.GetColor()},
+			basicfont.Face7x13,
+			fixed.P(0, 10),
+		}
+	*/
 	//fmt.Printf("Writing: %s (%s)\n", e.TextContent, fntDrawer.MeasureString(e.TextContent))
-	fntDrawer.DrawString(e.TextContent)
+	//fntDrawer.DrawString(e.TextContent)
+	return nil
 }
 func (e TextElement) GetWidthInPx(parentWidth int) (int, error) {
 	fntDrawer := font.Drawer{
@@ -220,16 +223,17 @@ func (e HTMLElement) GetDisplayProp() string {
 
 }
 
-func (e HTMLElement) Render(dst *image.RGBA) {
+func (e HTMLElement) Render(containerWidth int) *image.RGBA {
+
+	height, _ := e.GetHeightInPx()
+	width, err := e.GetWidthInPx(containerWidth)
+	if err == NoStyles {
+	}
+	width = containerWidth
+	bg := e.GetBackgroundColor()
+	dst := image.NewRGBA(image.Rectangle{image.ZP, image.Point{width, height}})
 	imageSize := dst.Bounds()
 
-	height, err := e.GetHeightInPx()
-	if err == NoStyles {
-		height = imageSize.Max.Y
-	}
-	bg := e.GetBackgroundColor()
-
-	width := imageSize.Max.X
 	if e.Type == html.ElementNode && e.Data == "body" {
 		if height < imageSize.Max.Y {
 			height = imageSize.Max.Y
@@ -285,7 +289,7 @@ func (e HTMLElement) Render(dst *image.RGBA) {
 			// Draw the block itself, and move dot.
 			childHeight, _ := c.GetHeightInPx()
 			childImage := image.NewRGBA(image.Rectangle{image.ZP, image.Point{width, height}})
-			c.Render(childImage)
+			childImage = c.Render(width)
 
 			sr := childImage.Bounds()
 
@@ -296,4 +300,5 @@ func (e HTMLElement) Render(dst *image.RGBA) {
 		}
 
 	}
+	return dst
 }

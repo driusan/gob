@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	//"fmt"
 	"golang.org/x/net/html"
 	"io"
 	"strings"
@@ -10,7 +10,6 @@ import (
 func convertNodeToHTMLElement(root *html.Node) (*HTMLElement, error) {
 	switch root.Type {
 	case html.ElementNode:
-		fmt.Printf("Convertin an element %s\n", root.Data)
 		var textContent string
 		var children []RenderableElement
 		var lastError error
@@ -38,7 +37,7 @@ func convertNodeToHTMLElement(root *html.Node) (*HTMLElement, error) {
 	default:
 		return nil, NotAnElement
 	}
-	fmt.Printf("This should not happen.\n")
+	panic("This should not happen")
 	return nil, NotAnElement
 }
 
@@ -57,9 +56,9 @@ func parseHTML(r io.Reader) (*Page, Stylesheet) {
 	if root == nil {
 		panic("Couldn't find HTML element")
 	}
-	fmt.Printf("root: %s\n", root)
+	//fmt.Printf("root: %s\n", root)
 	for c := root.FirstChild; c != nil; c = c.NextSibling {
-		fmt.Printf("Investigating %s\n", c)
+		//fmt.Printf("Investigating %s\n", c)
 		if c.Type == html.ElementNode && c.Data == "body" {
 			body, _ = convertNodeToHTMLElement(c)
 			break
