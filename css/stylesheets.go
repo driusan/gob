@@ -1,16 +1,16 @@
-package main
+package css
 
-//import "fmt"
-import "strings"
+import (
+	"Gob/dom"
+	"strings"
+)
 
-type Color string
-type Size string
-type Stylesheet []StyleRule
 type CSSSelector string
 type StyleRule struct {
 	Selector CSSSelector
 	Values   map[StyleAttribute]string
 }
+type Stylesheet []StyleRule
 
 type StyleAttribute string
 
@@ -64,7 +64,7 @@ func ParseStylesheet(val string) Stylesheet {
 	return s
 }
 
-func (s CSSSelector) Matches(el *HTMLElement) bool {
+func (s CSSSelector) Matches(el *dom.Element) bool {
 	pieces := strings.Split(string(s), " ")
 	if len(pieces) != 1 {
 		return false
@@ -91,6 +91,6 @@ func (s CSSSelector) Matches(el *HTMLElement) bool {
 	}
 	return false
 }
-func (r StyleRule) Matches(el *HTMLElement) bool {
+func (r StyleRule) Matches(el *dom.Element) bool {
 	return r.Selector.Matches(el)
 }

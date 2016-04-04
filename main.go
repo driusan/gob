@@ -1,6 +1,7 @@
 package main
 
 import (
+	"Gob/renderer"
 	"errors"
 	"fmt"
 	"golang.org/x/exp/shiny/driver"
@@ -10,7 +11,6 @@ import (
 	"golang.org/x/mobile/event/paint"
 	"golang.org/x/mobile/event/size"
 	"golang.org/x/mobile/event/touch"
-	"golang.org/x/net/html"
 	"image"
 	"image/color"
 	"image/draw"
@@ -21,8 +21,7 @@ var (
 	background = color.RGBA{0xE0, 0xE0, 0xE0, 0xFF}
 	//	background = color.RGBA{0xFF, 0xFF, 0xFF, 0xFF}
 
-	NoStyles     = errors.New("No styles to apply")
-	NotAnElement = errors.New("Not an element node")
+	NoStyles = errors.New("No styles to apply")
 )
 
 type Viewport struct {
@@ -38,30 +37,10 @@ type Viewport struct {
 }
 type Page struct {
 	//*html.Node
-	Body *HTMLElement
+	Body renderer.Renderer
 }
 
-func realWalkBody(n *HTMLElement, callback func(e *HTMLElement)) {
-	if n == nil {
-		return
-	}
-	if n.Type == html.ElementNode {
-		callback(n)
-	}
-	for _, c := range n.Children {
-		if val, ok := c.(*HTMLElement); ok {
-			realWalkBody(val, callback)
-		}
-	}
-}
-func (p Page) WalkBody(callback func(*HTMLElement)) {
-	if p.Body == nil {
-		panic("Nothing to walk")
-	}
-	realWalkBody(p.Body, callback)
-}
-
-func paintWindow(s screen.Screen, w screen.Window, v *Viewport, page *Page, sty Stylesheet) {
+func paintWindow(s screen.Screen, w screen.Window, v *Viewport, page *Page) {
 	viewport := v.Size.Bounds()
 
 	// Fill the window background with gray
@@ -97,16 +76,8 @@ func main() {
 			fmt.Fprintf(os.Stderr, "Could not open test.html\n")
 			return
 		}
-		parsedhtml, sty := parseHTML(f)
+		parsedhtml := parseHTML(f)
 		f.Close()
-		parsedhtml.WalkBody(func(n *HTMLElement) {
-			for _, rule := range sty {
-				if rule.Matches(n) {
-					n.AddStyle(rule)
-				}
-			}
-		})
-
 		var v Viewport
 		v.Content = parsedhtml.Body.Render(v.Size.Size().X)
 		for {
@@ -126,7 +97,7 @@ func main() {
 						if v.Cursor.Y > v.Content.Bounds().Max.Y {
 							v.Cursor.Y = v.Content.Bounds().Max.Y - 10
 						}
-						paintWindow(s, w, &v, parsedhtml, sty)
+						paintWindow(s, w, &v, parsedhtml)
 					}
 				case key.CodeUpArrow:
 					if e.Direction == key.DirPress {
@@ -135,13 +106,13 @@ func main() {
 						if v.Cursor.Y < 0 {
 							v.Cursor.Y = 0
 						}
-						paintWindow(s, w, &v, parsedhtml, sty)
+						paintWindow(s, w, &v, parsedhtml)
 					}
 				default:
 					fmt.Printf("Unknown key: %s", e.Code)
 				}
 			case paint.Event:
-				paintWindow(s, w, &v, parsedhtml, sty)
+				paintWindow(s, w, &v, parsedhtml)
 			case size.Event:
 				v.Size = e
 				v.Content = parsedhtml.Body.Render(e.Size().X)

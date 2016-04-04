@@ -8,8 +8,8 @@ import (
 )
 
 var (
-	NoStyles = errors.New("No styles to apply")
-	InvalidUnit = errors.New("Invalid CSS unit")
+	NoStyles       = errors.New("No styles to apply")
+	InvalidUnit    = errors.New("Invalid CSS unit")
 	NotImplemented = errors.New("Support not yet implemented")
 )
 
