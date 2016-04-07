@@ -5,6 +5,7 @@ import (
 	//"golang.org/x/net/html"
 	//"strings"
 )
+
 var (
 	NotAnElement = errors.New("Not a valid element")
 )

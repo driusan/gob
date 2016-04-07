@@ -1,15 +1,18 @@
 package renderer
 
 import (
-	"fmt"
 	"Gob/css"
 	"Gob/dom"
-	"image"
-	"image/color"
-	"golang.org/x/net/html"
+	"fmt"
 	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
+	"golang.org/x/net/html"
+	"image"
+	"image/color"
 	"image/draw"
+	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 const (
@@ -22,33 +25,32 @@ type Renderer interface {
 	// Returns an image representing this element.
 	Render(containerWidth int) *image.RGBA
 
-/*
-	// The final width of the element being rendered, including
-	// all borders, margins and padding
-	GetWidthInPx(parentWidth int) (int, error)
+	/*
+		// The final width of the element being rendered, including
+		// all borders, margins and padding
+		GetWidthInPx(parentWidth int) (int, error)
 
-	// The final height of the element being rendered, including
-	// all borders, margins and padding
-	GetHeightInPx(parentWidth int) (int, error)
+		// The final height of the element being rendered, including
+		// all borders, margins and padding
+		GetHeightInPx(parentWidth int) (int, error)
 
-	GetDisplayProp() string
+		GetDisplayProp() string
 
-	GetFontFace(int) font.Face
-	GetFontSize() int
-	SetFontSize(int)
-	GetTextContent() string
-	GetBackgroundColor() color.RGBA
-*/
+		GetFontFace(int) font.Face
+		GetFontSize() int
+		SetFontSize(int)
+		GetTextContent() string
+		GetBackgroundColor() color.RGBA
+	*/
 }
 
 type RenderableDomElement struct {
 	*dom.Element
 	Styles *css.StyledElement
 
-	FirstChild *RenderableDomElement
+	FirstChild  *RenderableDomElement
 	NextSibling *RenderableDomElement
 }
-
 
 func (e *RenderableDomElement) Walk(callback func(*RenderableDomElement)) {
 	if e == nil {
@@ -60,10 +62,10 @@ func (e *RenderableDomElement) Walk(callback func(*RenderableDomElement)) {
 	}
 
 	for c := e.FirstChild; c != nil; c = c.NextSibling {
-                        switch c.Type {
-                        case html.ElementNode:
-				callback(c)
-			}
+		switch c.Type {
+		case html.ElementNode:
+			callback(c)
+		}
 	}
 }
 func (e RenderableDomElement) GetHeightInPx(containerWidth int) (int, error) {
@@ -114,7 +116,7 @@ func (e RenderableDomElement) Render(containerWidth int) *image.RGBA {
 	}
 	width, _ := e.GetWidthInPx(containerWidth)
 	bg := e.GetBackgroundColor()
-print(height, "height and ", width, "width\n")
+	print(height, "height and ", width, "width\n")
 	dst := image.NewRGBA(image.Rectangle{image.ZP, image.Point{width, height}})
 	imageSize := dst.Bounds()
 
@@ -141,34 +143,11 @@ print(height, "height and ", width, "width\n")
 	}
 	//containsBlocks := e.ContainsBlocks()
 	//for _, c := range e.Children {
-	       fmt.Printf("printing node: %s", e)
+	fmt.Printf("printing node: %s", e)
 	for c := e.FirstChild; c != nil; c = c.NextSibling {
 
 		switch c.Type {
 		case html.TextNode:
-			// for now, pretend all text is inline
-			fntDrawer.DrawString(c.Data)
-		case html.ElementNode:
-			// for now, pretend all elements are blocks
-
-			// Draw the block itself, and move dot.
-			childHeight, _ := c.GetHeightInPx(containerWidth)
-			childImage := image.NewRGBA(image.Rectangle{image.ZP, image.Point{width, height}})
-			childImage = c.Render(width)
-
-			sr := childImage.Bounds()
-
-			r := image.Rectangle{dot, dot.Add(sr.Size())}
-			draw.Draw(dst, r, childImage, sr.Min, draw.Over)
-			dot.X = 0
-			dot.Y += childHeight
-			fntDrawer.Dot = fixed.P(dot.X, dot.Y+int(fontFace.Metrics().Ascent)>>6)
-		}
-	/*
-		c.SetFontSize(fSize)
-
-		switch c.GetDisplayProp() {
-		case "inline":
 			// Draw the background
 			//bgChild := c.GetBackgroundColor()
 
@@ -188,6 +167,7 @@ print(height, "height and ", width, "width\n")
 					dot.Y += fSize
 					fntDrawer.Dot = fixed.P(dot.X, dot.Y+int(fontFace.Metrics().Ascent)>>6)
 				}
+				print("Printing", word)
 				fntDrawer.DrawString(word)
 
 				// Add a three per em space between words, an em-quad after a period,
@@ -202,9 +182,11 @@ print(height, "height and ", width, "width\n")
 				}
 				fntDrawer.Dot = fixed.P(dot.X, dot.Y+int(fontFace.Metrics().Ascent)>>6)
 			}
-		case "block":
-			fallthrough
-		default:
+			// for now, pretend all text is inline
+			//fntDrawer.DrawString(c.Data)
+		case html.ElementNode:
+			// for now, pretend all elements are blocks
+
 			// Draw the block itself, and move dot.
 			childHeight, _ := c.GetHeightInPx(containerWidth)
 			childImage := image.NewRGBA(image.Rectangle{image.ZP, image.Point{width, height}})
@@ -218,8 +200,62 @@ print(height, "height and ", width, "width\n")
 			dot.Y += childHeight
 			fntDrawer.Dot = fixed.P(dot.X, dot.Y+int(fontFace.Metrics().Ascent)>>6)
 		}
+		/*
+			c.SetFontSize(fSize)
 
-*/
+			switch c.GetDisplayProp() {
+			case "inline":
+				// Draw the background
+				//bgChild := c.GetBackgroundColor()
+
+				// draw the content
+				textContent := c.GetTextContent()
+				words := strings.Fields(textContent)
+				firstRune, _ := utf8.DecodeRuneInString(textContent)
+				if unicode.IsSpace(firstRune) {
+					dot.X += (fSize / 3)
+					fntDrawer.Dot = fixed.P(dot.X, dot.Y+int(fontFace.Metrics().Ascent)>>6)
+				}
+				for _, word := range words {
+					//fntDrawer.Dot = fixed.P(dot.X, dot.Y+int(fontFace.Metrics().Ascent) >> 6 )
+					wordSizeInPx := int(fntDrawer.MeasureString(word) >> 6)
+					if dot.X+wordSizeInPx > width {
+						dot.X = 0
+						dot.Y += fSize
+						fntDrawer.Dot = fixed.P(dot.X, dot.Y+int(fontFace.Metrics().Ascent)>>6)
+					}
+					fntDrawer.DrawString(word)
+
+					// Add a three per em space between words, an em-quad after a period,
+					// and an en-quad after other punctuation
+					switch word[len(word)-1] {
+					case ',', ';', ':', '!', '?':
+						dot.X = (int(fntDrawer.Dot.X) >> 6) + (fSize / 2)
+					case '.':
+						dot.X = (int(fntDrawer.Dot.X) >> 6) + fSize
+					default:
+						dot.X = (int(fntDrawer.Dot.X) >> 6) + (fSize / 3)
+					}
+					fntDrawer.Dot = fixed.P(dot.X, dot.Y+int(fontFace.Metrics().Ascent)>>6)
+				}
+			case "block":
+				fallthrough
+			default:
+				// Draw the block itself, and move dot.
+				childHeight, _ := c.GetHeightInPx(containerWidth)
+				childImage := image.NewRGBA(image.Rectangle{image.ZP, image.Point{width, height}})
+				childImage = c.Render(width)
+
+				sr := childImage.Bounds()
+
+				r := image.Rectangle{dot, dot.Add(sr.Size())}
+				draw.Draw(dst, r, childImage, sr.Min, draw.Over)
+				dot.X = 0
+				dot.Y += childHeight
+				fntDrawer.Dot = fixed.P(dot.X, dot.Y+int(fontFace.Metrics().Ascent)>>6)
+			}
+
+		*/
 	}
 	return dst
 }
