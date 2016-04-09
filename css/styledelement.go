@@ -74,7 +74,12 @@ func (e StyledElement) FollowCascadeToPx(attr string, val int) int {
 	return val
 }
 
-func (e StyledElement) FollowCascadeToColor(attr string) (*color.RGBA, error) {
+// Follows the cascade to get the colour for the attribute named attr.
+// deflt is the default to return if there is nothing found for the attribute in
+// the cascade. It should be the parent's colour if it's an inherited property,
+// and nil otherwise.
+// error will be NoStyles if deflt is returned
+func (e StyledElement) FollowCascadeToColor(attr string, deflt *color.RGBA) (*color.RGBA, error) {
 	var ret *color.RGBA
 	// sort according to CSS cascading rules
 	e.SortStyles()
@@ -89,21 +94,22 @@ func (e StyledElement) FollowCascadeToColor(attr string) (*color.RGBA, error) {
 		}
 	}
 	if ret == nil {
-		return nil, NoStyles
+		return deflt, NoStyles
 	}
 	return ret, nil
 }
-func (e StyledElement) GetBackgroundColor() color.RGBA {
-	val, err := e.FollowCascadeToColor("background")
+func (e StyledElement) GetBackgroundColor(parentColour *color.RGBA) *color.RGBA {
+	val, err := e.FollowCascadeToColor("background", parentColour)
 	if err == NoStyles {
+		return parentColour
 	}
 
-	return *val
+	return val
 }
-func (e StyledElement) GetColor() color.RGBA {
-	val, err := e.FollowCascadeToColor("color")
+func (e StyledElement) GetColor(parentColour *color.RGBA) *color.RGBA {
+	val, err := e.FollowCascadeToColor("color", parentColour)
 	if err == NoStyles {
-		return color.RGBA{0, 0, 0, 255}
+		return parentColour
 	}
-	return *val
+	return val
 }
