@@ -55,11 +55,11 @@ func (e StyledElement) GetFontFace(fsize int) font.Face {
 			Hinting: font.HintingFull})
 
 }
-func (e StyledElement) GetFontSize() int {
+func (e StyledElement) GetFontSize() (int, error) {
 	if e.fontSize == 0 {
-		return DefaultFontSize
+		return 0, InheritValue
 	}
-	return e.fontSize
+	return e.fontSize, nil
 }
 
 func (e *StyledElement) AddStyle(s StyleRule) {
@@ -86,6 +86,14 @@ func (e *StyledElement) SortStyles() error {
 	return nil
 }
 
+func (e *StyledElement) DisplayProp() string {
+	for _, rule := range e.rules {
+		if string(rule.Name) == "display" {
+			return rule.Value.string
+		}
+	}
+	return ""
+}
 func (e *StyledElement) FollowCascadeToPx(attr string, val int) int {
 	// sort according to CSS cascading rules
 	e.SortStyles()

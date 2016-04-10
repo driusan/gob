@@ -63,6 +63,22 @@ func stringSize(fntDrawer font.Drawer, textContent string) (int, error) {
 	return size, nil
 }
 
+func (e *RenderableDomElement) GetFontSize() int {
+	fromCSS, err := e.Styles.GetFontSize()
+	switch err {
+	case css.NoStyles, css.InheritValue:
+		if e.Parent == nil {
+			return DefaultFontSize
+		}
+		return e.Parent.GetFontSize()
+	case nil:
+		return fromCSS
+	default:
+		panic("Could not determine font size")
+
+	}
+}
+
 func (e *RenderableDomElement) Walk(callback func(*RenderableDomElement)) {
 	if e == nil {
 		return
@@ -92,8 +108,8 @@ func (e RenderableDomElement) GetHeightInPx(containerWidth int) (int, error) {
 		// calculating the height
 
 		cH, _ := c.GetHeightInPx(containerWidth)
-		if cH < e.Styles.GetFontSize() {
-			calcHeight += e.Styles.GetFontSize()
+		if cH < c.GetFontSize() {
+			calcHeight += c.GetFontSize()
 		} else {
 			calcHeight += cH
 		}
@@ -105,12 +121,15 @@ func (e RenderableDomElement) GetHeightInPx(containerWidth int) (int, error) {
 	if e.Styles == nil {
 		return -1, css.NoStyles
 	}
-	return e.Styles.GetFontSize(), css.NoStyles
+	return e.GetFontSize(), css.NoStyles
 }
 func (e RenderableDomElement) GetWidthInPx(containerWidth int) (int, error) {
 	var calcWidth int
+	if e.GetDisplayProp() == "block" {
+		return containerWidth, nil
+	}
 	if e.Type == html.TextNode {
-		fSize := e.Styles.GetFontSize()
+		fSize := e.GetFontSize()
 		fontFace := e.Styles.GetFontFace(fSize)
 		fntDrawer := font.Drawer{
 			Dst:  nil,
@@ -118,9 +137,6 @@ func (e RenderableDomElement) GetWidthInPx(containerWidth int) (int, error) {
 			Face: fontFace,
 		}
 		return stringSize(fntDrawer, e.Data)
-	}
-	if e.GetDisplayProp() == "block" {
-		return containerWidth, nil
 	}
 	for child := e.FirstChild; child != nil; child = child.NextSibling {
 		cW, _ := child.GetWidthInPx(containerWidth)
@@ -163,19 +179,41 @@ func (e RenderableDomElement) GetDisplayProp() string {
 	if e.Type == html.TextNode {
 		return "inline"
 	}
-	switch e.Data {
-	case "span", "a":
-		return "inline"
-	case "p", "div", "h1":
-		return "block"
+	if cssVal := e.Styles.DisplayProp(); cssVal != "" {
+		return cssVal
 	}
 	return "block"
 }
+
+type borderDrawer struct {
+	i image.Image
+}
+
+func (b *borderDrawer) ColorModel() color.Model {
+	return color.AlphaModel
+}
+func (b *borderDrawer) Bounds() image.Rectangle {
+	return b.i.Bounds()
+}
+func (b *borderDrawer) At(x, y int) color.Color {
+	return color.Alpha{0}
+
+	// draw a 4px border for debugging.
+	if x < 4 || y < 4 {
+		return color.Alpha{255}
+	}
+
+	if bounds := b.i.Bounds(); x > bounds.Max.X-4 || y > bounds.Max.Y-4 {
+		return color.Alpha{255}
+	}
+	return color.Alpha{0}
+}
+
 func (e RenderableDomElement) Render(containerWidth int) *image.RGBA {
 	// font size is inherited, so if it's an h1 propagate it down. This is a hack until
 	// the CSS package properly implements GetFontSize.
 	dot := image.Point{0, 0}
-	fSize := e.Styles.GetFontSize()
+	fSize := e.GetFontSize()
 	fontFace := e.Styles.GetFontFace(fSize)
 	fntDrawer := font.Drawer{
 		Dst:  nil,
@@ -206,6 +244,15 @@ func (e RenderableDomElement) Render(containerWidth int) *image.RGBA {
 		b := image.Rectangle{image.Point{0, 0}, image.Point{width, height}}
 		draw.Draw(dst, b, &image.Uniform{bg}, image.ZP, draw.Src)
 	}
+	draw.DrawMask(
+		dst,
+		dst.Bounds(),
+		&image.Uniform{color.RGBA{0, 0, 255, 255}},
+		image.ZP,
+		&borderDrawer{dst},
+		image.ZP,
+		draw.Over,
+	)
 
 	/*
 		if e.Element.Type == html.ElementNode && e.Element.Data == "body" {
