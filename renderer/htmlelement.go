@@ -3,7 +3,7 @@ package renderer
 import (
 	"Gob/css"
 	"Gob/dom"
-	"fmt"
+	//	"fmt"
 	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
 	"golang.org/x/net/html"
@@ -24,32 +24,16 @@ const (
 type Renderer interface {
 	// Returns an image representing this element.
 	Render(containerWidth int) *image.RGBA
-
-	/*
-		// The final width of the element being rendered, including
-		// all borders, margins and padding
-		GetWidthInPx(parentWidth int) (int, error)
-
-		// The final height of the element being rendered, including
-		// all borders, margins and padding
-		GetHeightInPx(parentWidth int) (int, error)
-
-		GetDisplayProp() string
-
-		GetFontFace(int) font.Face
-		GetFontSize() int
-		SetFontSize(int)
-		GetTextContent() string
-		GetBackgroundColor() color.RGBA
-	*/
 }
 
 type RenderableDomElement struct {
 	*dom.Element
 	Styles *css.StyledElement
 
+	Parent      *RenderableDomElement
 	FirstChild  *RenderableDomElement
 	NextSibling *RenderableDomElement
+	PrevSibling *RenderableDomElement
 }
 
 func stringSize(fntDrawer font.Drawer, textContent string) (int, error) {
@@ -92,6 +76,7 @@ func (e *RenderableDomElement) Walk(callback func(*RenderableDomElement)) {
 		switch c.Type {
 		case html.ElementNode:
 			callback(c)
+			c.Walk(callback)
 		}
 	}
 }
@@ -133,8 +118,6 @@ func (e RenderableDomElement) GetWidthInPx(containerWidth int) (int, error) {
 			Face: fontFace,
 		}
 		return stringSize(fntDrawer, e.Data)
-		sizeInPx := int(fntDrawer.MeasureString(e.Data) >> 6)
-		return sizeInPx, nil
 	}
 	if e.GetDisplayProp() == "block" {
 		return containerWidth, nil
@@ -152,13 +135,22 @@ func (e RenderableDomElement) GetWidthInPx(containerWidth int) (int, error) {
 }
 
 func (e RenderableDomElement) GetBackgroundColor() color.Color {
-	background := color.RGBA{0xE0, 0xE0, 0xE0, 0xFF}
-	return background
+	deflt := &color.RGBA{0x00, 0xE0, 0xE0, 0x00}
+	//bg := e.Styles.GetBackgroundColor(&color.RGBA{0xE0, 0xE0, 0xE0, 0xFF})
+	switch bg, err := e.Styles.GetBackgroundColor(deflt); err {
+	case css.InheritValue:
+		return e.Parent.GetBackgroundColor()
+	case css.NoStyles:
+		return deflt
+	default:
+		return bg
+	}
+	//background := color.RGBA{0xE0, 0xE0, 0xE0, 0xFF}
+	//return background
 }
 func (e RenderableDomElement) GetColor() color.Color {
 	var deflt *color.RGBA
 	if e.Type == html.ElementNode && e.Data == "a" {
-		fmt.Printf("Default colour for link")
 		deflt = &color.RGBA{0, 0, 0xFF, 0xFF}
 	} else {
 		deflt = &color.RGBA{0, 0, 0, 0xFF}
@@ -191,13 +183,13 @@ func (e RenderableDomElement) Render(containerWidth int) *image.RGBA {
 		Face: fontFace,
 		Dot:  fixed.P(dot.X, int(fontFace.Metrics().Ascent)>>6),
 	}
+
 	if e.Element.Type == html.ElementNode && e.Element.Data == "h1" {
 		e.Styles.SetFontSize(DefaultFontSize * 2)
 		for c := e.FirstChild; c != nil; c = c.NextSibling {
 
 			c.Styles.SetFontSize(DefaultFontSize * 2)
-			sz, _ := stringSize(fntDrawer, c.Element.Data)
-			fmt.Printf("Data: %s Size: %d\n", c.Element.Data, sz)
+			//sz, _ := stringSize(fntDrawer, c.Element.Data)
 		}
 	}
 
@@ -209,15 +201,18 @@ func (e RenderableDomElement) Render(containerWidth int) *image.RGBA {
 	bg := e.GetBackgroundColor()
 	dst := image.NewRGBA(image.Rectangle{image.ZP, image.Point{width, height}})
 	fntDrawer.Dst = dst
-	imageSize := dst.Bounds()
-
-	if e.Element.Type == html.ElementNode && e.Element.Data == "body" {
-		if height < imageSize.Max.Y {
-			height = imageSize.Max.Y
-		}
+	if bg != nil {
+		//imageSize := dst.Bounds()
 		b := image.Rectangle{image.Point{0, 0}, image.Point{width, height}}
 		draw.Draw(dst, b, &image.Uniform{bg}, image.ZP, draw.Src)
 	}
+
+	/*
+		if e.Element.Type == html.ElementNode && e.Element.Data == "body" {
+			if height < imageSize.Max.Y {
+				height = imageSize.Max.Y
+			}
+		}*/
 
 	for c := e.FirstChild; c != nil; c = c.NextSibling {
 		switch c.Type {
@@ -235,7 +230,7 @@ func (e RenderableDomElement) Render(containerWidth int) *image.RGBA {
 				fntDrawer.Dot = fixed.P(dot.X, dot.Y+int(fontFace.Metrics().Ascent)>>6)
 			}
 			for _, word := range words {
-				wordSizeInPx := int(fntDrawer.MeasureString(word)) >> 6
+				wordSizeInPx := int(fntDrawer.MeasureString(word) >> 6)
 				if dot.X+wordSizeInPx > width {
 					dot.X = 0
 					dot.Y += fSize

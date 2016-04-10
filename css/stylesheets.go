@@ -5,26 +5,24 @@ import (
 	"strings"
 )
 
-type CSSSelector string
 type StyleRule struct {
 	Selector CSSSelector
-	Values   map[StyleAttribute]string
+	Name     StyleAttribute
+	Value    StyleValue
+	//Values   map[StyleAttribute]StyleValue
+	src StyleSource
 }
 type Stylesheet []StyleRule
 
 type StyleAttribute string
 
-func parseSelectors(val string) []CSSSelector {
-	vals := strings.Split(val, ",")
-	var ret []CSSSelector
-	for _, selector := range vals {
-		ret = append(ret, CSSSelector(strings.TrimSpace(selector)))
-	}
-	return ret
+type StyleValue struct {
+	string
+	Important bool
 }
 
-func parseBlock(val string) map[StyleAttribute]string {
-	m := make(map[StyleAttribute]string)
+func parseBlock(val string) map[StyleAttribute]StyleValue {
+	m := make(map[StyleAttribute]StyleValue)
 	pieces := strings.Split(val, ";")
 	for _, attrib := range pieces {
 		if strings.TrimSpace(attrib) == "" {
@@ -36,13 +34,19 @@ func parseBlock(val string) map[StyleAttribute]string {
 		}
 		selector := strings.TrimSpace(attrib[0:idx])
 		value := strings.TrimSpace(attrib[idx+1:])
-		m[StyleAttribute(selector)] = value
+
+		var important bool
+		if strings.HasSuffix(value, "important") {
+			important = true
+			value = value[0 : len(value)-len("important")]
+		}
+		m[StyleAttribute(selector)] = StyleValue{value, important}
 
 	}
 	return m
 }
 
-func ParseStylesheet(val string) Stylesheet {
+func ParseStylesheet(val string, src StyleSource) Stylesheet {
 	s := make([]StyleRule, 0)
 	selectorStart := 0
 	blockStart := -1
@@ -53,7 +57,16 @@ func ParseStylesheet(val string) Stylesheet {
 			selectorStart = idx + 1
 			blockVals := parseBlock(val[blockStart:idx])
 			for _, sel := range selectors {
-				s = append(s, StyleRule{sel, blockVals})
+				//func parseBlock(val string) map[StyleAttribute]StyleValue {
+				for name, val := range blockVals {
+					s = append(s, StyleRule{
+						Selector: sel,
+						Name:     name,
+						Value:    val,
+						src:      src,
+					})
+
+				}
 			}
 		case '{':
 			blockStart = idx + 1
@@ -64,33 +77,6 @@ func ParseStylesheet(val string) Stylesheet {
 	return s
 }
 
-func (s CSSSelector) Matches(el *dom.Element) bool {
-	pieces := strings.Split(string(s), " ")
-	if len(pieces) != 1 {
-		return false
-		panic("I am neither a well coded error handler nor CSS parser. Can't handle complex Stylesheets.")
-	}
-	if s[0] == '.' {
-		for _, attr := range el.Attr {
-			if attr.Key == "class" && attr.Val == string(s[1:]) {
-				return true
-			}
-		}
-	}
-	if s[0] == '#' {
-		for _, attr := range el.Attr {
-			if attr.Key == "id" && attr.Val == string(s[1:]) {
-				//fmt.Printf("Matched by id: %s", s)
-				return true
-			}
-		}
-	}
-
-	if el.Data == pieces[0] {
-		return true
-	}
-	return false
-}
 func (r StyleRule) Matches(el *dom.Element) bool {
 	return r.Selector.Matches(el)
 }

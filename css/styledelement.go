@@ -1,14 +1,38 @@
 package css
 
 import (
+	"fmt"
 	"github.com/golang/freetype/truetype"
 	"golang.org/x/image/font"
 	"image/color"
 	"io/ioutil"
+	"sort"
 )
 
 const (
 	DefaultFontSize = 16
+)
+
+type StyleSource uint8
+
+func (s StyleSource) String() string {
+	switch s {
+	case UserAgentSrc:
+		return "User Agent"
+	case UserSrc:
+		return "User"
+	case AuthorSrc:
+		return "Author"
+	}
+	return "Unknown Source"
+}
+
+const (
+	UnknownSrc StyleSource = iota
+	UserAgentSrc
+	UserSrc
+	AuthorSrc
+	InlineStyleSrc
 )
 
 // A StyleElement is anything that has CSS rules applied to it.
@@ -43,8 +67,8 @@ func (e *StyledElement) AddStyle(s StyleRule) {
 	return
 }
 
-// SortStyles will sort the rules on this element according to the CSS spec, which state:s
-
+// SortStyles will sort the rules on this element according to the CSS spec, which states
+//
 // 1. Find all declarations that apply too element/property (already done when this is called)
 // 2. Sort according to importance (normal or important) and origin (author, user, or user agent). In ascending order of precedence:
 //	1. user agent declarations (defaults)
@@ -54,22 +78,29 @@ func (e *StyledElement) AddStyle(s StyleRule) {
 //	5. user important declarations (don't exist)
 // 3. Sort rules with the same importance and origin by specificity of selector: more specific selectors will override more general ones. Pseudo-elements and pseudo-classes are counted as normal elements and classes, respectively.
 // 4. Finally, sort by order specified: if two declarations have the same weight, origin, and specificity, the latter specified wins. Declarations in imported stylesheets are considered to be before any declaration in the style sheet itself
-// BUG(driusan): SortStyles is not implemented
+// BUG(driusan): Specificity is not implemented, nor is the final tie break
 func (e *StyledElement) SortStyles() error {
+	sort.Sort(byCSSPrecedence(e.rules))
+	fmt.Printf("%s\n", e.rules)
+
 	return nil
 }
 
-func (e StyledElement) FollowCascadeToPx(attr string, val int) int {
+func (e *StyledElement) FollowCascadeToPx(attr string, val int) int {
 	// sort according to CSS cascading rules
 	e.SortStyles()
 
 	// apply each rule
 	for _, rule := range e.rules {
+		if string(rule.Name) == attr {
+			val, _ = ConvertUnitToPx(val, rule.Value.string)
+			return val
+		}
 		// the rule has this attribute, so convert it and apply
 		// it to the value calculated so far
-		if cssval, ok := rule.Values[StyleAttribute(attr)]; ok {
-			val, _ = ConvertUnitToPx(val, cssval)
-		}
+		//if cssval, ok := rule.Values[StyleAttribute(attr)]; ok {
+		//val, _ = ConvertUnitToPx(val, cssval.string)
+		//}
 	}
 	return val
 }
@@ -80,36 +111,43 @@ func (e StyledElement) FollowCascadeToPx(attr string, val int) int {
 // and nil otherwise.
 // error will be NoStyles if deflt is returned
 func (e StyledElement) FollowCascadeToColor(attr string, deflt *color.RGBA) (*color.RGBA, error) {
-	var ret *color.RGBA
 	// sort according to CSS cascading rules
 	e.SortStyles()
 
 	// apply each rule
 	for _, rule := range e.rules {
-		// the rule has this attribute, so convert it and apply
-		// it to the value calculated so far
-		if cssval, ok := rule.Values[StyleAttribute(attr)]; ok {
-			ret, _ = ConvertColorToRGBA(cssval)
-
+		if string(rule.Name) == attr {
+			if rule.Value.string == "inherit" {
+				return nil, InheritValue
+			}
+			val, _ := ConvertColorToRGBA(rule.Value.string)
+			return val, nil
 		}
 	}
-	if ret == nil {
-		return deflt, NoStyles
-	}
-	return ret, nil
+	return deflt, NoStyles
 }
-func (e StyledElement) GetBackgroundColor(parentColour *color.RGBA) *color.RGBA {
-	val, err := e.FollowCascadeToColor("background", parentColour)
-	if err == NoStyles {
-		return parentColour
-	}
 
-	return val
-}
-func (e StyledElement) GetColor(parentColour *color.RGBA) *color.RGBA {
-	val, err := e.FollowCascadeToColor("color", parentColour)
-	if err == NoStyles {
-		return parentColour
+func (e StyledElement) GetBackgroundColor(defaultColour *color.RGBA) (*color.RGBA, error) {
+	val, err := e.FollowCascadeToColor("background", defaultColour)
+	switch err {
+	case NoStyles:
+		return defaultColour, InheritValue
+	case InheritValue:
+		return defaultColour, InheritValue
+	case nil:
+		return val, nil
+	default:
+		return defaultColour, InheritValue
 	}
-	return val
+}
+func (e StyledElement) GetColor(defaultColour *color.RGBA) *color.RGBA {
+	val, err := e.FollowCascadeToColor("color", defaultColour)
+	switch err {
+	case NoStyles:
+		return defaultColour
+	case nil:
+		return val
+	default:
+		panic("Could not get colour and got an error")
+	}
 }

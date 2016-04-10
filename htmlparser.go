@@ -1,12 +1,14 @@
 package main
 
 import (
+	//"fmt"
 	"Gob/css"
 	"Gob/dom"
 	"Gob/renderer"
 	"golang.org/x/net/html"
 	//	"strings"
 	"io"
+	"io/ioutil"
 )
 
 /*
@@ -28,9 +30,18 @@ func convertNodeToRenderableElement(root *html.Node) (*renderer.RenderableDomEle
 		new(css.StyledElement),
 		nil,
 		nil,
+		nil,
+		nil,
 	}
 	element.FirstChild, _ = convertNodeToRenderableElement(root.FirstChild)
 	element.NextSibling, _ = convertNodeToRenderableElement(root.NextSibling)
+
+	var prev *renderer.RenderableDomElement = nil
+	for c := element.FirstChild; c != nil; c = c.NextSibling {
+		c.PrevSibling = prev
+		c.Parent = element
+		prev = c
+	}
 	return element, nil
 
 	/*
@@ -75,6 +86,7 @@ func parseHTML(r io.Reader) *Page {
 	if root == nil {
 		panic("Couldn't find HTML element")
 	}
+
 	//fmt.Printf("root: %s\n", root)
 	for c := root.FirstChild; c != nil; c = c.NextSibling {
 		//fmt.Printf("Investigating %s\n", c)
@@ -86,15 +98,29 @@ func parseHTML(r io.Reader) *Page {
 		}
 	}
 
-	styles2 := css.ParseStylesheet(styles)
+	styles2 := css.ParseStylesheet(styles, css.AuthorSrc)
 
 	renderable, _ := convertNodeToRenderableElement(body)
-	//renderer.RenderableDomElement{root, &css.StyledElement{}, nil, nil}
-	for _, rule := range styles2 {
-		if rule.Matches(renderable.Element) {
-			renderable.Styles.AddStyle(rule)
+
+	sheet, _ := ioutil.ReadFile("useragent.css")
+	userAgentStyles := css.ParseStylesheet(string(sheet), css.UserAgentSrc)
+
+	renderable.Walk(func(el *renderer.RenderableDomElement) {
+		for _, rule := range userAgentStyles {
+			if rule.Matches(el.Element) {
+				el.Styles.AddStyle(rule)
+			}
 		}
-	}
+
+		for _, rule := range styles2 {
+			if rule.Matches(el.Element) {
+				el.Styles.AddStyle(rule)
+			}
+		}
+
+		// TODO(driusan): Add inline and user styles too
+		el.Styles.SortStyles()
+	})
 
 	return &Page{renderable}
 
