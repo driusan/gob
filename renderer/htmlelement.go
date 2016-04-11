@@ -155,6 +155,9 @@ func (e RenderableDomElement) GetBackgroundColor() color.Color {
 	//bg := e.Styles.GetBackgroundColor(&color.RGBA{0xE0, 0xE0, 0xE0, 0xFF})
 	switch bg, err := e.Styles.GetBackgroundColor(deflt); err {
 	case css.InheritValue:
+		if e.Parent == nil {
+			return &color.RGBA{0xE0, 0xE0, 0xE0, 0xFF}
+		}
 		return e.Parent.GetBackgroundColor()
 	case css.NoStyles:
 		return deflt
@@ -210,8 +213,6 @@ func (b *borderDrawer) At(x, y int) color.Color {
 }
 
 func (e RenderableDomElement) Render(containerWidth int) *image.RGBA {
-	// font size is inherited, so if it's an h1 propagate it down. This is a hack until
-	// the CSS package properly implements GetFontSize.
 	dot := image.Point{0, 0}
 	fSize := e.GetFontSize()
 	fontFace := e.Styles.GetFontFace(fSize)
@@ -222,15 +223,6 @@ func (e RenderableDomElement) Render(containerWidth int) *image.RGBA {
 		Dot:  fixed.P(dot.X, int(fontFace.Metrics().Ascent)>>6),
 	}
 
-	if e.Element.Type == html.ElementNode && e.Element.Data == "h1" {
-		e.Styles.SetFontSize(DefaultFontSize * 2)
-		for c := e.FirstChild; c != nil; c = c.NextSibling {
-
-			c.Styles.SetFontSize(DefaultFontSize * 2)
-			//sz, _ := stringSize(fntDrawer, c.Element.Data)
-		}
-	}
-
 	height, _ := e.GetHeightInPx(containerWidth)
 	if height < 0 {
 		height = 0
@@ -239,10 +231,10 @@ func (e RenderableDomElement) Render(containerWidth int) *image.RGBA {
 	bg := e.GetBackgroundColor()
 	dst := image.NewRGBA(image.Rectangle{image.ZP, image.Point{width, height}})
 	fntDrawer.Dst = dst
-	if bg != nil {
-		//imageSize := dst.Bounds()
-		b := image.Rectangle{image.Point{0, 0}, image.Point{width, height}}
-		draw.Draw(dst, b, &image.Uniform{bg}, image.ZP, draw.Src)
+	if bg != nil && dst != nil {
+		imageSize := dst.Bounds()
+		//b := image.Rectangle{image.Point{0, 0}, image.Point{width, height}}
+		draw.Draw(dst, imageSize, &image.Uniform{bg}, image.ZP, draw.Src)
 	}
 	draw.DrawMask(
 		dst,
@@ -253,13 +245,6 @@ func (e RenderableDomElement) Render(containerWidth int) *image.RGBA {
 		image.ZP,
 		draw.Over,
 	)
-
-	/*
-		if e.Element.Type == html.ElementNode && e.Element.Data == "body" {
-			if height < imageSize.Max.Y {
-				height = imageSize.Max.Y
-			}
-		}*/
 
 	for c := e.FirstChild; c != nil; c = c.NextSibling {
 		switch c.Type {
@@ -306,10 +291,10 @@ func (e RenderableDomElement) Render(containerWidth int) *image.RGBA {
 			// for now, pretend all elements are blocks
 
 			// Draw the block itself, and move dot.
-			childHeight, _ := c.GetHeightInPx(width)
 			childWidth, _ := c.GetWidthInPx(containerWidth)
+			childHeight, _ := c.GetHeightInPx(childWidth)
 			childImage := image.NewRGBA(image.Rectangle{image.ZP, image.Point{childWidth, childHeight}})
-			childImage = c.Render(width)
+			childImage = c.Render(childWidth)
 
 			sr := childImage.Bounds()
 

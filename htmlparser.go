@@ -1,25 +1,18 @@
 package main
 
 import (
-	//"fmt"
 	"Gob/css"
 	"Gob/dom"
 	"Gob/renderer"
+	"fmt"
 	"golang.org/x/net/html"
+	"strconv"
 	//	"strings"
 	"io"
 	"io/ioutil"
+	"os"
 )
 
-/*
-type RenderableDomElement struct {
-	*dom.Element
-	Styles *css.StyledElement
-
-	FirstChild *RenderableDomElement
-	NextSibling *RenderableDomElement
-}
-*/
 func convertNodeToRenderableElement(root *html.Node) (*renderer.RenderableDomElement, error) {
 	if root == nil {
 		return nil, nil
@@ -43,32 +36,6 @@ func convertNodeToRenderableElement(root *html.Node) (*renderer.RenderableDomEle
 		prev = c
 	}
 	return element, nil
-
-	/*
-		switch root.Type {
-		case html.ElementNode:
-			var textContent string
-			var lastError error
-			for c := root.FirstChild; c != nil; c = c.NextSibling {
-				switch c.Type {
-				case html.ElementNode:
-					//newChild, err := convertNodeToRenderableElement(c)
-					if err != nil {
-						lastError = err
-						continue
-					}
-				case html.TextNode:
-					if trimmed := strings.TrimSpace(c.Data); trimmed != "" {
-						textContent += trimmed
-					}
-				}
-			}
-
-			return element, lastError
-		}
-		panic("This should not happen")
-		//return nil, NotAnElement
-	*/
 }
 
 func parseHTML(r io.Reader) *Page {
@@ -92,8 +59,6 @@ func parseHTML(r io.Reader) *Page {
 		//fmt.Printf("Investigating %s\n", c)
 		if c.Type == html.ElementNode && c.Data == "body" {
 			body = c
-			//body, _ = convertNodeToRenderableElement(c)
-			//body = (*dom.Element)(c)
 			break
 		}
 	}
@@ -119,9 +84,133 @@ func parseHTML(r io.Reader) *Page {
 		}
 
 		// TODO(driusan): Add inline and user styles too
+
 		el.Styles.SortStyles()
+
+		// Set the font size for this element, because em and ex
+		// units depend on it.
+		val := el.Styles.GetAttribute("font-size")
+		switch strVal := val.String(); strVal {
+		case "":
+			// nothing specified, so inherit from parent, or
+			// fall back on default if there is no parent.
+			if el.Parent == nil {
+				el.Styles.SetFontSize(renderer.DefaultFontSize)
+			} else {
+				size, _ := el.Parent.Styles.GetFontSize()
+				el.Styles.SetFontSize(size)
+			}
+		default:
+			el.Styles.SetFontSize(fontSizeToPx(strVal, el.Parent))
+		}
 	})
 
 	return &Page{renderable}
+
+}
+
+func fontSizeToPx(val string, parent *renderer.RenderableDomElement) int {
+	DefaultFontSize := renderer.DefaultFontSize
+	if len(val) == 0 {
+		psize, err := parent.Styles.GetFontSize()
+		if err == nil {
+			return psize
+		}
+		return DefaultFontSize
+	}
+
+	// "medium" is the default, and the CSS spec suggests a scaling factor
+	// of 1.2.  1 / 1.2 = 0.833 for scaling downwards.
+	// Use floating point arithmetric, then round
+	switch val {
+	// absolute size keywords
+	case "xx-small":
+		return int(float64(0.833*0.833*0.833) * float64(DefaultFontSize))
+	case "x-small":
+		return int(float64(0.833*0.833) * float64(DefaultFontSize))
+	case "small":
+		return int(float64(0.833) * float64(DefaultFontSize))
+	case "medium":
+		return DefaultFontSize
+	case "large":
+		return int(float64(1.2) * float64(DefaultFontSize))
+	case "x-large":
+		return int(1.2 * 1.2 * float64(DefaultFontSize))
+	case "xx-large":
+		return int(1.2 * 1.2 * 1.2 * float64(DefaultFontSize))
+	// relative size keywords
+	case "smaller":
+		psize, _ := parent.Styles.GetFontSize()
+		return int(0.833 * float64(psize))
+	case "larger":
+		psize, _ := parent.Styles.GetFontSize()
+		return int(1.2 * float64(psize))
+	// inherit
+	case "inherit":
+		psize, _ := parent.Styles.GetFontSize()
+		return psize
+	}
+	// handle percentages,
+	if val[len(val)-1] == '%' {
+		f, err := strconv.ParseFloat(string(val[0:len(val)-1]), 64)
+		if err == nil {
+			psize, err := parent.Styles.GetFontSize()
+			if err != nil {
+				return DefaultFontSize
+			}
+			size := int(f * float64(psize) / 100.0)
+			fmt.Printf("FontSize: %d\n", size)
+			return size
+		}
+		return DefaultFontSize
+	}
+
+	// all other units are 2 characters long
+	switch unit := string(val[len(val)-2:]); unit {
+	case "em":
+		// 1em is basically a scaling factor for the parent font
+		// when calculating font size
+		f, err := strconv.ParseFloat(string(val[0:len(val)-2]), 64)
+		if err == nil {
+			psize, _ := parent.Styles.GetFontSize()
+			return int(f * float64(psize))
+		}
+		return DefaultFontSize
+	case "ex":
+		// 1ex is supposed to be the height of a lower case x, but
+		// the spec says you can use 1ex = 0.5em if calculating
+		// the size of an x is impossible or impracticle. Since
+		// I'm too lazy to figure out how to do that, it's impracticle.
+		f, err := strconv.ParseFloat(string(val[0:len(val)-2]), 64)
+		if err == nil {
+			psize, _ := parent.Styles.GetFontSize()
+			return int(f * float64(psize) / 2.0)
+		}
+		return DefaultFontSize
+	case "px":
+		// parse px as a float then cast, just in case someone
+		// used a decimal.
+		f, err := strconv.ParseFloat(string(val[0:len(val)-2]), 64)
+		if err == nil {
+			return int(f)
+		}
+		return DefaultFontSize
+	case "in", "cm", "mm", "pt", "pc":
+		fmt.Fprintf(os.Stderr, "Unhandled unit for font size: %s. Using default.\n", unit)
+		return DefaultFontSize
+	}
+
+	// If nothing's been handled and there's no parent, use the default.
+	if parent == nil {
+		return DefaultFontSize
+	}
+
+	// if there is a parent, use it if we can.
+	switch psize, err := parent.Styles.GetFontSize(); err {
+	case nil:
+		return psize
+	default:
+		return DefaultFontSize
+	}
 
 }

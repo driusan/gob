@@ -17,7 +17,8 @@ func parseSelectors(val string) []CSSSelector {
 }
 
 func (s CSSSelector) Matches(el *dom.Element) bool {
-	pieces := strings.Split(string(s), " ")
+	pieces := strings.Fields(string(s))
+
 	if len(pieces) != 1 {
 		return false
 		panic("I am neither a well coded error handler nor CSS parser. Can't handle complex Stylesheets.")

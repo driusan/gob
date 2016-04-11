@@ -21,6 +21,9 @@ type StyleValue struct {
 	Important bool
 }
 
+func (sv StyleValue) String() string {
+	return sv.string
+}
 func parseBlock(val string) map[StyleAttribute]StyleValue {
 	m := make(map[StyleAttribute]StyleValue)
 	pieces := strings.Split(val, ";")
@@ -57,7 +60,6 @@ func ParseStylesheet(val string, src StyleSource) Stylesheet {
 			selectorStart = idx + 1
 			blockVals := parseBlock(val[blockStart:idx])
 			for _, sel := range selectors {
-				//func parseBlock(val string) map[StyleAttribute]StyleValue {
 				for name, val := range blockVals {
 					s = append(s, StyleRule{
 						Selector: sel,

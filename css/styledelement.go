@@ -1,7 +1,7 @@
 package css
 
 import (
-	"fmt"
+	//	"fmt"
 	"github.com/golang/freetype/truetype"
 	"golang.org/x/image/font"
 	"image/color"
@@ -81,8 +81,6 @@ func (e *StyledElement) AddStyle(s StyleRule) {
 // BUG(driusan): Specificity is not implemented, nor is the final tie break
 func (e *StyledElement) SortStyles() error {
 	sort.Sort(byCSSPrecedence(e.rules))
-	fmt.Printf("%s\n", e.rules)
-
 	return nil
 }
 
@@ -94,10 +92,16 @@ func (e *StyledElement) DisplayProp() string {
 	}
 	return ""
 }
-func (e *StyledElement) FollowCascadeToPx(attr string, val int) int {
-	// sort according to CSS cascading rules
-	e.SortStyles()
 
+func (e *StyledElement) GetAttribute(attr string) StyleValue {
+	for _, rule := range e.rules {
+		if string(rule.Name) == attr {
+			return rule.Value
+		}
+	}
+	return StyleValue{"", false}
+}
+func (e *StyledElement) FollowCascadeToPx(attr string, val int) int {
 	// apply each rule
 	for _, rule := range e.rules {
 		if string(rule.Name) == attr {
