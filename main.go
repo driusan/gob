@@ -36,7 +36,6 @@ type Viewport struct {
 	Cursor image.Point
 }
 type Page struct {
-	//*html.Node
 	Body renderer.Renderer
 }
 
@@ -53,9 +52,7 @@ func paintWindow(s screen.Screen, w screen.Window, v *Viewport, page *Page) {
 			return
 		}
 		defer b.Release()
-		//fmt.Printf("%s", v.Size.Size())
 		draw.Draw(b.RGBA(), viewport, v.Content, v.Cursor, draw.Src)
-		//page.Body.Render(b.RGBA())
 		w.Upload(image.Point{0, 0}, b, viewport)
 	} else {
 		fmt.Fprintf(os.Stderr, "No body to render!\n")
@@ -79,7 +76,9 @@ func main() {
 		parsedhtml := parseHTML(f)
 		f.Close()
 		var v Viewport
-		v.Content = parsedhtml.Body.Render(v.Size.Size().X)
+		// there will be a size event immediately after creating
+		// the window which will trigger this.
+		//v.Content = parsedhtml.Body.Render(v.Size.Size().X)
 		for {
 			switch e := w.NextEvent().(type) {
 			case lifecycle.Event:

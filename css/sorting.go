@@ -25,7 +25,7 @@ type StyleRule struct {
 }
 */
 func specificityLess(i, j StyleRule) bool {
-	if i.src == InlineStyleSrc {
+	if i.Src == InlineStyleSrc {
 		return true
 	}
 
@@ -55,7 +55,22 @@ func specificityLess(i, j StyleRule) bool {
 func (r byCSSPrecedence) Len() int      { return len(r) }
 func (r byCSSPrecedence) Swap(i, j int) { r[i], r[j] = r[j], r[i] }
 func (r byCSSPrecedence) Less(i, j int) bool {
-	if r[i].src == UserAgentSrc {
+	// handle inline styles first.
+	if r[i].Src == InlineStyleSrc {
+		if r[j].Src != InlineStyleSrc {
+			return true
+		}
+		return specificityLess(r[i], r[j])
+
+	}
+	if r[j].Src == InlineStyleSrc {
+		if r[i].Src != InlineStyleSrc {
+			return false
+		}
+		return specificityLess(r[i], r[j])
+
+	}
+	if r[i].Src == UserAgentSrc {
 		// This is a UserAgent stylesheet.
 		// Reminder:
 		//	1. user agent declarations
@@ -66,7 +81,7 @@ func (r byCSSPrecedence) Less(i, j int) bool {
 
 		// User agent stylesheets are less important than any
 		// other stylesheet type, so it's never "less"
-		if r[j].src != UserAgentSrc {
+		if r[j].Src != UserAgentSrc {
 			return false
 		}
 		// Order by importance if they're both user agent style
@@ -78,7 +93,7 @@ func (r byCSSPrecedence) Less(i, j int) bool {
 		}
 		// they're both the same importance, so order by specificity
 		return specificityLess(r[i], r[j])
-	} else if r[i].src == UserSrc {
+	} else if r[i].Src == UserSrc {
 		// This is a User stylesheet.
 		// Reminder:
 		//	1. user agent declarations
@@ -88,7 +103,7 @@ func (r byCSSPrecedence) Less(i, j int) bool {
 		//	5. user important declarations
 
 		// Always more important than user agent stylesheets
-		if r[j].src == UserAgentSrc {
+		if r[j].Src == UserAgentSrc {
 			return true
 		}
 		// important user stylesheets are more important
@@ -96,7 +111,7 @@ func (r byCSSPrecedence) Less(i, j int) bool {
 		if r[i].Value.Important == true {
 			// they're both important user sheets, so use
 			// specificity as a tie breaker
-			if r[j].src == UserSrc && r[j].Value.Important == true {
+			if r[j].Src == UserSrc && r[j].Value.Important == true {
 				return specificityLess(r[i], r[j])
 			}
 			return true
@@ -106,7 +121,7 @@ func (r byCSSPrecedence) Less(i, j int) bool {
 		// stylesheets are never more important, so they're never
 		// "less"
 		return false
-	} else if r[i].src == AuthorSrc {
+	} else if r[i].Src == AuthorSrc {
 		// This is an Author stylesheet.
 		// Reminder:
 		//	1. user agent declarations
@@ -116,13 +131,13 @@ func (r byCSSPrecedence) Less(i, j int) bool {
 		//	5. user important declarations
 
 		// Always more important than UserAgent stylesheets
-		if r[j].src == UserAgentSrc {
+		if r[j].Src == UserAgentSrc {
 			return true
 		}
 
 		// User important are more important, but user !important
 		// are less important than author stylesheets
-		if r[j].src == UserSrc {
+		if r[j].Src == UserSrc {
 			if r[j].Value.Important == true {
 				return false
 			} else {

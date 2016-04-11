@@ -9,8 +9,7 @@ type StyleRule struct {
 	Selector CSSSelector
 	Name     StyleAttribute
 	Value    StyleValue
-	//Values   map[StyleAttribute]StyleValue
-	src StyleSource
+	Src      StyleSource
 }
 type Stylesheet []StyleRule
 
@@ -24,7 +23,7 @@ type StyleValue struct {
 func (sv StyleValue) String() string {
 	return sv.string
 }
-func parseBlock(val string) map[StyleAttribute]StyleValue {
+func ParseBlock(val string) map[StyleAttribute]StyleValue {
 	m := make(map[StyleAttribute]StyleValue)
 	pieces := strings.Split(val, ";")
 	for _, attrib := range pieces {
@@ -58,14 +57,14 @@ func ParseStylesheet(val string, src StyleSource) Stylesheet {
 		switch chr {
 		case '}':
 			selectorStart = idx + 1
-			blockVals := parseBlock(val[blockStart:idx])
+			blockVals := ParseBlock(val[blockStart:idx])
 			for _, sel := range selectors {
 				for name, val := range blockVals {
 					s = append(s, StyleRule{
 						Selector: sel,
 						Name:     name,
 						Value:    val,
-						src:      src,
+						Src:      src,
 					})
 
 				}

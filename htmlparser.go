@@ -42,7 +42,7 @@ func parseHTML(r io.Reader) *Page {
 	parsedhtml, _ := html.Parse(r)
 	styles := css.ExtractStyles(parsedhtml)
 
-	var body *html.Node // renderer.RenderableDomElement
+	var body *html.Node
 	var root *html.Node
 	for c := parsedhtml.FirstChild; c != nil; c = c.NextSibling {
 		if c.Data == "html" && c.Type == html.ElementNode {
@@ -83,7 +83,22 @@ func parseHTML(r io.Reader) *Page {
 			}
 		}
 
-		// TODO(driusan): Add inline and user styles too
+		for _, attr := range el.Element.Attr {
+			if attr.Key == "style" {
+				vals := css.ParseBlock(attr.Val)
+				for name, val := range vals {
+					el.Styles.AddStyle(
+						css.StyleRule{
+							Selector: "",
+							Name:     name,
+							Value:    val,
+							Src:      css.InlineStyleSrc,
+						})
+				}
+			}
+		}
+
+		// TODO(driusan): User styles too
 
 		el.Styles.SortStyles()
 
