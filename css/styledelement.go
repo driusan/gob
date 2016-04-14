@@ -7,6 +7,7 @@ import (
 	"image/color"
 	"io/ioutil"
 	"sort"
+	"strings"
 )
 
 const (
@@ -62,8 +63,143 @@ func (e StyledElement) GetFontSize() (int, error) {
 	return e.fontSize, nil
 }
 
+
+func (e *StyledElement) expandBoxBorderWidthShorthand(s StyleRule) {
+	values := strings.Fields(s.Value.string)
+	switch len(values) {
+	case 0:
+		return
+	case 1:
+		s.Name = "border-top-width"
+		s.Value.string = values[0]
+		e.rules = append(e.rules, s)
+		s.Name = "border-right-width"
+		e.rules = append(e.rules, s)
+		s.Name = "border-bottom-width"
+		e.rules = append(e.rules, s)
+		s.Name = "border-left-width"
+		e.rules = append(e.rules, s)
+	case 2:
+		s.Name = "border-top-width"
+		s.Value.string = values[0]
+
+		e.rules = append(e.rules, s)
+		s.Name = "border-bottom-width"
+		e.rules = append(e.rules, s)
+
+		s.Value.string = values[1]
+		s.Name = "border-right-width"
+		e.rules = append(e.rules, s)
+		s.Name = "border-left-width"
+		e.rules = append(e.rules, s)
+	case 3:
+		s.Name = "border-top-width"
+		s.Value.string = values[0]
+		e.rules = append(e.rules, s)
+
+		s.Name = "border-right-width"
+		s.Value.string = values[1]
+		e.rules = append(e.rules, s)
+		s.Name = "border-left-width"
+		e.rules = append(e.rules, s)
+
+		s.Name = "border-bottom-width"
+		s.Value.string = values[2]
+		e.rules = append(e.rules, s)
+	case 4:
+		fallthrough
+	default:
+		s.Name = "border-top-width"
+		s.Value.string = values[0]
+		e.rules = append(e.rules, s)
+
+		s.Name = "border-right-width"
+		s.Value.string = values[1]
+		e.rules = append(e.rules, s)
+
+		s.Name = "border-bottom-width"
+		s.Value.string = values[2]
+		e.rules = append(e.rules, s)
+
+		s.Name = "border-left-width"
+		s.Value.string = values[3]
+		e.rules = append(e.rules, s)
+	}
+}
+func (e *StyledElement) expandBoxSideShorthand(attrib StyleAttribute, s StyleRule) {
+	values := strings.Fields(s.Value.string)
+	switch len(values) {
+	case 0:
+		return
+	case 1:
+		s.Name = attrib + "-top"
+		s.Value.string = values[0]
+		e.rules = append(e.rules, s)
+		s.Name = attrib + "-right"
+		e.rules = append(e.rules, s)
+		s.Name = attrib + "-bottom"
+		e.rules = append(e.rules, s)
+		s.Name = attrib + "-left"
+		e.rules = append(e.rules, s)
+	case 2:
+		s.Name = attrib + "-top"
+		s.Value.string = values[0]
+		e.rules = append(e.rules, s)
+		s.Name = attrib + "-bottom"
+		e.rules = append(e.rules, s)
+
+		s.Name = attrib + "-right"
+		s.Value.string = values[1]
+		e.rules = append(e.rules, s)
+		s.Name = attrib + "-left"
+		e.rules = append(e.rules, s)
+	case 3:
+		s.Name = attrib + "-top"
+		s.Value.string = values[0]
+		e.rules = append(e.rules, s)
+
+		s.Name = attrib + "-right"
+		s.Value.string = values[1]
+		e.rules = append(e.rules, s)
+		s.Name = attrib + "-left"
+		e.rules = append(e.rules, s)
+
+		s.Name = attrib + "-bottom"
+		s.Value.string = values[2]
+		e.rules = append(e.rules, s)
+	case 4:
+		fallthrough
+	default:
+		s.Name = attrib + "-top"
+		s.Value.string = values[0]
+		e.rules = append(e.rules, s)
+
+		s.Name = attrib + "-right"
+		s.Value.string = values[1]
+		e.rules = append(e.rules, s)
+
+		s.Name = attrib + "-bottom"
+		s.Value.string = values[2]
+		e.rules = append(e.rules, s)
+
+		s.Name = attrib + "-left"
+		s.Value.string = values[3]
+		e.rules = append(e.rules, s)
+	}
+}
 func (e *StyledElement) AddStyle(s StyleRule) {
-	e.rules = append(e.rules, s)
+	switch s.Name {
+	case "padding", "margin":
+		e.expandBoxSideShorthand(s.Name, s)
+	case "border-width":
+		// border width expands to border-side-width, not
+		// border-width-side, so we can't use the helper
+		// function
+		e.expandBoxBorderWidthShorthand(s)
+	default:
+		e.rules = append(e.rules, s)
+
+	}
 	return
 }
 
