@@ -11,19 +11,10 @@ package css
 //	5. user important declarations (don't exist)
 // 3. Sort rules with the same importance and origin by specificity of selector: more specific selectors will override more general ones. Pseudo-elements and pseudo-classes are counted as normal elements and classes, respectively.
 // 4. Finally, sort by order specified: if two declarations have the same weight, origin, and specificity, the latter specified wins. Declarations in imported stylesheets are considered to be before any declaration in the style sheet itself
-// BUG(driusan): Specificity is not implemented, nor is the final tie break
+// BUG(driusan): The final tie break is not implemented
 
 type byCSSPrecedence []StyleRule
 
-/*
-type StyleRule struct {
-	Selector CSSSelector
-	Name     StyleAttribute
-	Value    StyleValue
-	//Values   map[StyleAttribute]StyleValue
-	src StyleSource
-}
-*/
 func specificityLess(i, j StyleRule) bool {
 	if i.Src == InlineStyleSrc {
 		return true

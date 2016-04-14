@@ -11,8 +11,8 @@ import (
 	"image/color"
 	"image/draw"
 	"strings"
-	"unicode"
-	"unicode/utf8"
+	//"unicode"
+	//	"unicode/utf8"
 )
 
 const (
@@ -40,11 +40,8 @@ func stringSize(fntDrawer font.Drawer, textContent string) (int, error) {
 	var size int
 	words := strings.Fields(textContent)
 	fSize := int(fntDrawer.Face.Metrics().Height) >> 6
-	firstRune, _ := utf8.DecodeRuneInString(textContent)
+	//firstRune, _ := utf8.DecodeRuneInString(textContent)
 
-	if unicode.IsSpace(firstRune) {
-		size = fSize / 3
-	}
 	for _, word := range words {
 		wordSizeInPx := int(fntDrawer.MeasureString(word)) >> 6
 		size += wordSizeInPx
@@ -53,16 +50,19 @@ func stringSize(fntDrawer font.Drawer, textContent string) (int, error) {
 		// and an en-quad after other punctuation
 		switch word[len(word)-1] {
 		case ',', ';', ':', '!', '?':
-			size += (int(fntDrawer.Dot.X) >> 6) + (fSize / 2)
+			size += (fSize / 2)
 		case '.':
-			size += (int(fntDrawer.Dot.X) >> 6) + fSize
+			size += fSize
 		default:
-			size += (int(fntDrawer.Dot.X) >> 6) + (fSize / 3)
+			size += (fSize / 3)
 		}
 	}
 	return size, nil
 }
 
+func (e *RenderableDomElement) GetLineHeight() int {
+	return e.GetFontSize()
+}
 func (e *RenderableDomElement) GetFontSize() int {
 	fromCSS, err := e.Styles.GetFontSize()
 	switch err {
@@ -96,37 +96,68 @@ func (e *RenderableDomElement) Walk(callback func(*RenderableDomElement)) {
 		}
 	}
 }
-func (e RenderableDomElement) GetHeightInPx(containerWidth int) (int, error) {
-	explicitHeight := e.Styles.FollowCascadeToPx("height", -1)
-	if explicitHeight != -1 {
-		return explicitHeight, nil
-	}
 
-	var calcHeight int
-	for c := e.FirstChild; c != nil; c = c.NextSibling {
-		// Cascade the font size down to the children before
-		// calculating the height
+func (e RenderableDomElement) GetIntrinsicHeightInPx(containerWidth int) (int, error) {
+	switch e.GetDisplayProp() {
+	case "inline":
+		panic("This shouldn't happen. This is handled in the parent block.")
+		return 0, nil //e.inlineBoxImplicitContainerHeight(containerWidth), nil
+	case "block":
+		fallthrough
+	default:
+		var calcHeight int
+		var dot int = 0
 
-		cH, _ := c.GetHeightInPx(containerWidth)
-		if cH < c.GetFontSize() {
-			calcHeight += c.GetFontSize()
-		} else {
-			calcHeight += cH
+		width, _ := e.GetWidthInPx(containerWidth)
+
+		for c := e.FirstChild; c != nil; c = c.NextSibling {
+			switch c.GetDisplayProp() {
+			case "inline":
+				remainingTextContent := strings.TrimSpace(c.GetTextContent())
+				if remainingTextContent == "" {
+					continue
+				}
+				if calcHeight == 0 {
+					calcHeight = e.GetLineHeight()
+				}
+
+				for remainingTextContent != "" {
+					ad, rt := c.measureLineBoxAdvancement(width-dot, remainingTextContent)
+					//print( "text: ", remainingTextContent, "\nContainer width: ", width, "\ndot: ", dot, "\nad: ", ad, "\nunc: ", rt, "\n\n")
+					remainingTextContent = rt
+					// If anything was unconsumed, it means it didn't fit on this line, so make a new
+					// one
+					if rt != "" {
+						dot = 0
+						calcHeight += e.GetLineHeight()
+					} else {
+						dot += ad
+					}
+				}
+			case "block":
+				fallthrough
+			default:
+				dot = 0
+				cH, _ := c.GetIntrinsicHeightInPx(width)
+				calcHeight += cH
+			}
+
 		}
-	}
-	if calcHeight > 0 {
-		return calcHeight, nil
+
+		if calcHeight > 0 {
+			return calcHeight, nil
+		}
 	}
 
 	if e.Styles == nil {
-		return -1, css.NoStyles
+		return 0, css.NoStyles
 	}
-	return e.GetFontSize(), css.NoStyles
+	return 0, css.NoStyles
 }
 func (e RenderableDomElement) GetWidthInPx(containerWidth int) (int, error) {
-	var calcWidth int
+	width := e.Styles.FollowCascadeToPx("width", containerWidth)
 	if e.GetDisplayProp() == "block" {
-		return containerWidth, nil
+		return e.Styles.FollowCascadeToPx("width", containerWidth), nil
 	}
 	if e.Type == html.TextNode {
 		fSize := e.GetFontSize()
@@ -136,10 +167,17 @@ func (e RenderableDomElement) GetWidthInPx(containerWidth int) (int, error) {
 			Src:  &image.Uniform{e.GetColor()},
 			Face: fontFace,
 		}
-		return stringSize(fntDrawer, e.Data)
+		sSize, _ := stringSize(fntDrawer, e.Data)
+		if sSize > width {
+			return width, nil
+		}
+		return sSize, nil
 	}
+
+	var calcWidth int
+
 	for child := e.FirstChild; child != nil; child = child.NextSibling {
-		cW, _ := child.GetWidthInPx(containerWidth)
+		cW, _ := child.GetWidthInPx(width)
 		if calcWidth < cW {
 			calcWidth = cW
 		}
@@ -147,7 +185,7 @@ func (e RenderableDomElement) GetWidthInPx(containerWidth int) (int, error) {
 	if calcWidth > 0 {
 		return calcWidth, nil
 	}
-	return containerWidth, nil
+	return width, nil
 }
 
 func (e RenderableDomElement) GetBackgroundColor() color.Color {
@@ -200,7 +238,6 @@ func (b *borderDrawer) Bounds() image.Rectangle {
 }
 func (b *borderDrawer) At(x, y int) color.Color {
 	return color.Alpha{0}
-
 	// draw a 4px border for debugging.
 	if x < 4 || y < 4 {
 		return color.Alpha{255}
@@ -212,30 +249,120 @@ func (b *borderDrawer) At(x, y int) color.Color {
 	return color.Alpha{0}
 }
 
-func (e RenderableDomElement) Render(containerWidth int) *image.RGBA {
-	dot := image.Point{0, 0}
+// measures how much printing a string will advance the cursor, and returns the amount that
+// it would be advanced, and the unconsumed string that didn't fit in the line and will need
+// to go into the next line.
+// If nothing fits onto the line, it will still consume the first word of the string in order
+// to ensure that the caller doesn't get into an infinite loop.
+func (e RenderableDomElement) measureLineBoxAdvancement(remainingWidth int, textContent string) (int, string) {
+	words := strings.Fields(textContent)
+	//firstRune, _ := utf8.DecodeRuneInString(textContent)
 	fSize := e.GetFontSize()
 	fontFace := e.Styles.GetFontFace(fSize)
+	var dot int
 	fntDrawer := font.Drawer{
 		Dst:  nil,
 		Src:  &image.Uniform{e.GetColor()},
 		Face: fontFace,
-		Dot:  fixed.P(dot.X, int(fontFace.Metrics().Ascent)>>6),
+		Dot:  fixed.P(0, int(fontFace.Metrics().Ascent)>>6),
 	}
 
-	height, _ := e.GetHeightInPx(containerWidth)
+	for i, word := range words {
+		wordSizeInPx := int(fntDrawer.MeasureString(word)) >> 6
+		if dot+wordSizeInPx > remainingWidth {
+			if i == 0 {
+				// make sure at least one word gets consumed to avoid an infinite loop.
+				// this isn't ideal, since some words will disappear, but if we reach this
+				// point we're already in a pretty bad state..
+				return 0, strings.Join(words[i+1:], " ")
+			}
+			return dot, strings.Join(words[i:], " ")
+		}
+		dot += wordSizeInPx
+
+		// Add a three per em space between words, an em-quad after a period,
+		// and an en-quad after other punctuation
+		switch word[len(word)-1] {
+		case ',', ';', ':', '!', '?':
+			dot += (fSize / 2)
+		case '.':
+			dot += fSize
+		default:
+			dot += (fSize / 3)
+		}
+	}
+	return dot, ""
+}
+func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent string) (img *image.RGBA, unconsumed string) {
+	words := strings.Fields(textContent)
+	//firstRune, _ := utf8.DecodeRuneInString(textContent)
+	fSize := e.GetFontSize()
+	fontFace := e.Styles.GetFontFace(fSize)
+	var dot int
+	fntDrawer := font.Drawer{
+		Dst:  nil,
+		Src:  &image.Uniform{e.GetColor()},
+		Face: fontFace,
+		Dot:  fixed.P(0, int(fontFace.Metrics().Ascent)>>6),
+	}
+
+	ssize, _ := stringSize(fntDrawer, textContent)
+	if ssize > remainingWidth {
+		ssize = remainingWidth
+	}
+	img = image.NewRGBA(image.Rectangle{image.ZP, image.Point{ssize, fSize}})
+	fntDrawer.Dst = img
+
+	for i, word := range words {
+		wordSizeInPx := int(fntDrawer.MeasureString(word)) >> 6
+		if dot+wordSizeInPx > remainingWidth {
+			if i == 0 {
+				// make sure at least one word gets consumed to avoid an infinite loop.
+				// this isn't ideal, since some words will disappear, but if we reach this
+				// point we're already in a pretty bad state..
+				unconsumed = strings.Join(words[i+1:], " ")
+			} else {
+				unconsumed = strings.Join(words[i:], " ")
+			}
+			return
+		}
+		fntDrawer.DrawString(word)
+
+		// Add a three per em space between words, an em-quad after a period,
+		// and an en-quad after other punctuation
+		switch word[len(word)-1] {
+		case ',', ';', ':', '!', '?':
+			dot = (int(fntDrawer.Dot.X) >> 6) + (fSize / 2)
+		case '.':
+			dot = (int(fntDrawer.Dot.X) >> 6) + fSize
+		default:
+			dot = (int(fntDrawer.Dot.X) >> 6) + (fSize / 3)
+		}
+		fntDrawer.Dot.X = fixed.Int26_6(dot << 6)
+	}
+	unconsumed = ""
+	return
+}
+
+func (e RenderableDomElement) Render(containerWidth int) *image.RGBA {
+	dot := image.Point{0, 0}
+
+	width, _ := e.GetWidthInPx(containerWidth)
+	height, _ := e.GetIntrinsicHeightInPx(width)
 	if height < 0 {
 		height = 0
 	}
-	width, _ := e.GetWidthInPx(containerWidth)
 	bg := e.GetBackgroundColor()
 	dst := image.NewRGBA(image.Rectangle{image.ZP, image.Point{width, height}})
-	fntDrawer.Dst = dst
-	if bg != nil && dst != nil {
+
+	displayProp := e.GetDisplayProp()
+	// draw the background
+	if bg != nil && dst != nil && displayProp != "inline" {
 		imageSize := dst.Bounds()
-		//b := image.Rectangle{image.Point{0, 0}, image.Point{width, height}}
 		draw.Draw(dst, imageSize, &image.Uniform{bg}, image.ZP, draw.Src)
 	}
+
+	// draw the border
 	draw.DrawMask(
 		dst,
 		dst.Bounds(),
@@ -249,64 +376,55 @@ func (e RenderableDomElement) Render(containerWidth int) *image.RGBA {
 	for c := e.FirstChild; c != nil; c = c.NextSibling {
 		switch c.Type {
 		case html.TextNode:
+			c.Styles = e.Styles
 			// Draw the background
 			//bgChild := c.GetBackgroundColor()
-
-			// draw the content
-			textContent := c.GetTextContent()
-			words := strings.Fields(textContent)
-			firstRune, _ := utf8.DecodeRuneInString(textContent)
-
-			if unicode.IsSpace(firstRune) {
-				dot.X += (fSize / 3)
-				fntDrawer.Dot = fixed.P(dot.X, dot.Y+int(fontFace.Metrics().Ascent)>>6)
-			}
-			for _, word := range words {
-				wordSizeInPx := int(fntDrawer.MeasureString(word) >> 6)
-				if dot.X+wordSizeInPx > width {
+			//childWidth, _ := c.GetWidthInPx(width)
+			remainingTextContent := strings.TrimSpace(c.Data)
+			for remainingTextContent != "" {
+				childImage, rt := c.renderLineBox(width-dot.X, remainingTextContent)
+				remainingTextContent = rt
+				sr := childImage.Bounds()
+				r := image.Rectangle{dot, dot.Add(sr.Size())}
+				draw.Draw(dst, r, childImage, sr.Min, draw.Over)
+				if r.Max.X >= width {
 					dot.X = 0
-					dot.Y += fSize
-					fntDrawer.Dot = fixed.P(dot.X, dot.Y+int(fontFace.Metrics().Ascent>>6))
+					dot.Y += e.GetLineHeight()
 				} else {
-
+					dot.X = r.Max.X
 				}
-				fntDrawer.DrawString(word)
-
-				// Add a three per em space between words, an em-quad after a period,
-				// and an en-quad after other punctuation
-				switch word[len(word)-1] {
-				case ',', ';', ':', '!', '?':
-					dot.X = (int(fntDrawer.Dot.X) >> 6) + (fSize / 2)
-				case '.':
-					dot.X = (int(fntDrawer.Dot.X) >> 6) + fSize
-				default:
-					dot.X = (int(fntDrawer.Dot.X) >> 6) + (fSize / 3)
-				}
-				fntDrawer.Dot = fixed.P(dot.X, dot.Y+int(fontFace.Metrics().Ascent)>>6)
 			}
-			// for now, pretend all text is inline
-			//fntDrawer.DrawString(c.Data)
 		case html.ElementNode:
+			switch c.GetDisplayProp() {
+			case "inline":
+				remainingTextContent := strings.TrimSpace(c.GetTextContent())
+				for remainingTextContent != "" {
+					childImage, rt := c.renderLineBox(width-dot.X, remainingTextContent)
+					remainingTextContent = rt
+					sr := childImage.Bounds()
+					r := image.Rectangle{dot, dot.Add(sr.Size())}
+					draw.Draw(dst, r, childImage, sr.Min, draw.Over)
+					if r.Max.X >= width {
+						dot.X = 0
+						dot.Y += e.GetLineHeight()
+					} else {
+						dot.X = r.Max.X
+					}
+				}
+			case "block":
+				fallthrough
+			default:
+				childWidth, _ := c.GetWidthInPx(width)
+				childHeight, _ := c.GetIntrinsicHeightInPx(childWidth)
+				childImage := image.NewRGBA(image.Rectangle{image.ZP, image.Point{childWidth, childHeight}})
+				childImage = c.Render(childWidth)
+				sr := childImage.Bounds()
+				r := image.Rectangle{dot, dot.Add(sr.Size())}
+				draw.Draw(dst, r, childImage, sr.Min, draw.Over)
 
-			// for now, pretend all elements are blocks
-
-			// Draw the block itself, and move dot.
-			childWidth, _ := c.GetWidthInPx(containerWidth)
-			childHeight, _ := c.GetHeightInPx(childWidth)
-			childImage := image.NewRGBA(image.Rectangle{image.ZP, image.Point{childWidth, childHeight}})
-			childImage = c.Render(childWidth)
-
-			sr := childImage.Bounds()
-
-			r := image.Rectangle{dot, dot.Add(sr.Size())}
-			draw.Draw(dst, r, childImage, sr.Min, draw.Over)
-			if c.GetDisplayProp() != "inline" {
 				dot.X = 0
 				dot.Y += childHeight
-			} else {
-				dot.X += childWidth
 			}
-			fntDrawer.Dot = fixed.P(dot.X, dot.Y+int(fontFace.Metrics().Ascent)>>6)
 
 		}
 	}

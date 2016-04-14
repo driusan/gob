@@ -19,10 +19,48 @@ func ConvertUnitToPx(basis int, cssString string) (int, error) {
 	if len(cssString) < 2 {
 		return basis, Invalid
 	}
-	if cssString[len(cssString)-2:] == "px" {
-		val, _ := strconv.Atoi(cssString[0 : len(cssString)-2])
-		return val, nil
 
+	val := cssString
+	// handle percentages,
+	if val[len(val)-1] == '%' {
+		f, err := strconv.ParseFloat(string(val[0:len(val)-1]), 64)
+		if err == nil {
+			size := int(f * float64(basis) / 100.0)
+			return size, nil
+		}
+		return basis, Invalid
+	}
+
+	// all other units are 2 characters long
+	switch unit := string(val[len(val)-2:]); unit {
+	case "em":
+		// 1em is basically a scaling factor for the parent font
+		// when calculating font size
+		f, err := strconv.ParseFloat(string(val[0:len(val)-2]), 64)
+		if err == nil {
+			return int(f * float64(basis)), nil
+		}
+		return basis, Invalid
+	case "ex":
+		// 1ex is supposed to be the height of a lower case x, but
+		// the spec says you can use 1ex = 0.5em if calculating
+		// the size of an x is impossible or impracticle. Since
+		// I'm too lazy to figure out how to do that, it's impracticle.
+		f, err := strconv.ParseFloat(string(val[0:len(val)-2]), 64)
+		if err == nil {
+			return int(f * float64(basis) / 2.0), nil
+		}
+		return basis, Invalid
+	case "px":
+		// parse px as a float then cast, just in case someone
+		// used a decimal.
+		f, err := strconv.ParseFloat(string(val[0:len(val)-2]), 64)
+		if err == nil {
+			return int(f), nil
+		}
+		return basis, Invalid
+	case "in", "cm", "mm", "pt", "pc":
+		return basis, NotImplemented
 	}
 	return basis, NotImplemented
 }

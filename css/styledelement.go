@@ -78,7 +78,7 @@ func (e *StyledElement) AddStyle(s StyleRule) {
 //	5. user important declarations (don't exist)
 // 3. Sort rules with the same importance and origin by specificity of selector: more specific selectors will override more general ones. Pseudo-elements and pseudo-classes are counted as normal elements and classes, respectively.
 // 4. Finally, sort by order specified: if two declarations have the same weight, origin, and specificity, the latter specified wins. Declarations in imported stylesheets are considered to be before any declaration in the style sheet itself
-// BUG(driusan): Specificity is not implemented, nor is the final tie break
+// BUG(driusan): The final tie break is not implemented
 func (e *StyledElement) SortStyles() error {
 	sort.Sort(byCSSPrecedence(e.rules))
 	return nil
@@ -108,11 +108,6 @@ func (e *StyledElement) FollowCascadeToPx(attr string, val int) int {
 			val, _ = ConvertUnitToPx(val, rule.Value.string)
 			return val
 		}
-		// the rule has this attribute, so convert it and apply
-		// it to the value calculated so far
-		//if cssval, ok := rule.Values[StyleAttribute(attr)]; ok {
-		//val, _ = ConvertUnitToPx(val, cssval.string)
-		//}
 	}
 	return val
 }

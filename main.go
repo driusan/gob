@@ -11,6 +11,7 @@ import (
 	"golang.org/x/mobile/event/paint"
 	"golang.org/x/mobile/event/size"
 	"golang.org/x/mobile/event/touch"
+	//	"golang.org/x/mobile/event/mouse"
 	"image"
 	"image/color"
 	"image/draw"
@@ -117,6 +118,8 @@ func main() {
 				v.Content = parsedhtml.Body.Render(e.Size().X)
 			case touch.Event:
 				fmt.Printf("Touch event!")
+			//case mouse.Event:
+			//	fmt.Printf("Mouse event! %e", e)
 			default:
 				//	fmt.Printf("%s\n", e)
 			}

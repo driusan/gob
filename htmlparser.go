@@ -2,7 +2,6 @@ package main
 
 import (
 	"Gob/css"
-	"Gob/dom"
 	"Gob/renderer"
 	"fmt"
 	"golang.org/x/net/html"
@@ -12,31 +11,6 @@ import (
 	"io/ioutil"
 	"os"
 )
-
-func convertNodeToRenderableElement(root *html.Node) (*renderer.RenderableDomElement, error) {
-	if root == nil {
-		return nil, nil
-	}
-
-	element := &renderer.RenderableDomElement{
-		(*dom.Element)(root),
-		new(css.StyledElement),
-		nil,
-		nil,
-		nil,
-		nil,
-	}
-	element.FirstChild, _ = convertNodeToRenderableElement(root.FirstChild)
-	element.NextSibling, _ = convertNodeToRenderableElement(root.NextSibling)
-
-	var prev *renderer.RenderableDomElement = nil
-	for c := element.FirstChild; c != nil; c = c.NextSibling {
-		c.PrevSibling = prev
-		c.Parent = element
-		prev = c
-	}
-	return element, nil
-}
 
 func parseHTML(r io.Reader) *Page {
 	parsedhtml, _ := html.Parse(r)
@@ -65,7 +39,7 @@ func parseHTML(r io.Reader) *Page {
 
 	styles2 := css.ParseStylesheet(styles, css.AuthorSrc)
 
-	renderable, _ := convertNodeToRenderableElement(body)
+	renderable, _ := renderer.ConvertNodeToRenderableElement(body)
 
 	sheet, _ := ioutil.ReadFile("useragent.css")
 	userAgentStyles := css.ParseStylesheet(string(sheet), css.UserAgentSrc)
