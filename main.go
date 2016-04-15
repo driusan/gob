@@ -2,7 +2,6 @@ package main
 
 import (
 	"Gob/renderer"
-	"errors"
 	"fmt"
 	"golang.org/x/exp/shiny/driver"
 	"golang.org/x/exp/shiny/screen"
@@ -19,10 +18,8 @@ import (
 )
 
 var (
-	background = color.RGBA{0xE0, 0xE0, 0xE0, 0xFF}
+	background = color.RGBA{0xEF, 0xE0, 0xE0, 0xFF}
 	//	background = color.RGBA{0xFF, 0xFF, 0xFF, 0xFF}
-
-	NoStyles = errors.New("No styles to apply")
 )
 
 type Viewport struct {
@@ -31,7 +28,7 @@ type Viewport struct {
 
 	// The whole, source image to be displayed in the viewport. It will be clipped
 	// and displayed in the viewport according to the Size and Cursor
-	Content *image.RGBA
+	Content image.Image
 
 	// The location of the image to be displayed into the viewpart.
 	Cursor image.Point
@@ -43,17 +40,22 @@ type Page struct {
 func paintWindow(s screen.Screen, w screen.Window, v *Viewport, page *Page) {
 	viewport := v.Size.Bounds()
 
-	// Fill the window background with gray
-	w.Fill(viewport, background, screen.Src)
-
 	if v.Content != nil {
 		b, err := s.NewBuffer(v.Size.Size())
+		dst := b.RGBA()
+
+		// Fill the buffer with the window background colour before
+		// drawing the web page on top of it.
+		draw.Draw(dst, dst.Bounds(), &image.Uniform{background}, image.ZP, draw.Src)
+
+		// Draw the clipped portion of the page that is within view
+		draw.Draw(dst, viewport, v.Content, v.Cursor, draw.Over)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%s", err)
 			return
 		}
 		defer b.Release()
-		draw.Draw(b.RGBA(), viewport, v.Content, v.Cursor, draw.Src)
+		draw.Draw(dst, viewport, v.Content, v.Cursor, draw.Over)
 		w.Upload(image.Point{0, 0}, b, viewport)
 	} else {
 		fmt.Fprintf(os.Stderr, "No body to render!\n")
@@ -90,6 +92,24 @@ func main() {
 				switch e.Code {
 				case key.CodeEscape:
 					return
+				case key.CodeLeftArrow:
+					if e.Direction == key.DirPress {
+						scrollSize := 50
+						v.Cursor.X -= scrollSize
+						if v.Cursor.X > v.Content.Bounds().Max.X {
+							v.Cursor.X = v.Content.Bounds().Max.X - 10
+						}
+						paintWindow(s, w, &v, parsedhtml)
+					}
+				case key.CodeRightArrow:
+					if e.Direction == key.DirPress {
+						scrollSize := 50
+						v.Cursor.X += scrollSize
+						if v.Cursor.X > v.Content.Bounds().Max.X {
+							v.Cursor.X = v.Content.Bounds().Max.X - 10
+						}
+						paintWindow(s, w, &v, parsedhtml)
+					}
 				case key.CodeDownArrow:
 					if e.Direction == key.DirPress {
 						scrollSize := v.Size.Size().Y / 2

@@ -63,65 +63,64 @@ func (e StyledElement) GetFontSize() (int, error) {
 	return e.fontSize, nil
 }
 
-
-func (e *StyledElement) expandBoxBorderWidthShorthand(s StyleRule) {
+func (e *StyledElement) expandBoxBorderShorthand(att StyleAttribute, s StyleRule) {
 	values := strings.Fields(s.Value.string)
 	switch len(values) {
 	case 0:
 		return
 	case 1:
-		s.Name = "border-top-width"
+		s.Name = "border-top-" + att
 		s.Value.string = values[0]
 		e.rules = append(e.rules, s)
-		s.Name = "border-right-width"
+		s.Name = "border-right-" + att
 		e.rules = append(e.rules, s)
-		s.Name = "border-bottom-width"
+		s.Name = "border-bottom-" + att
 		e.rules = append(e.rules, s)
-		s.Name = "border-left-width"
+		s.Name = "border-left-" + att
 		e.rules = append(e.rules, s)
 	case 2:
-		s.Name = "border-top-width"
+		s.Name = "border-top-" + att
 		s.Value.string = values[0]
 
 		e.rules = append(e.rules, s)
-		s.Name = "border-bottom-width"
+		s.Name = "border-bottom-" + att
 		e.rules = append(e.rules, s)
 
 		s.Value.string = values[1]
-		s.Name = "border-right-width"
+		s.Name = "border-right-" + att
 		e.rules = append(e.rules, s)
-		s.Name = "border-left-width"
+		s.Name = "border-left-" + att
 		e.rules = append(e.rules, s)
 	case 3:
-		s.Name = "border-top-width"
+		s.Name = "border-top-" + att
 		s.Value.string = values[0]
 		e.rules = append(e.rules, s)
 
-		s.Name = "border-right-width"
+		s.Name = "border-right-" + att
 		s.Value.string = values[1]
 		e.rules = append(e.rules, s)
-		s.Name = "border-left-width"
+		s.Name = "border-left-" + att
 		e.rules = append(e.rules, s)
 
-		s.Name = "border-bottom-width"
+		s.Name = "border-bottom-" + att
 		s.Value.string = values[2]
 		e.rules = append(e.rules, s)
 	case 4:
 		fallthrough
 	default:
-		s.Name = "border-top-width"
+		s.Name = "border-top-" + att
 		s.Value.string = values[0]
 		e.rules = append(e.rules, s)
 
-		s.Name = "border-right-width"
+		s.Name = "border-right-" + att
 		s.Value.string = values[1]
 		e.rules = append(e.rules, s)
 
-		s.Name = "border-bottom-width"
+		s.Name = "border-bottom-" + att
 		s.Value.string = values[2]
 		e.rules = append(e.rules, s)
 
-		s.Name = "border-left-width"
+		s.Name = "border-left-" + att
 		s.Value.string = values[3]
 		e.rules = append(e.rules, s)
 	}
@@ -193,12 +192,15 @@ func (e *StyledElement) AddStyle(s StyleRule) {
 		e.expandBoxSideShorthand(s.Name, s)
 	case "border-width":
 		// border width expands to border-side-width, not
-		// border-width-side, so we can't use the helper
+		// border-width-side, so we can't use the normal helper
 		// function
-		e.expandBoxBorderWidthShorthand(s)
+		e.expandBoxBorderShorthand("width", s)
+	case "border-color":
+		e.expandBoxBorderShorthand("color", s)
+	case "border-style":
+		e.expandBoxBorderShorthand("style", s)
 	default:
 		e.rules = append(e.rules, s)
-
 	}
 	return
 }
@@ -237,15 +239,29 @@ func (e *StyledElement) GetAttribute(attr string) StyleValue {
 	}
 	return StyleValue{"", false}
 }
-func (e *StyledElement) FollowCascadeToPx(attr string, val int) int {
+func (e *StyledElement) FollowCascadeToPx(attr string, val int) (int, error) {
 	// apply each rule
 	for _, rule := range e.rules {
 		if string(rule.Name) == attr {
-			val, _ = ConvertUnitToPx(val, rule.Value.string)
-			return val
+			if rule.Name == "inherit" {
+				return 0, InheritValue
+			}
+			return ConvertUnitToPx(val, rule.Value.string)
 		}
 	}
-	return val
+	return val, NoStyles
+}
+func (e *StyledElement) FollowCascadeToString(attr string) (string, error) {
+	// apply each rule
+	for _, rule := range e.rules {
+		if string(rule.Name) == attr {
+			if rule.Name == "inherit" {
+				return rule.Value.string, InheritValue
+			}
+			return rule.Value.string, nil
+		}
+	}
+	return "", NoStyles
 }
 
 // Follows the cascade to get the colour for the attribute named attr.
@@ -281,6 +297,25 @@ func (e StyledElement) GetBackgroundColor(defaultColour *color.RGBA) (*color.RGB
 		return val, nil
 	default:
 		return defaultColour, InheritValue
+	}
+}
+
+func (e StyledElement) GetBorderSizeInPx(side string) (int, error) {
+	fSize, _ := e.GetFontSize()
+	return e.FollowCascadeToPx("border-"+side+"-width", fSize)
+
+}
+func (e StyledElement) GetBorderColor(side string, defaultColour *color.RGBA) (*color.RGBA, error) {
+	val, err := e.FollowCascadeToColor("border-"+side+"-color", defaultColour)
+	switch err {
+	case NoStyles:
+		return defaultColour, NoStyles
+	case InheritValue:
+		return defaultColour, InheritValue
+	case nil:
+		return val, nil
+	default:
+		panic("Could not get colour and got an error")
 	}
 }
 func (e StyledElement) GetColor(defaultColour *color.RGBA) *color.RGBA {
