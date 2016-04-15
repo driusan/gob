@@ -15,9 +15,9 @@ var (
 	InheritValue   = errors.New("Value should be inherited")
 )
 
-func ConvertUnitToPx(basis int, cssString string) (int, error) {
+func ConvertUnitToPx(fontsize int, percentbasis int, cssString string) (int, error) {
 	if len(cssString) < 2 {
-		return basis, Invalid
+		return fontsize, Invalid
 	}
 
 	val := cssString
@@ -25,10 +25,10 @@ func ConvertUnitToPx(basis int, cssString string) (int, error) {
 	if val[len(val)-1] == '%' {
 		f, err := strconv.ParseFloat(string(val[0:len(val)-1]), 64)
 		if err == nil {
-			size := int(f * float64(basis) / 100.0)
+			size := int(f * float64(percentbasis) / 100.0)
 			return size, nil
 		}
-		return basis, Invalid
+		return fontsize, Invalid
 	}
 
 	// all other units are 2 characters long
@@ -38,9 +38,9 @@ func ConvertUnitToPx(basis int, cssString string) (int, error) {
 		// when calculating font size
 		f, err := strconv.ParseFloat(string(val[0:len(val)-2]), 64)
 		if err == nil {
-			return int(f * float64(basis)), nil
+			return int(f * float64(fontsize)), nil
 		}
-		return basis, Invalid
+		return fontsize, Invalid
 	case "ex":
 		// 1ex is supposed to be the height of a lower case x, but
 		// the spec says you can use 1ex = 0.5em if calculating
@@ -48,9 +48,9 @@ func ConvertUnitToPx(basis int, cssString string) (int, error) {
 		// I'm too lazy to figure out how to do that, it's impracticle.
 		f, err := strconv.ParseFloat(string(val[0:len(val)-2]), 64)
 		if err == nil {
-			return int(f * float64(basis) / 2.0), nil
+			return int(f * float64(fontsize) / 2.0), nil
 		}
-		return basis, Invalid
+		return fontsize, Invalid
 	case "px":
 		// parse px as a float then cast, just in case someone
 		// used a decimal.
@@ -58,11 +58,11 @@ func ConvertUnitToPx(basis int, cssString string) (int, error) {
 		if err == nil {
 			return int(f), nil
 		}
-		return basis, Invalid
+		return fontsize, Invalid
 	case "in", "cm", "mm", "pt", "pc":
-		return basis, NotImplemented
+		return fontsize, NotImplemented
 	}
-	return basis, NotImplemented
+	return fontsize, NotImplemented
 }
 
 func hexToUint8(val string) uint8 {

@@ -7,17 +7,18 @@ import (
 
 func NewDynamicMemoryDrawer(r image.Rectangle) *DynamicMemoryDrawer {
 	return &DynamicMemoryDrawer{
-		src: make(map[image.Point]color.RGBA),
-		min: image.Point{0, 0},
-		max: image.Point{r.Dx(), r.Dy()},
+		src:   make(map[image.Point]color.RGBA),
+		min:   image.Point{0, 0},
+		max:   image.Point{r.Dx(), r.Dy()},
 		model: color.RGBAModel,
 	}
 }
+
 type DynamicMemoryDrawer struct {
-	src map[image.Point]color.RGBA
+	src   map[image.Point]color.RGBA
 	model color.Model
-	min image.Point
-	max image.Point
+	min   image.Point
+	max   image.Point
 }
 
 func (d *DynamicMemoryDrawer) ColorModel() color.Model {

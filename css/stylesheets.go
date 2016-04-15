@@ -23,6 +23,9 @@ type StyleValue struct {
 func (sv StyleValue) String() string {
 	return sv.string
 }
+func (sv StyleValue) GetValue() string {
+	return sv.string
+}
 func ParseBlock(val string) map[StyleAttribute]StyleValue {
 	m := make(map[StyleAttribute]StyleValue)
 	pieces := strings.Split(val, ";")

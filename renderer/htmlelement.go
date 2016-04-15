@@ -3,7 +3,6 @@ package renderer
 import (
 	"Gob/css"
 	"Gob/dom"
-	//	"fmt"
 	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
 	"golang.org/x/net/html"
@@ -11,8 +10,6 @@ import (
 	"image/color"
 	"image/draw"
 	"strings"
-	//"unicode"
-	//	"unicode/utf8"
 )
 
 const (
@@ -104,7 +101,6 @@ func (e *RenderableDomElement) Walk(callback func(*RenderableDomElement)) {
 	}
 }
 
-
 func (e RenderableDomElement) GetBackgroundColor() color.Color {
 	deflt := &color.RGBA{0x00, 0xE0, 0xE0, 0x00}
 	switch bg, err := e.Styles.GetBackgroundColor(deflt); err {
@@ -141,9 +137,45 @@ func (e RenderableDomElement) GetDisplayProp() string {
 	return "block"
 }
 
+func (e RenderableDomElement) GetTextDecoration() string {
+	if e.Styles == nil {
+		return "none"
+	}
+
+	switch decoration := e.Styles.TextDecoration.GetValue(); decoration {
+	case "inherit":
+		return e.Parent.GetTextDecoration()
+	default:
+		return strings.TrimSpace(decoration)
+	}
+}
+func (e RenderableDomElement) GetTextTransform() string {
+	if e.Styles == nil {
+		return "none"
+	}
+
+	switch transformation := e.Styles.TextTransform.GetValue(); transformation {
+	case "inherit":
+		return e.Parent.GetTextTransform()
+	case "capitalize", "uppercase", "lowercase", "none":
+		return transformation
+	default:
+		if e.Parent == nil {
+			return "none"
+		}
+		return e.Parent.GetTextTransform()
+	}
+}
 func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent string) (img *image.RGBA, unconsumed string) {
+	switch e.GetTextTransform() {
+	case "capitalize":
+		textContent = strings.Title(textContent)
+	case "uppercase":
+		textContent = strings.ToUpper(textContent)
+	case "lowercase":
+		textContent = strings.ToLower(textContent)
+	}
 	words := strings.Fields(textContent)
-	//firstRune, _ := utf8.DecodeRuneInString(textContent)
 	fSize := e.GetFontSize()
 	fontFace := e.Styles.GetFontFace(fSize)
 	var dot int
@@ -162,6 +194,27 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 	img = image.NewRGBA(image.Rectangle{image.ZP, image.Point{ssize, lineheight}})
 	fntDrawer.Dst = img
 
+	if decoration := e.GetTextDecoration(); decoration != "" && decoration != "none" && decoration != "blink" {
+		color := e.GetColor()
+		if strings.Contains(decoration, "underline") {
+			y := fntDrawer.Dot.Y.Floor()
+			for px := 0; px < ssize; px++ {
+				img.Set(px, y, color)
+			}
+		}
+		if strings.Contains(decoration, "overline") {
+			y := 1
+			for px := 0; px < ssize; px++ {
+				img.Set(px, y, color)
+			}
+		}
+		if strings.Contains(decoration, "line-through") {
+			y := fontFace.Metrics().Ascent.Floor() / 2
+			for px := 0; px < ssize; px++ {
+				img.Set(px, y, color)
+			}
+		}
+	}
 	for i, word := range words {
 		wordSizeInPx := int(fntDrawer.MeasureString(word)) >> 6
 		if dot+wordSizeInPx > remainingWidth {
@@ -193,14 +246,36 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 	return
 }
 
+func (e RenderableDomElement) GetTextIndent(containerWidth int) int {
+	// it's inherited, with the initial value of 0
+	if e.Styles == nil {
+		if e.Parent == nil {
+			return 0
+		}
+		return e.Parent.GetTextIndent(containerWidth)
+	}
+	val := e.Styles.TextIndent.GetValue()
+	if val == "" {
+		if e.Parent == nil {
+			return 0
+		}
+		return e.Parent.GetTextIndent(containerWidth)
+	}
+	px, err := css.ConvertUnitToPx(e.GetFontSize(), containerWidth, val)
+	if err != nil {
+		return 0
+	}
+	return px
+}
 func (e RenderableDomElement) Render(containerWidth int) image.Image {
 	dot := image.Point{0, 0}
 
-	width := containerWidth-(e.GetMarginLeftSize()+e.GetMarginRightSize()+e.GetBorderLeftSize()+e.GetBorderRightSize()+e.GetPaddingLeftSize()+e.GetPaddingRightSize())
+	width := containerWidth - (e.GetMarginLeftSize() + e.GetMarginRightSize() + e.GetBorderLeftWidth() + e.GetBorderRightWidth() + e.GetPaddingLeftSize() + e.GetPaddingRightSize())
 	height := 0
 
 	dst := NewDynamicMemoryDrawer(image.Rectangle{image.ZP, image.Point{width, height}})
 
+	firstLine := true
 	for c := e.FirstChild; c != nil; c = c.NextSibling {
 		switch c.Type {
 		case html.TextNode:
@@ -209,6 +284,11 @@ func (e RenderableDomElement) Render(containerWidth int) image.Image {
 			// because their style should be identical to their
 			// parent.
 			c.Styles = e.Styles
+
+			if firstLine == true {
+				dot.X += c.GetTextIndent(width)
+				firstLine = false
+			}
 
 			remainingTextContent := strings.TrimSpace(c.Data)
 			for remainingTextContent != "" {
@@ -230,6 +310,10 @@ func (e RenderableDomElement) Render(containerWidth int) image.Image {
 			case "none":
 				continue
 			case "inline":
+				if firstLine == true {
+					dot.X += c.GetTextIndent(width)
+					firstLine = false
+				}
 				remainingTextContent := strings.TrimSpace(c.GetTextContent())
 				for remainingTextContent != "" {
 					childImage, rt := c.renderLineBox(width-dot.X, remainingTextContent)

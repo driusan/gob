@@ -97,6 +97,7 @@ func BenchmarkParseOnly(b *testing.B) {
 func BenchmarkRenderOnly(b *testing.B) {
 	f := strings.NewReader(content)
 	parsedhtml := parseHTML(f)
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		parsedhtml.Body.Render(1024)
 	}

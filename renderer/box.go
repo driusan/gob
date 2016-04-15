@@ -103,22 +103,25 @@ func (b *outerBoxDrawer) At(x, y int) color.Color {
 
 var dfltBorder *color.RGBA = &color.RGBA{255, 128, 128, 0}
 
-func (e RenderableDomElement) GetBorderBottomSize() int {
+func (e RenderableDomElement) GetBorderBottomWidth() int {
 	if e.Styles == nil {
 		return 0
 	}
-	if style := e.GetBorderBottomStyle(); style == "hidden" || style == "none" {
+	value := e.Styles.BorderBottomWidth.GetValue()
+	if value == "" {
+		// No style, use default.
 		return 0
 	}
-
-	val, err := e.Styles.GetBorderSizeInPx("bottom")
-	switch err {
-	case css.InheritValue:
+	if value == "inherit" {
 		if e.Parent == nil {
 			return 0
 		}
-		return e.Parent.GetBorderBottomSize()
-	case css.NoStyles:
+		return e.Parent.GetBorderBottomWidth()
+
+	}
+	fontsize := e.GetFontSize()
+	val, err := css.ConvertUnitToPx(fontsize, fontsize, value)
+	if err != nil {
 		return 0
 	}
 	return val
@@ -127,30 +130,41 @@ func (e RenderableDomElement) GetBorderBottomColor() *color.RGBA {
 	if e.Styles == nil {
 		return dfltBorder
 	}
-	val, err := e.Styles.GetBorderColor("bottom", dfltBorder)
-	if err == css.InheritValue {
+	value := e.Styles.BorderBottomColor.GetValue()
+	if value == "" {
+		return dfltBorder
+	}
+	if value == "inherit" {
 		if e.Parent == nil {
 			return dfltBorder
 		}
 		return e.Parent.GetBorderBottomColor()
 	}
-	return val
+	c, err := css.ConvertColorToRGBA(value)
+	if err != nil {
+		return dfltBorder
+	}
+	return c
 }
-func (e RenderableDomElement) GetBorderTopSize() int {
+func (e RenderableDomElement) GetBorderTopWidth() int {
 	if e.Styles == nil {
 		return 0
 	}
-	if style := e.GetBorderTopStyle(); style == "hidden" || style == "none" {
+	value := e.Styles.BorderTopWidth.GetValue()
+	if value == "" {
+		// No style, use default.
 		return 0
 	}
-	val, err := e.Styles.GetBorderSizeInPx("top")
-	switch err {
-	case css.InheritValue:
+	if value == "inherit" {
 		if e.Parent == nil {
 			return 0
 		}
-		return e.Parent.GetBorderTopSize()
-	case css.NoStyles:
+		return e.Parent.GetBorderTopWidth()
+
+	}
+	fontsize := e.GetFontSize()
+	val, err := css.ConvertUnitToPx(fontsize, fontsize, value)
+	if err != nil {
 		return 0
 	}
 	return val
@@ -159,31 +173,42 @@ func (e RenderableDomElement) GetBorderTopColor() *color.RGBA {
 	if e.Styles == nil {
 		return dfltBorder
 	}
-	val, err := e.Styles.GetBorderColor("top", dfltBorder)
-	if err == css.InheritValue {
+	value := e.Styles.BorderTopColor.GetValue()
+	if value == "" {
+		return dfltBorder
+	}
+	if value == "inherit" {
 		if e.Parent == nil {
 			return dfltBorder
 		}
 		return e.Parent.GetBorderTopColor()
 	}
-	return val
+	c, err := css.ConvertColorToRGBA(value)
+	if err != nil {
+		return dfltBorder
+	}
+	return c
 }
 
-func (e RenderableDomElement) GetBorderLeftSize() int {
+func (e RenderableDomElement) GetBorderLeftWidth() int {
 	if e.Styles == nil {
 		return 0
 	}
-	if style := e.GetBorderLeftStyle(); style == "hidden" || style == "none" {
+	value := e.Styles.BorderLeftWidth.GetValue()
+	if value == "" {
+		// No style, use default.
 		return 0
 	}
-	val, err := e.Styles.GetBorderSizeInPx("left")
-	switch err {
-	case css.InheritValue:
+	if value == "inherit" {
 		if e.Parent == nil {
 			return 0
 		}
-		return e.Parent.GetBorderLeftSize()
-	case css.NoStyles:
+		return e.Parent.GetBorderLeftWidth()
+
+	}
+	fontsize := e.GetFontSize()
+	val, err := css.ConvertUnitToPx(fontsize, fontsize, value)
+	if err != nil {
 		return 0
 	}
 	return val
@@ -192,31 +217,42 @@ func (e RenderableDomElement) GetBorderLeftColor() *color.RGBA {
 	if e.Styles == nil {
 		return dfltBorder
 	}
-	val, err := e.Styles.GetBorderColor("left", dfltBorder)
-	if err == css.InheritValue {
+	value := e.Styles.BorderLeftColor.GetValue()
+	if value == "" {
+		return dfltBorder
+	}
+	if value == "inherit" {
 		if e.Parent == nil {
 			return dfltBorder
 		}
 		return e.Parent.GetBorderLeftColor()
 	}
-	return val
+	c, err := css.ConvertColorToRGBA(value)
+	if err != nil {
+		return dfltBorder
+	}
+	return c
 }
 
-func (e RenderableDomElement) GetBorderRightSize() int {
+func (e RenderableDomElement) GetBorderRightWidth() int {
 	if e.Styles == nil {
 		return 0
 	}
-	if style := e.GetBorderRightStyle(); style == "hidden" || style == "none" {
+	value := e.Styles.BorderRightWidth.GetValue()
+	if value == "" {
+		// No style, use default.
 		return 0
 	}
-	val, err := e.Styles.GetBorderSizeInPx("right")
-	switch err {
-	case css.InheritValue:
+	if value == "inherit" {
 		if e.Parent == nil {
 			return 0
 		}
-		return e.Parent.GetBorderRightSize()
-	case css.NoStyles:
+		return e.Parent.GetBorderRightWidth()
+
+	}
+	fontsize := e.GetFontSize()
+	val, err := css.ConvertUnitToPx(fontsize, fontsize, value)
+	if err != nil {
 		return 0
 	}
 	return val
@@ -225,139 +261,179 @@ func (e RenderableDomElement) GetBorderRightColor() *color.RGBA {
 	if e.Styles == nil {
 		return dfltBorder
 	}
-	val, err := e.Styles.GetBorderColor("right", dfltBorder)
-	if err == css.InheritValue {
+	value := e.Styles.BorderRightColor.GetValue()
+	if value == "" {
+		return dfltBorder
+	}
+	if value == "inherit" {
 		if e.Parent == nil {
 			return dfltBorder
 		}
 		return e.Parent.GetBorderRightColor()
 	}
-	return val
+	c, err := css.ConvertColorToRGBA(value)
+	if err != nil {
+		return dfltBorder
+	}
+	return c
 }
 func (e RenderableDomElement) GetMarginLeftSize() int {
-	if e.Styles == nil {
+	value := e.Styles.MarginLeft.GetValue()
+	if value == "" {
+		// No style, use default.
 		return 0
 	}
-	val, err := e.Styles.FollowCascadeToPx("margin-left", e.GetFontSize())
-	switch err {
-	case css.InheritValue:
+	if value == "inherit" {
 		if e.Parent == nil {
 			return 0
 		}
 		return e.Parent.GetMarginLeftSize()
-	case css.NoStyles:
+
+	}
+	fontsize := e.GetFontSize()
+	val, err := css.ConvertUnitToPx(fontsize, fontsize, value)
+	if err != nil {
 		return 0
 	}
 	return val
 }
 func (e RenderableDomElement) GetMarginRightSize() int {
-	if e.Styles == nil {
+	value := e.Styles.MarginRight.GetValue()
+	if value == "" {
+		// No style, use default.
 		return 0
 	}
-	val, err := e.Styles.FollowCascadeToPx("margin-right", e.GetFontSize())
-	switch err {
-	case css.InheritValue:
+	if value == "inherit" {
 		if e.Parent == nil {
 			return 0
 		}
 		return e.Parent.GetMarginRightSize()
-	case css.NoStyles:
+
+	}
+	fontsize := e.GetFontSize()
+	val, err := css.ConvertUnitToPx(fontsize, fontsize, value)
+	if err != nil {
 		return 0
 	}
 	return val
 }
 func (e RenderableDomElement) GetMarginTopSize() int {
-	if e.Styles == nil {
+	value := e.Styles.MarginTop.GetValue()
+	if value == "" {
+		// No style, use default.
 		return 0
 	}
-	val, err := e.Styles.FollowCascadeToPx("margin-top", e.GetFontSize())
-	switch err {
-	case css.InheritValue:
+	if value == "inherit" {
 		if e.Parent == nil {
 			return 0
 		}
 		return e.Parent.GetMarginTopSize()
-	case css.NoStyles:
+
+	}
+	fontsize := e.GetFontSize()
+	val, err := css.ConvertUnitToPx(fontsize, fontsize, value)
+	if err != nil {
 		return 0
 	}
 	return val
 }
+
 func (e RenderableDomElement) GetMarginBottomSize() int {
-	if e.Styles == nil {
+	value := e.Styles.MarginBottom.GetValue()
+	if value == "" {
+		// No style, use default.
 		return 0
 	}
-	val, err := e.Styles.FollowCascadeToPx("margin-bottom", e.GetFontSize())
-	switch err {
-	case css.InheritValue:
+	if value == "inherit" {
 		if e.Parent == nil {
 			return 0
 		}
 		return e.Parent.GetMarginBottomSize()
-	case css.NoStyles:
+
+	}
+	fontsize := e.GetFontSize()
+	val, err := css.ConvertUnitToPx(fontsize, fontsize, value)
+	if err != nil {
 		return 0
 	}
 	return val
 }
 func (e RenderableDomElement) GetPaddingLeftSize() int {
-	if e.Styles == nil {
+	value := e.Styles.PaddingLeft.GetValue()
+	if value == "" {
+		// No style, use default.
 		return 0
 	}
-	val, err := e.Styles.FollowCascadeToPx("padding-left", e.GetFontSize())
-	switch err {
-	case css.InheritValue:
+	if value == "inherit" {
 		if e.Parent == nil {
 			return 0
 		}
 		return e.Parent.GetPaddingLeftSize()
-	case css.NoStyles:
+
+	}
+	fontsize := e.GetFontSize()
+	val, err := css.ConvertUnitToPx(fontsize, fontsize, value)
+	if err != nil {
 		return 0
 	}
 	return val
 }
 func (e RenderableDomElement) GetPaddingRightSize() int {
-	if e.Styles == nil {
+	value := e.Styles.PaddingRight.GetValue()
+	if value == "" {
+		// No style, use default.
 		return 0
 	}
-	val, err := e.Styles.FollowCascadeToPx("padding-right", e.GetFontSize())
-	switch err {
-	case css.InheritValue:
+	if value == "inherit" {
 		if e.Parent == nil {
 			return 0
 		}
 		return e.Parent.GetPaddingRightSize()
-	case css.NoStyles:
+
+	}
+	fontsize := e.GetFontSize()
+	val, err := css.ConvertUnitToPx(fontsize, fontsize, value)
+	if err != nil {
 		return 0
 	}
 	return val
 }
 func (e RenderableDomElement) GetPaddingTopSize() int {
-	if e.Styles == nil {
+	value := e.Styles.PaddingTop.GetValue()
+	if value == "" {
+		// No style, use default.
 		return 0
 	}
-	val, err := e.Styles.FollowCascadeToPx("padding-top", e.GetFontSize())
-	switch err {
-	case css.InheritValue:
+	if value == "inherit" {
 		if e.Parent == nil {
 			return 0
 		}
 		return e.Parent.GetPaddingTopSize()
-	case css.NoStyles:
+
+	}
+	fontsize := e.GetFontSize()
+	val, err := css.ConvertUnitToPx(fontsize, fontsize, value)
+	if err != nil {
 		return 0
 	}
 	return val
 }
 func (e RenderableDomElement) GetPaddingBottomSize() int {
-	if e.Styles == nil {
+	value := e.Styles.PaddingBottom.GetValue()
+	if value == "" {
+		// No style, use default.
 		return 0
 	}
-	val, err := e.Styles.FollowCascadeToPx("padding-bottom", e.GetFontSize())
-	switch err {
-	case css.InheritValue:
+	if value == "inherit" {
 		if e.Parent == nil {
 			return 0
 		}
 		return e.Parent.GetPaddingBottomSize()
-	case css.NoStyles:
+
+	}
+	fontsize := e.GetFontSize()
+	val, err := css.ConvertUnitToPx(fontsize, fontsize, value)
+	if err != nil {
 		return 0
 	}
 	return val
@@ -366,15 +442,15 @@ func (e RenderableDomElement) GetBorderTopStyle() string {
 	if e.Styles == nil {
 		return "none"
 	}
-	val, err := e.Styles.FollowCascadeToString("border-top-style")
-	switch err {
-	case css.InheritValue:
+	val := e.Styles.BorderTopStyle.GetValue()
+	if val == "" {
+		return "none"
+	}
+	if val == "inherit" {
 		if e.Parent == nil {
 			return "none"
 		}
 		return e.Parent.GetBorderTopStyle()
-	case css.NoStyles:
-		return "none"
 	}
 	return val
 }
@@ -382,15 +458,15 @@ func (e RenderableDomElement) GetBorderBottomStyle() string {
 	if e.Styles == nil {
 		return "none"
 	}
-	val, err := e.Styles.FollowCascadeToString("border-bottom-style")
-	switch err {
-	case css.InheritValue:
+	val := e.Styles.BorderBottomStyle.GetValue()
+	if val == "" {
+		return "none"
+	}
+	if val == "inherit" {
 		if e.Parent == nil {
 			return "none"
 		}
 		return e.Parent.GetBorderBottomStyle()
-	case css.NoStyles:
-		return "none"
 	}
 	return val
 }
@@ -398,15 +474,15 @@ func (e RenderableDomElement) GetBorderLeftStyle() string {
 	if e.Styles == nil {
 		return "none"
 	}
-	val, err := e.Styles.FollowCascadeToString("border-left-style")
-	switch err {
-	case css.InheritValue:
+	val := e.Styles.BorderLeftStyle.GetValue()
+	if val == "" {
+		return "none"
+	}
+	if val == "inherit" {
 		if e.Parent == nil {
 			return "none"
 		}
 		return e.Parent.GetBorderLeftStyle()
-	case css.NoStyles:
-		return "none"
 	}
 	return val
 }
@@ -414,15 +490,15 @@ func (e RenderableDomElement) GetBorderRightStyle() string {
 	if e.Styles == nil {
 		return "none"
 	}
-	val, err := e.Styles.FollowCascadeToString("border-right-style")
-	switch err {
-	case css.InheritValue:
+	val := e.Styles.BorderRightStyle.GetValue()
+	if val == "" {
+		return "none"
+	}
+	if val == "inherit" {
 		if e.Parent == nil {
 			return "none"
 		}
 		return e.Parent.GetBorderRightStyle()
-	case css.NoStyles:
-		return "none"
 	}
 	return val
 }
@@ -440,10 +516,10 @@ func (e RenderableDomElement) getCSSBox(img image.Image) *outerBoxDrawer {
 			Bottom: BoxMargin{Width: e.GetMarginBottomSize()},
 		},
 		Border: BoxBorders{
-			Top:    BoxBorder{BoxOffset: BoxOffset{Width: e.GetBorderTopSize()}, Color: e.GetBorderTopColor(), Style: e.GetBorderTopStyle()},
-			Left:   BoxBorder{BoxOffset: BoxOffset{Width: e.GetBorderLeftSize()}, Color: e.GetBorderLeftColor(), Style: e.GetBorderLeftStyle()},
-			Right:  BoxBorder{BoxOffset: BoxOffset{Width: e.GetBorderRightSize()}, Color: e.GetBorderRightColor(), Style: e.GetBorderRightStyle()},
-			Bottom: BoxBorder{BoxOffset: BoxOffset{Width: e.GetBorderBottomSize()}, Color: e.GetBorderBottomColor(), Style: e.GetBorderBottomStyle()},
+			Top:    BoxBorder{BoxOffset: BoxOffset{Width: e.GetBorderTopWidth()}, Color: e.GetBorderTopColor(), Style: e.GetBorderTopStyle()},
+			Left:   BoxBorder{BoxOffset: BoxOffset{Width: e.GetBorderLeftWidth()}, Color: e.GetBorderLeftColor(), Style: e.GetBorderLeftStyle()},
+			Right:  BoxBorder{BoxOffset: BoxOffset{Width: e.GetBorderRightWidth()}, Color: e.GetBorderRightColor(), Style: e.GetBorderRightStyle()},
+			Bottom: BoxBorder{BoxOffset: BoxOffset{Width: e.GetBorderBottomWidth()}, Color: e.GetBorderBottomColor(), Style: e.GetBorderBottomStyle()},
 		},
 		Padding: BoxPaddings{
 			Top:    BoxPadding{Width: e.GetPaddingTopSize()},
