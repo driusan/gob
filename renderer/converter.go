@@ -18,6 +18,8 @@ func ConvertNodeToRenderableElement(root *html.Node) (*RenderableDomElement, err
 		nil,
 		nil,
 		nil,
+		0,
+		0,
 	}
 
 	element.FirstChild, _ = ConvertNodeToRenderableElement(root.FirstChild)

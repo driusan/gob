@@ -32,6 +32,9 @@ type RenderableDomElement struct {
 	FirstChild  *RenderableDomElement
 	NextSibling *RenderableDomElement
 	PrevSibling *RenderableDomElement
+
+	contentWidth   int
+	containerWidth int
 }
 
 func getFontHeight(face font.Face) int {
@@ -297,10 +300,35 @@ func (e RenderableDomElement) GetTextIndent(containerWidth int) int {
 	}
 	return px
 }
-func (e RenderableDomElement) Render(containerWidth int) image.Image {
+
+func (e RenderableDomElement) GetContentWidth(containerWidth int) int {
+	width := containerWidth - (e.GetMarginLeftSize() + e.GetMarginRightSize() + e.GetBorderLeftWidth() + e.GetBorderRightWidth() + e.GetPaddingLeftSize() + e.GetPaddingRightSize())
+	if e.Styles == nil {
+		return width
+	}
+	cssVal := e.Styles.Width.GetValue()
+	switch cssVal {
+	case "inherit":
+		if e.Parent == nil {
+			return width
+		}
+		return e.Parent.GetContentWidth(containerWidth)
+	case "", "auto":
+		return width
+	default:
+		calVal, err := css.ConvertUnitToPx(e.GetFontSize(), containerWidth, cssVal)
+		if err == nil {
+			return calVal
+		}
+		return width
+	}
+}
+func (e *RenderableDomElement) Render(containerWidth int) image.Image {
 	dot := image.Point{0, 0}
 
-	width := containerWidth - (e.GetMarginLeftSize() + e.GetMarginRightSize() + e.GetBorderLeftWidth() + e.GetBorderRightWidth() + e.GetPaddingLeftSize() + e.GetPaddingRightSize())
+	width := e.GetContentWidth(containerWidth)
+	e.contentWidth = width
+	e.containerWidth = containerWidth
 	height := 0
 
 	dst := NewDynamicMemoryDrawer(image.Rectangle{image.ZP, image.Point{width, height}})

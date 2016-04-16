@@ -120,7 +120,7 @@ func (e RenderableDomElement) GetBorderBottomWidth() int {
 
 	}
 	fontsize := e.GetFontSize()
-	val, err := css.ConvertUnitToPx(fontsize, fontsize, value)
+	val, err := css.ConvertUnitToPx(fontsize, e.containerWidth, value)
 	if err != nil {
 		return 0
 	}
@@ -163,7 +163,7 @@ func (e RenderableDomElement) GetBorderTopWidth() int {
 
 	}
 	fontsize := e.GetFontSize()
-	val, err := css.ConvertUnitToPx(fontsize, fontsize, value)
+	val, err := css.ConvertUnitToPx(fontsize, e.containerWidth, value)
 	if err != nil {
 		return 0
 	}
@@ -207,7 +207,7 @@ func (e RenderableDomElement) GetBorderLeftWidth() int {
 
 	}
 	fontsize := e.GetFontSize()
-	val, err := css.ConvertUnitToPx(fontsize, fontsize, value)
+	val, err := css.ConvertUnitToPx(fontsize, e.containerWidth, value)
 	if err != nil {
 		return 0
 	}
@@ -251,7 +251,7 @@ func (e RenderableDomElement) GetBorderRightWidth() int {
 
 	}
 	fontsize := e.GetFontSize()
-	val, err := css.ConvertUnitToPx(fontsize, fontsize, value)
+	val, err := css.ConvertUnitToPx(fontsize, e.containerWidth, value)
 	if err != nil {
 		return 0
 	}
@@ -278,24 +278,29 @@ func (e RenderableDomElement) GetBorderRightColor() *color.RGBA {
 	return c
 }
 func (e RenderableDomElement) GetMarginLeftSize() int {
-	value := e.Styles.MarginLeft.GetValue()
-	if value == "" {
-		// No style, use default.
+	switch value := e.Styles.MarginLeft.GetValue(); value {
+	case "":
 		return 0
-	}
-	if value == "inherit" {
+	case "inherit":
 		if e.Parent == nil {
 			return 0
 		}
 		return e.Parent.GetMarginLeftSize()
-
-	}
-	fontsize := e.GetFontSize()
-	val, err := css.ConvertUnitToPx(fontsize, fontsize, value)
-	if err != nil {
+	case "auto":
+		if e.Styles.MarginRight.GetValue() == "auto" {
+			// return calculate how much is needed to center
+			return (e.containerWidth - e.contentWidth) / 2
+		}
 		return 0
+	default:
+
+		fontsize := e.GetFontSize()
+		val, err := css.ConvertUnitToPx(fontsize, e.containerWidth, value)
+		if err != nil {
+			return 0
+		}
+		return val
 	}
-	return val
 }
 func (e RenderableDomElement) GetMarginRightSize() int {
 	value := e.Styles.MarginRight.GetValue()
@@ -311,7 +316,7 @@ func (e RenderableDomElement) GetMarginRightSize() int {
 
 	}
 	fontsize := e.GetFontSize()
-	val, err := css.ConvertUnitToPx(fontsize, fontsize, value)
+	val, err := css.ConvertUnitToPx(fontsize, e.containerWidth, value)
 	if err != nil {
 		return 0
 	}
@@ -331,7 +336,7 @@ func (e RenderableDomElement) GetMarginTopSize() int {
 
 	}
 	fontsize := e.GetFontSize()
-	val, err := css.ConvertUnitToPx(fontsize, fontsize, value)
+	val, err := css.ConvertUnitToPx(fontsize, e.containerWidth, value)
 	if err != nil {
 		return 0
 	}
@@ -352,7 +357,7 @@ func (e RenderableDomElement) GetMarginBottomSize() int {
 
 	}
 	fontsize := e.GetFontSize()
-	val, err := css.ConvertUnitToPx(fontsize, fontsize, value)
+	val, err := css.ConvertUnitToPx(fontsize, e.containerWidth, value)
 	if err != nil {
 		return 0
 	}
@@ -372,7 +377,7 @@ func (e RenderableDomElement) GetPaddingLeftSize() int {
 
 	}
 	fontsize := e.GetFontSize()
-	val, err := css.ConvertUnitToPx(fontsize, fontsize, value)
+	val, err := css.ConvertUnitToPx(fontsize, e.containerWidth, value)
 	if err != nil {
 		return 0
 	}
@@ -392,7 +397,7 @@ func (e RenderableDomElement) GetPaddingRightSize() int {
 
 	}
 	fontsize := e.GetFontSize()
-	val, err := css.ConvertUnitToPx(fontsize, fontsize, value)
+	val, err := css.ConvertUnitToPx(fontsize, e.containerWidth, value)
 	if err != nil {
 		return 0
 	}
@@ -412,7 +417,7 @@ func (e RenderableDomElement) GetPaddingTopSize() int {
 
 	}
 	fontsize := e.GetFontSize()
-	val, err := css.ConvertUnitToPx(fontsize, fontsize, value)
+	val, err := css.ConvertUnitToPx(fontsize, e.containerWidth, value)
 	if err != nil {
 		return 0
 	}
@@ -432,7 +437,7 @@ func (e RenderableDomElement) GetPaddingBottomSize() int {
 
 	}
 	fontsize := e.GetFontSize()
-	val, err := css.ConvertUnitToPx(fontsize, fontsize, value)
+	val, err := css.ConvertUnitToPx(fontsize, e.containerWidth, value)
 	if err != nil {
 		return 0
 	}
