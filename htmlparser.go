@@ -92,6 +92,11 @@ func parseHTML(r io.Reader) *Page {
 		default:
 			el.Styles.SetFontSize(fontSizeToPx(strVal, el.Parent))
 		}
+
+		if el.Type == html.ElementNode && el.Data == "body" {
+			background = el.GetBackgroundColor()
+			fmt.Printf("Body!")
+		}
 	})
 
 	return &Page{renderable}

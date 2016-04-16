@@ -133,11 +133,12 @@ func (e *RenderableDomElement) Walk(callback func(*RenderableDomElement)) {
 }
 
 func (e RenderableDomElement) GetBackgroundColor() color.Color {
-	deflt := &color.RGBA{0x00, 0xE0, 0xE0, 0x00}
+	deflt := &color.RGBA{0xE0, 0xE0, 0xE0, 0x00}
 	switch bg, err := e.Styles.GetBackgroundColor(deflt); err {
 	case css.InheritValue:
 		if e.Parent == nil {
-			return &color.RGBA{0xE0, 0xE0, 0xE0, 0xFF}
+			return deflt
+			//&color.RGBA{0xE0, 0xE0, 0xE0, 0xFF}
 		}
 		return e.Parent.GetBackgroundColor()
 	case css.NoStyles:
