@@ -3,6 +3,7 @@ package renderer
 import (
 	"Gob/css"
 	"Gob/dom"
+	//"fmt"
 	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
 	"golang.org/x/net/html"
@@ -62,8 +63,35 @@ func stringSize(fntDrawer font.Drawer, textContent string) (int, error) {
 }
 
 func (e *RenderableDomElement) GetLineHeight() int {
+	// inheritd == yes
+	// percentage relative to the font size of the element itself
 	fSize := e.GetFontSize()
-	fontFace := e.Styles.GetFontFace(fSize)
+	if e.Styles == nil {
+		if e.Parent == nil {
+			fontFace := e.Styles.GetFontFace(fSize)
+			return getFontHeight(fontFace)
+		}
+		//return e.Parent.GetLineHeight()
+		fontFace := e.Styles.GetFontFace(fSize)
+		return getFontHeight(fontFace)
+	}
+	stringVal := e.Styles.LineHeight.GetValue()
+	if stringVal == "" {
+		if e.Parent == nil {
+			fontFace := e.Styles.GetFontFace(fSize)
+			return getFontHeight(fontFace)
+		}
+		//return e.Parent.GetLineHeight()
+		fontFace := e.Styles.GetFontFace(fSize)
+		return getFontHeight(fontFace)
+
+	}
+	lHeightSize, err := css.ConvertUnitToPx(fSize, fSize, stringVal)
+	if err != nil {
+		fontFace := e.Styles.GetFontFace(fSize)
+		return getFontHeight(fontFace)
+	}
+	fontFace := e.Styles.GetFontFace(lHeightSize)
 	return getFontHeight(fontFace)
 }
 
@@ -183,7 +211,6 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 		Dst:  nil,
 		Src:  &image.Uniform{e.GetColor()},
 		Face: fontFace,
-		Dot:  fixed.P(0, fontFace.Metrics().Ascent.Floor()),
 	}
 
 	ssize, _ := stringSize(fntDrawer, textContent)
@@ -192,6 +219,9 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 	}
 	lineheight := e.GetLineHeight()
 	img = image.NewRGBA(image.Rectangle{image.ZP, image.Point{ssize, lineheight}})
+
+	//BUG(driusan): This math is wrong
+	fntDrawer.Dot = fixed.P(0, fontFace.Metrics().Ascent.Floor())
 	fntDrawer.Dst = img
 
 	if decoration := e.GetTextDecoration(); decoration != "" && decoration != "none" && decoration != "blink" {
@@ -203,13 +233,13 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 			}
 		}
 		if strings.Contains(decoration, "overline") {
-			y := 1
+			y := fntDrawer.Dot.Y.Floor() - fontFace.Metrics().Ascent.Floor()
 			for px := 0; px < ssize; px++ {
 				img.Set(px, y, color)
 			}
 		}
 		if strings.Contains(decoration, "line-through") {
-			y := fontFace.Metrics().Ascent.Floor() / 2
+			y := fntDrawer.Dot.Y.Floor() - (fontFace.Metrics().Ascent.Floor() / 2)
 			for px := 0; px < ssize; px++ {
 				img.Set(px, y, color)
 			}
