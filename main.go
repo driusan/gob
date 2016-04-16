@@ -64,6 +64,20 @@ func paintWindow(s screen.Screen, w screen.Window, v *Viewport, page *Page) {
 }
 
 func main() {
+	filename := "test.html"
+	if len(os.Args) > 1 {
+		if _, err := os.Stat(os.Args[1]); !os.IsNotExist(err) {
+			filename = os.Args[1]
+		}
+
+	}
+	f, err := os.Open(filename)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Could not open test.html\n")
+		return
+	}
+	parsedhtml := parseHTML(f)
+	f.Close()
 	driver.Main(func(s screen.Screen) {
 		w, err := s.NewWindow(nil)
 		if err != nil {
@@ -71,13 +85,6 @@ func main() {
 		}
 		defer w.Release()
 
-		f, err := os.Open("test.html")
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Could not open test.html\n")
-			return
-		}
-		parsedhtml := parseHTML(f)
-		f.Close()
 		var v Viewport
 		// there will be a size event immediately after creating
 		// the window which will trigger this.
