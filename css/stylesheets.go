@@ -1,7 +1,8 @@
 package css
 
 import (
-	"Gob/dom"
+	//"Gob/dom"
+	"golang.org/x/net/html"
 	"strings"
 )
 
@@ -81,6 +82,6 @@ func ParseStylesheet(val string, src StyleSource) Stylesheet {
 	return s
 }
 
-func (r StyleRule) Matches(el *dom.Element) bool {
+func (r StyleRule) Matches(el *html.Node) bool {
 	return r.Selector.Matches(el)
 }

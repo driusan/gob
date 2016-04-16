@@ -46,13 +46,13 @@ func parseHTML(r io.Reader) *Page {
 
 	renderable.Walk(func(el *renderer.RenderableDomElement) {
 		for _, rule := range userAgentStyles {
-			if rule.Matches(el.Element) {
+			if rule.Matches((*html.Node)(el.Element)) {
 				el.Styles.AddStyle(rule)
 			}
 		}
 
 		for _, rule := range styles2 {
-			if rule.Matches(el.Element) {
+			if rule.Matches((*html.Node)(el.Element)) {
 				el.Styles.AddStyle(rule)
 			}
 		}
@@ -95,7 +95,6 @@ func parseHTML(r io.Reader) *Page {
 
 		if el.Type == html.ElementNode && el.Data == "body" {
 			background = el.GetBackgroundColor()
-			fmt.Printf("Body!")
 		}
 	})
 
