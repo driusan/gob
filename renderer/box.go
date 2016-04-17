@@ -46,8 +46,9 @@ type outerBoxDrawer struct {
 
 	Margin BoxMargins
 
-	contentSize image.Point
-	background  image.Image
+	contentSize     image.Point
+	background      image.Image
+	backgroundColor color.Color
 }
 
 func (b *outerBoxDrawer) ColorModel() color.Model {
@@ -63,6 +64,20 @@ func (b *outerBoxDrawer) Bounds() image.Rectangle {
 	}
 }
 
+func (b *outerBoxDrawer) RGBA() *image.RGBA {
+	bounds := b.Bounds()
+	img := image.NewRGBA(b.Bounds())
+	//bg := img.ColorModel().Convert(b.backgroundColor)
+	//var rgbaBg color.RGBA
+	//rgbaBg, _ = bg.(color.RGBA)
+	//rgbaBgP := &rgbaBg
+	for x := bounds.Min.X; x < bounds.Max.X; x++ {
+		for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+			img.Set(x, y, b.background.At(x, y))
+		}
+	}
+	return img
+}
 func (b *outerBoxDrawer) GetContentOrigin() image.Point {
 	return image.Point{
 		X: b.Border.Left.Width + b.Margin.Left.Width + b.Padding.Left.Width,
@@ -96,8 +111,6 @@ func (b *outerBoxDrawer) At(x, y int) color.Color {
 		return b.Border.Right.Color
 	}
 
-	// The padding is taken care of by the GetContentOrigin() call. Everything else
-	// is a background
 	return b.background.At(x, y)
 }
 

@@ -325,6 +325,10 @@ func (e RenderableDomElement) GetContentWidth(containerWidth int) int {
 	}
 }
 func (e *RenderableDomElement) Render(containerWidth int) image.Image {
+	size := e.realRender(containerWidth, true, image.ZR)
+	return e.realRender(containerWidth, false, size.Bounds())
+}
+func (e *RenderableDomElement) realRender(containerWidth int, measureOnly bool, r image.Rectangle) image.Image {
 	dot := image.Point{0, 0}
 
 	width := e.GetContentWidth(containerWidth)
@@ -332,7 +336,14 @@ func (e *RenderableDomElement) Render(containerWidth int) image.Image {
 	e.containerWidth = containerWidth
 	height := 0
 
-	dst := NewDynamicMemoryDrawer(image.Rectangle{image.ZP, image.Point{width, height}})
+	var dst draw.Image
+	var mst *DynamicMemoryDrawer
+	if measureOnly {
+		mst = NewDynamicMemoryDrawer(image.Rectangle{image.ZP, image.Point{width, height}})
+		dst = mst
+	} else {
+		dst = image.NewRGBA(r)
+	}
 
 	firstLine := true
 	for c := e.FirstChild; c != nil; c = c.NextSibling {
@@ -355,8 +366,11 @@ func (e *RenderableDomElement) Render(containerWidth int) image.Image {
 				remainingTextContent = rt
 				sr := childImage.Bounds()
 				r := image.Rectangle{dot, dot.Add(sr.Size())}
-				dst.GrowBounds(r)
-				draw.Draw(dst, r, childImage, sr.Min, draw.Over)
+				if measureOnly {
+					mst.GrowBounds(r)
+				} else {
+					draw.Draw(dst, r, childImage, sr.Min, draw.Over)
+				}
 				if r.Max.X >= width {
 					dot.X = 0
 					dot.Y += e.GetLineHeight()
@@ -379,8 +393,11 @@ func (e *RenderableDomElement) Render(containerWidth int) image.Image {
 					remainingTextContent = rt
 					sr := childImage.Bounds()
 					r := image.Rectangle{dot, dot.Add(sr.Size())}
-					dst.GrowBounds(r)
-					draw.Draw(dst, r, childImage, sr.Min, draw.Over)
+					if measureOnly {
+						mst.GrowBounds(r)
+					} else {
+						draw.Draw(dst, r, childImage, sr.Min, draw.Over)
+					}
 					if r.Max.X >= width {
 						dot.X = 0
 						dot.Y += e.GetLineHeight()
@@ -392,30 +409,36 @@ func (e *RenderableDomElement) Render(containerWidth int) image.Image {
 				fallthrough
 			default:
 				childContent := c.Render(width)
-				box := c.getCSSBox(childContent)
+				box, contentorigin := c.getCSSBox(childContent)
 				sr := box.Bounds()
 				r := image.Rectangle{dot, dot.Add(sr.Size())}
-				dst.GrowBounds(r)
+				if measureOnly {
+					mst.GrowBounds(r)
+				} else {
 
-				draw.Draw(
-					dst,
-					r,
-					box,
-					sr.Min,
-					draw.Over,
-				)
+					draw.Draw(
+						dst,
+						r,
+						box,
+						sr.Min,
+						draw.Over,
+					)
+				}
 
-				contentStart := dot.Add(box.GetContentOrigin())
+				contentStart := dot.Add(contentorigin)
 				contentBounds := childContent.Bounds()
 				cr := image.Rectangle{contentStart, contentStart.Add(contentBounds.Size())}
-				dst.GrowBounds(cr)
-				draw.Draw(
-					dst,
-					cr,
-					childContent,
-					contentBounds.Min,
-					draw.Over,
-				)
+				if measureOnly {
+					mst.GrowBounds(cr)
+				} else {
+					draw.Draw(
+						dst,
+						cr,
+						childContent,
+						contentBounds.Min,
+						draw.Over,
+					)
+				}
 
 				dot.X = 0
 				dot.Y = r.Max.Y
