@@ -303,7 +303,7 @@ func (e RenderableDomElement) GetTextIndent(containerWidth int) int {
 }
 
 func (e RenderableDomElement) GetContentWidth(containerWidth int) int {
-	width := containerWidth - (e.GetMarginLeftSize() + e.GetMarginRightSize() + e.GetBorderLeftWidth() + e.GetBorderRightWidth() + e.GetPaddingLeftSize() + e.GetPaddingRightSize())
+	width := containerWidth - (e.GetMarginLeftSize() + e.GetMarginRightSize() + e.GetBorderLeftWidth() + e.GetBorderRightWidth() + e.GetPaddingLeft() + e.GetPaddingRight())
 	if e.Styles == nil {
 		return width
 	}

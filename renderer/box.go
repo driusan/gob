@@ -289,7 +289,8 @@ func (e RenderableDomElement) GetMarginLeftSize() int {
 	case "auto":
 		if e.Styles.MarginRight.GetValue() == "auto" {
 			// return calculate how much is needed to center
-			return (e.containerWidth - e.contentWidth) / 2
+
+			return (e.containerWidth - e.contentWidth - e.GetBorderLeftWidth() - e.GetBorderRightWidth() - e.GetPaddingLeft() - e.GetPaddingRight()) / 2
 		}
 		return 0
 	default:
@@ -363,7 +364,7 @@ func (e RenderableDomElement) GetMarginBottomSize() int {
 	}
 	return val
 }
-func (e RenderableDomElement) GetPaddingLeftSize() int {
+func (e RenderableDomElement) GetPaddingLeft() int {
 	value := e.Styles.PaddingLeft.GetValue()
 	if value == "" {
 		// No style, use default.
@@ -373,7 +374,7 @@ func (e RenderableDomElement) GetPaddingLeftSize() int {
 		if e.Parent == nil {
 			return 0
 		}
-		return e.Parent.GetPaddingLeftSize()
+		return e.Parent.GetPaddingLeft()
 
 	}
 	fontsize := e.GetFontSize()
@@ -383,7 +384,7 @@ func (e RenderableDomElement) GetPaddingLeftSize() int {
 	}
 	return val
 }
-func (e RenderableDomElement) GetPaddingRightSize() int {
+func (e RenderableDomElement) GetPaddingRight() int {
 	value := e.Styles.PaddingRight.GetValue()
 	if value == "" {
 		// No style, use default.
@@ -393,7 +394,7 @@ func (e RenderableDomElement) GetPaddingRightSize() int {
 		if e.Parent == nil {
 			return 0
 		}
-		return e.Parent.GetPaddingRightSize()
+		return e.Parent.GetPaddingRight()
 
 	}
 	fontsize := e.GetFontSize()
@@ -403,7 +404,7 @@ func (e RenderableDomElement) GetPaddingRightSize() int {
 	}
 	return val
 }
-func (e RenderableDomElement) GetPaddingTopSize() int {
+func (e RenderableDomElement) GetPaddingTop() int {
 	value := e.Styles.PaddingTop.GetValue()
 	if value == "" {
 		// No style, use default.
@@ -413,7 +414,7 @@ func (e RenderableDomElement) GetPaddingTopSize() int {
 		if e.Parent == nil {
 			return 0
 		}
-		return e.Parent.GetPaddingTopSize()
+		return e.Parent.GetPaddingTop()
 
 	}
 	fontsize := e.GetFontSize()
@@ -423,7 +424,7 @@ func (e RenderableDomElement) GetPaddingTopSize() int {
 	}
 	return val
 }
-func (e RenderableDomElement) GetPaddingBottomSize() int {
+func (e RenderableDomElement) GetPaddingBottom() int {
 	value := e.Styles.PaddingBottom.GetValue()
 	if value == "" {
 		// No style, use default.
@@ -433,7 +434,7 @@ func (e RenderableDomElement) GetPaddingBottomSize() int {
 		if e.Parent == nil {
 			return 0
 		}
-		return e.Parent.GetPaddingBottomSize()
+		return e.Parent.GetPaddingBottom()
 
 	}
 	fontsize := e.GetFontSize()
@@ -508,12 +509,13 @@ func (e RenderableDomElement) GetBorderRightStyle() string {
 	return val
 }
 
-func (e RenderableDomElement) getCSSBox(img image.Image) *outerBoxDrawer {
+func (e RenderableDomElement) getCSSBox(img image.Image) (image.Image, image.Point) {
 	bg := e.GetBackgroundColor()
 	if bg == nil {
 		bg = dfltBorder
 	}
-	return &outerBoxDrawer{
+
+	box := &outerBoxDrawer{
 		Margin: BoxMargins{
 			Top:    BoxMargin{Width: e.GetMarginTopSize()},
 			Left:   BoxMargin{Width: e.GetMarginLeftSize()},
@@ -527,12 +529,13 @@ func (e RenderableDomElement) getCSSBox(img image.Image) *outerBoxDrawer {
 			Bottom: BoxBorder{BoxOffset: BoxOffset{Width: e.GetBorderBottomWidth()}, Color: e.GetBorderBottomColor(), Style: e.GetBorderBottomStyle()},
 		},
 		Padding: BoxPaddings{
-			Top:    BoxPadding{Width: e.GetPaddingTopSize()},
-			Left:   BoxPadding{Width: e.GetPaddingLeftSize()},
-			Right:  BoxPadding{Width: e.GetPaddingRightSize()},
-			Bottom: BoxPadding{Width: e.GetPaddingBottomSize()},
+			Top:    BoxPadding{Width: e.GetPaddingTop()},
+			Left:   BoxPadding{Width: e.GetPaddingLeft()},
+			Right:  BoxPadding{Width: e.GetPaddingRight()},
+			Bottom: BoxPadding{Width: e.GetPaddingBottom()},
 		},
 		contentSize: img.Bounds().Size(),
 		background:  &image.Uniform{bg},
 	}
+	return box, box.GetContentOrigin()
 }
