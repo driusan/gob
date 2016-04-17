@@ -12,14 +12,8 @@ func ConvertNodeToRenderableElement(root *html.Node) (*RenderableDomElement, err
 	}
 
 	element := &RenderableDomElement{
-		(*dom.Element)(root),
-		new(css.StyledElement),
-		nil,
-		nil,
-		nil,
-		nil,
-		0,
-		0,
+		Element: (*dom.Element)(root),
+		Styles:  new(css.StyledElement),
 	}
 
 	element.FirstChild, _ = ConvertNodeToRenderableElement(root.FirstChild)

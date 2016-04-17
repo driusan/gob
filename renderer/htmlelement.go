@@ -3,7 +3,6 @@ package renderer
 import (
 	"Gob/css"
 	"Gob/dom"
-	//"fmt"
 	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
 	"golang.org/x/net/html"
@@ -33,6 +32,7 @@ type RenderableDomElement struct {
 	NextSibling *RenderableDomElement
 	PrevSibling *RenderableDomElement
 
+	ImageMap       ImageMap
 	contentWidth   int
 	containerWidth int
 }
@@ -133,27 +133,26 @@ func (e *RenderableDomElement) Walk(callback func(*RenderableDomElement)) {
 }
 
 func (e RenderableDomElement) GetBackgroundColor() color.Color {
-	deflt := &color.RGBA{0xE0, 0xE0, 0xE0, 0x00}
-	switch bg, err := e.Styles.GetBackgroundColor(deflt); err {
+	switch bg, err := e.Styles.GetBackgroundColor(dfltBackground); err {
 	case css.InheritValue:
 		if e.Parent == nil {
-			return deflt
+			return dfltBackground
 			//&color.RGBA{0xE0, 0xE0, 0xE0, 0xFF}
 		}
 		return e.Parent.GetBackgroundColor()
 	case css.NoStyles:
-		return deflt
+		return dfltBackground
 	default:
 		return bg
 	}
 }
 
 func (e RenderableDomElement) GetColor() color.Color {
-	var deflt *color.RGBA
+	var deflt color.RGBA
 	if e.Type == html.ElementNode && e.Data == "a" {
-		deflt = &color.RGBA{0, 0, 0xFF, 0xFF}
+		deflt = color.RGBA{0, 0, 0xFF, 0xFF}
 	} else {
-		deflt = &color.RGBA{0, 0, 0, 0xFF}
+		deflt = color.RGBA{0, 0, 0, 0xFF}
 	}
 	cssColor := e.Styles.GetColor(deflt)
 	return cssColor
@@ -211,9 +210,13 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 	fSize := e.GetFontSize()
 	fontFace := e.Styles.GetFontFace(fSize)
 	var dot int
+	clr := e.GetColor()
+	if clr == nil {
+		clr = color.RGBA{0xff, 0xff, 0xff, 0xff}
+	}
 	fntDrawer := font.Drawer{
 		Dst:  nil,
-		Src:  &image.Uniform{e.GetColor()},
+		Src:  &image.Uniform{clr},
 		Face: fontFace,
 	}
 
@@ -229,23 +232,22 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 	fntDrawer.Dst = img
 
 	if decoration := e.GetTextDecoration(); decoration != "" && decoration != "none" && decoration != "blink" {
-		color := e.GetColor()
 		if strings.Contains(decoration, "underline") {
 			y := fntDrawer.Dot.Y.Floor()
 			for px := 0; px < ssize; px++ {
-				img.Set(px, y, color)
+				img.Set(px, y, clr)
 			}
 		}
 		if strings.Contains(decoration, "overline") {
 			y := fntDrawer.Dot.Y.Floor() - fontFace.Metrics().Ascent.Floor()
 			for px := 0; px < ssize; px++ {
-				img.Set(px, y, color)
+				img.Set(px, y, clr)
 			}
 		}
 		if strings.Contains(decoration, "line-through") {
 			y := fntDrawer.Dot.Y.Floor() - (fontFace.Metrics().Ascent.Floor() / 2)
 			for px := 0; px < ssize; px++ {
-				img.Set(px, y, color)
+				img.Set(px, y, clr)
 			}
 		}
 	}
@@ -346,6 +348,7 @@ func (e *RenderableDomElement) realRender(containerWidth int, measureOnly bool, 
 	}
 
 	firstLine := true
+	imageMap := NewImageMap()
 	for c := e.FirstChild; c != nil; c = c.NextSibling {
 		switch c.Type {
 		case html.TextNode:
@@ -369,7 +372,7 @@ func (e *RenderableDomElement) realRender(containerWidth int, measureOnly bool, 
 				if measureOnly {
 					mst.GrowBounds(r)
 				} else {
-					draw.Draw(dst, r, childImage, sr.Min, draw.Over)
+					draw.Draw(dst, r, childImage, sr.Min, draw.Src)
 				}
 				if r.Max.X >= width {
 					dot.X = 0
@@ -398,6 +401,23 @@ func (e *RenderableDomElement) realRender(containerWidth int, measureOnly bool, 
 					} else {
 						draw.Draw(dst, r, childImage, sr.Min, draw.Over)
 					}
+					// populate the imagemap by adding the line box, then adding the children's
+					// children.
+					// add the child
+					imageMap.Add(c, r.Add(image.Point{
+						X: 0, //e.GetPaddingLeft()+e.GetMarginLeftSize()+e.GetBorderLeftWidth(),
+						Y: 0, //e.GetPaddingTop()+e.GetMarginTopSize()+e.GetBorderTopWidth(),
+					})) //childImage.Bounds())
+					//childImageMap := c.ImageMap
+					// add the grandchildren
+
+					/*
+						for _, area := range childImageMap {
+							// translate the coordinate systems from the child's to this one
+							newArea := area.Area.Add(dot)
+							imageMap.Add(area.Content, newArea)
+						}
+					*/
 					if r.Max.X >= width {
 						dot.X = 0
 						dot.Y += e.GetLineHeight()
@@ -408,14 +428,15 @@ func (e *RenderableDomElement) realRender(containerWidth int, measureOnly bool, 
 			case "block":
 				fallthrough
 			default:
+				// draw the border
 				childContent := c.Render(width)
 				box, contentorigin := c.getCSSBox(childContent)
 				sr := box.Bounds()
 				r := image.Rectangle{dot, dot.Add(sr.Size())}
+
 				if measureOnly {
 					mst.GrowBounds(r)
 				} else {
-
 					draw.Draw(
 						dst,
 						r,
@@ -423,6 +444,17 @@ func (e *RenderableDomElement) realRender(containerWidth int, measureOnly bool, 
 						sr.Min,
 						draw.Over,
 					)
+				}
+				// populate the imagemap by adding the child, then adding the children's
+				// children.
+				// add the child
+				childImageMap := c.ImageMap
+				imageMap.Add(c, r)
+				// add the grandchildren
+				for _, area := range childImageMap {
+					// translate the coordinate systems from the child's to this one
+					newArea := area.Area.Add(dot).Add(contentorigin)
+					imageMap.Add(area.Content, newArea)
 				}
 
 				contentStart := dot.Add(contentorigin)
@@ -446,5 +478,6 @@ func (e *RenderableDomElement) realRender(containerWidth int, measureOnly bool, 
 
 		}
 	}
+	e.ImageMap = imageMap
 	return dst
 }

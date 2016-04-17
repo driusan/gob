@@ -36,7 +36,7 @@ func ParseBlock(val string) map[StyleAttribute]StyleValue {
 		}
 		idx := strings.Index(attrib, ":")
 		if idx < 0 {
-			panic("Got a bad selector" + attrib)
+			continue //panic("Got a bad selector" + attrib)
 		}
 		selector := strings.TrimSpace(attrib[0:idx])
 		value := strings.TrimSpace(attrib[idx+1:])

@@ -9,12 +9,13 @@ import (
 	//	"strings"
 	"io"
 	"io/ioutil"
+	"net/url"
 	"os"
 )
 
-func parseHTML(r io.Reader) *Page {
+func loadHTML(r io.Reader, urlContext *url.URL) *Page {
 	parsedhtml, _ := html.Parse(r)
-	styles := css.ExtractStyles(parsedhtml)
+	styles := css.ExtractStyles(parsedhtml, urlContext)
 
 	var body *html.Node
 	var root *html.Node
@@ -98,7 +99,10 @@ func parseHTML(r io.Reader) *Page {
 		}
 	})
 
-	return &Page{renderable}
+	return &Page{
+		Content: renderable,
+		URL:     nil,
+	}
 
 }
 
@@ -152,7 +156,6 @@ func fontSizeToPx(val string, parent *renderer.RenderableDomElement) int {
 				return DefaultFontSize
 			}
 			size := int(f * float64(psize) / 100.0)
-			fmt.Printf("FontSize: %d\n", size)
 			return size
 		}
 		return DefaultFontSize

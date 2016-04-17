@@ -115,6 +115,7 @@ func (b *outerBoxDrawer) At(x, y int) color.Color {
 }
 
 var dfltBorder *color.RGBA = &color.RGBA{255, 128, 128, 0}
+var dfltBackground *color.RGBA = &color.RGBA{255, 128, 128, 255}
 
 func (e RenderableDomElement) GetBorderBottomWidth() int {
 	if e.Styles == nil {
@@ -525,7 +526,7 @@ func (e RenderableDomElement) GetBorderRightStyle() string {
 func (e RenderableDomElement) getCSSBox(img image.Image) (image.Image, image.Point) {
 	bg := e.GetBackgroundColor()
 	if bg == nil {
-		bg = dfltBorder
+		bg = dfltBackground
 	}
 
 	box := &outerBoxDrawer{

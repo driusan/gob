@@ -113,11 +113,12 @@ func sHexToUint8(val byte) uint8 {
 	panic("Invalid character")
 }
 func ConvertColorToRGBA(cssString string) (*color.RGBA, error) {
+	black := &color.RGBA{0, 0, 0, 255}
 	if cssString[0:3] == "rgb" {
 		tuple := cssString[4 : len(cssString)-1]
 		pieces := strings.Split(tuple, ",")
 		if len(pieces) != 3 {
-			return nil, Invalid
+			return black, Invalid
 		}
 
 		rint, _ := strconv.Atoi(strings.TrimSpace(pieces[0]))
@@ -135,11 +136,11 @@ func ConvertColorToRGBA(cssString string) (*color.RGBA, error) {
 			// #RGB
 			return &color.RGBA{sHexToUint8(cssString[1]), sHexToUint8(cssString[2]), sHexToUint8(cssString[3]), 255}, nil
 		}
-		return nil, Invalid
+		return black, Invalid
 	}
 	switch cssString {
 	case "inherit":
-		return nil, InheritValue
+		return black, InheritValue
 	case "transparent":
 		return &color.RGBA{0x80, 0, 0, 0}, nil
 	case "maroon":
@@ -177,5 +178,5 @@ func ConvertColorToRGBA(cssString string) (*color.RGBA, error) {
 	case "gray", "grey":
 		return &color.RGBA{0x80, 0x80, 0x80, 255}, nil
 	}
-	return nil, NoStyles
+	return black, NoStyles
 }

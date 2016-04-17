@@ -1,19 +1,23 @@
 package main
 
 import (
+	//"runtime/pprof"
+	"Gob/net"
 	"Gob/renderer"
 	"fmt"
 	"golang.org/x/exp/shiny/driver"
 	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/mobile/event/key"
 	"golang.org/x/mobile/event/lifecycle"
+	"golang.org/x/mobile/event/mouse"
 	"golang.org/x/mobile/event/paint"
 	"golang.org/x/mobile/event/size"
 	"golang.org/x/mobile/event/touch"
-	//	"golang.org/x/mobile/event/mouse"
+	"golang.org/x/net/html"
 	"image"
 	"image/color"
 	"image/draw"
+	"net/url"
 	"os"
 )
 
@@ -34,7 +38,8 @@ type Viewport struct {
 	Cursor image.Point
 }
 type Page struct {
-	Body renderer.Renderer
+	Content *renderer.RenderableDomElement
+	URL     *url.URL
 }
 
 func paintWindow(s screen.Screen, w screen.Window, v *Viewport, page *Page) {
@@ -64,20 +69,24 @@ func paintWindow(s screen.Screen, w screen.Window, v *Viewport, page *Page) {
 }
 
 func main() {
+	/*
+		f, _ := os.Create("test.profile")
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
+	*/
+
 	filename := "test.html"
 	if len(os.Args) > 1 {
-		if _, err := os.Stat(os.Args[1]); !os.IsNotExist(err) {
-			filename = os.Args[1]
-		}
+		filename = os.Args[1]
 
 	}
-	f, err := os.Open(filename)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Could not open test.html\n")
+
+	page, err := loadPage(filename)
+	if err != nil || page == nil {
+		fmt.Fprintf(os.Stderr, "Error: %s\n", err.Error())
 		return
 	}
-	parsedhtml := parseHTML(f)
-	f.Close()
+
 	driver.Main(func(s screen.Screen) {
 		w, err := s.NewWindow(nil)
 		if err != nil {
@@ -88,7 +97,6 @@ func main() {
 		var v Viewport
 		// there will be a size event immediately after creating
 		// the window which will trigger this.
-		//v.Content = parsedhtml.Body.Render(v.Size.Size().X)
 		for {
 			switch e := w.NextEvent().(type) {
 			case lifecycle.Event:
@@ -106,7 +114,7 @@ func main() {
 						if v.Cursor.X > v.Content.Bounds().Max.X {
 							v.Cursor.X = v.Content.Bounds().Max.X - 10
 						}
-						paintWindow(s, w, &v, parsedhtml)
+						paintWindow(s, w, &v, page)
 					}
 				case key.CodeRightArrow:
 					if e.Direction == key.DirPress {
@@ -115,7 +123,7 @@ func main() {
 						if v.Cursor.X > v.Content.Bounds().Max.X {
 							v.Cursor.X = v.Content.Bounds().Max.X - 10
 						}
-						paintWindow(s, w, &v, parsedhtml)
+						paintWindow(s, w, &v, page)
 					}
 				case key.CodeDownArrow:
 					if e.Direction == key.DirPress {
@@ -124,7 +132,7 @@ func main() {
 						if v.Cursor.Y > v.Content.Bounds().Max.Y {
 							v.Cursor.Y = v.Content.Bounds().Max.Y - 10
 						}
-						paintWindow(s, w, &v, parsedhtml)
+						paintWindow(s, w, &v, page)
 					}
 				case key.CodeUpArrow:
 					if e.Direction == key.DirPress {
@@ -133,23 +141,62 @@ func main() {
 						if v.Cursor.Y < 0 {
 							v.Cursor.Y = 0
 						}
-						paintWindow(s, w, &v, parsedhtml)
+						paintWindow(s, w, &v, page)
 					}
 				default:
 					fmt.Printf("Unknown key: %s", e.Code)
 				}
 			case paint.Event:
-				paintWindow(s, w, &v, parsedhtml)
+				paintWindow(s, w, &v, page)
 			case size.Event:
 				v.Size = e
-				v.Content = parsedhtml.Body.Render(e.Size().X)
+				v.Content = page.Content.Render(e.Size().X)
 			case touch.Event:
 				fmt.Printf("Touch event!")
-			//case mouse.Event:
-			//	fmt.Printf("Mouse event! %e", e)
+			case mouse.Event:
+				//fmt.Printf("Mouse event at %d, %d! %e", e.X, e.Y, e)
+				if page.Content != nil && page.Content.ImageMap != nil {
+
+					el := page.Content.ImageMap.At(int(e.X)+v.Cursor.X, int(e.Y)+v.Cursor.Y)
+					if el != nil {
+						switch e.Direction {
+						case mouse.DirRelease:
+							el.OnClick()
+							if el.Type == html.ElementNode && el.Data == "a" {
+								p, err := loadNewPage(page.URL, el.GetAttribute("href"))
+								if err == nil && p != nil {
+									page = p
+									v.Content = p.Content.Render(v.Size.Size().X)
+								}
+							}
+						default:
+							if el.Type == html.ElementNode && el.Data == "a" {
+								fmt.Printf("Hovering over link %s\n", el.GetAttribute("href"))
+							}
+						}
+					}
+				}
 			default:
 				//	fmt.Printf("%s\n", e)
 			}
 		}
 	})
+}
+func loadNewPage(context *url.URL, path string) (*Page, error) {
+	fmt.Printf("Inew newPage\n")
+	u, err := url.Parse(path)
+	if err != nil {
+		return nil, err
+	}
+	newURL := context.ResolveReference(u)
+	r, err := net.GetURLReader(newURL)
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+	fmt.Printf("Loading new page %s\n", newURL)
+	p := loadHTML(r, newURL)
+	p.URL = newURL
+	fmt.Printf("Loaded new page %s\n", newURL)
+	return p, nil
 }

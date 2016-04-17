@@ -19,3 +19,16 @@ func (e Element) GetTextContent() string {
 	}
 	return ret
 }
+
+func (e Element) GetAttribute(attr string) string {
+	for _, attrField := range e.Attr {
+		if attrField.Key == attr {
+			return attrField.Val
+		}
+	}
+	return ""
+
+}
+
+func (e Element) OnClick() {
+}

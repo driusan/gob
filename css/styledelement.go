@@ -14,6 +14,15 @@ const (
 	DefaultFontSize = 16
 )
 
+var SansSerifFont *truetype.Font
+var sansSerifFontSizeCache map[int]font.Face
+
+func init() {
+	fontBytes, _ := ioutil.ReadFile("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+	SansSerifFont, _ = truetype.Parse(fontBytes)
+	sansSerifFontSizeCache = make(map[int]font.Face)
+}
+
 type StyleSource uint8
 
 func (s StyleSource) String() string {
@@ -127,13 +136,17 @@ func (e *StyledElement) SetFontSize(size int) {
 	e.fontSize = size
 }
 func (e StyledElement) GetFontFace(fsize int) font.Face {
-	fontBytes, _ := ioutil.ReadFile("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
-	fnt, _ := truetype.Parse(fontBytes)
-	return truetype.NewFace(fnt,
+	if face, ok := sansSerifFontSizeCache[fsize]; ok {
+		return face
+	}
+
+	face := truetype.NewFace(SansSerifFont,
 		&truetype.Options{
 			Size:    float64(fsize),
 			DPI:     72,
 			Hinting: font.HintingFull})
+	sansSerifFontSizeCache[fsize] = face
+	return face
 
 }
 func (e StyledElement) GetFontSize() (int, error) {
@@ -438,39 +451,12 @@ func (e *StyledElement) GetAttribute(attr string) StyleValue {
 	return StyleValue{"", false}
 }
 
-/*
-func (e *StyledElement) FollowCascadeToPx(attr string, val int) (int, error) {
-	// apply each rule
-	for _, rule := range e.rules {
-		if string(rule.Name) == attr {
-			if rule.Name == "inherit" {
-				return 0, InheritValue
-			}
-			return ConvertUnitToPx(val, val, rule.Value.string)
-		}
-	}
-	return val, NoStyles
-}
-func (e *StyledElement) FollowCascadeToString(attr string) (string, error) {
-	// apply each rule
-	for _, rule := range e.rules {
-		if string(rule.Name) == attr {
-			if rule.Name == "inherit" {
-				return rule.Value.string, InheritValue
-			}
-			return rule.Value.string, nil
-		}
-	}
-	return "", NoStyles
-}
-*/
-
 // Follows the cascade to get the colour for the attribute named attr.
 // deflt is the default to return if there is nothing found for the attribute in
 // the cascade. It should be the parent's colour if it's an inherited property,
 // and nil otherwise.
 // error will be NoStyles if deflt is returned
-func (e StyledElement) FollowCascadeToColor(attr string, deflt *color.RGBA) (*color.RGBA, error) {
+func (e StyledElement) FollowCascadeToColor(attr string, deflt color.Color) (color.Color, error) {
 	// sort according to CSS cascading rules
 	e.SortStyles()
 
@@ -478,7 +464,7 @@ func (e StyledElement) FollowCascadeToColor(attr string, deflt *color.RGBA) (*co
 	for _, rule := range e.rules {
 		if string(rule.Name) == attr {
 			if rule.Value.string == "inherit" {
-				return nil, InheritValue
+				return deflt, InheritValue
 			}
 			val, _ := ConvertColorToRGBA(rule.Value.string)
 			return val, nil
@@ -487,7 +473,7 @@ func (e StyledElement) FollowCascadeToColor(attr string, deflt *color.RGBA) (*co
 	return deflt, NoStyles
 }
 
-func (e StyledElement) GetBackgroundColor(defaultColour *color.RGBA) (*color.RGBA, error) {
+func (e StyledElement) GetBackgroundColor(defaultColour color.Color) (color.Color, error) {
 	val, err := e.FollowCascadeToColor("background", defaultColour)
 	switch err {
 	case NoStyles:
@@ -508,7 +494,7 @@ func (e StyledElement) GetBorderSizeInPx(side string) (int, error) {
 
 }
 */
-func (e StyledElement) GetBorderColor(side string, defaultColour *color.RGBA) (*color.RGBA, error) {
+func (e StyledElement) GetBorderColor(side string, defaultColour color.Color) (color.Color, error) {
 	val, err := e.FollowCascadeToColor("border-"+side+"-color", defaultColour)
 	switch err {
 	case NoStyles:
@@ -521,7 +507,7 @@ func (e StyledElement) GetBorderColor(side string, defaultColour *color.RGBA) (*
 		panic("Could not get colour and got an error")
 	}
 }
-func (e StyledElement) GetColor(defaultColour *color.RGBA) *color.RGBA {
+func (e StyledElement) GetColor(defaultColour color.Color) color.Color {
 	val, err := e.FollowCascadeToColor("color", defaultColour)
 	switch err {
 	case NoStyles:
