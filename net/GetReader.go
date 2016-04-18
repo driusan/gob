@@ -1,11 +1,12 @@
 package net
 
 import (
-	//"fmt"
+	//	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
+	"os/user"
 	"path/filepath"
 )
 
@@ -38,10 +39,41 @@ func GetURLReader(u *url.URL) (io.ReadCloser, error) {
 		}
 		return os.Open(u.Path)
 	default:
+		if cached := getCacheReader(u); cached != nil {
+			//fmt.Printf("Using cache for %s\n", u)
+			return cached, nil
+		}
 		resp, err := http.Get(u.String())
 		if err != nil {
 			return nil, err
 		}
-		return resp.Body, nil
+		return GetCacheWriter(resp.Body, "/home/driusan/.gob/cache/", u), nil
 	}
+}
+
+func GetCacheLocation(resource *url.URL) string {
+	user, err := user.Current()
+	if err != nil {
+		return ""
+	}
+	cachedir := user.HomeDir + "/.gob/cache/"
+	if resource.Scheme == "" || resource.Host == "" {
+		return ""
+	}
+	dir := filepath.Join(cachedir, resource.Scheme, resource.Host)
+	if dir == "" {
+		return ""
+	}
+	return filepath.Join(dir, escapeString(resource.Path)+"?"+escapeString(resource.RawQuery))
+}
+func getCacheReader(u *url.URL) io.ReadCloser {
+	cacheLocation := GetCacheLocation(u)
+	if _, err := os.Stat(cacheLocation); !os.IsNotExist(err) {
+		o, err := os.Open(cacheLocation)
+		if err != nil {
+			return nil
+		}
+		return o
+	}
+	return nil
 }

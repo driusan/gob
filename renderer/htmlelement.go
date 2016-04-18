@@ -3,6 +3,7 @@ package renderer
 import (
 	"Gob/css"
 	"Gob/dom"
+	//	"fmt"
 	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
 	"golang.org/x/net/html"
@@ -31,6 +32,9 @@ type RenderableDomElement struct {
 	FirstChild  *RenderableDomElement
 	NextSibling *RenderableDomElement
 	PrevSibling *RenderableDomElement
+
+	CSSOuterBox    image.Image
+	ContentOverlay image.Image
 
 	ImageMap       ImageMap
 	FirstPageOnly  bool
@@ -343,6 +347,7 @@ func (e *RenderableDomElement) realRender(containerWidth int, measureOnly bool, 
 				c.RenderAbort <- true
 			}
 		}
+		close(e.RenderAbort)
 		return dst
 	default:
 		dot := image.Point{0, 0}
@@ -351,6 +356,12 @@ func (e *RenderableDomElement) realRender(containerWidth int, measureOnly bool, 
 		e.contentWidth = width
 		e.containerWidth = containerWidth
 		height := 0
+		/*
+			if e.Type == html.ElementNode && e.Data == "img" {
+				if src := e.GetAttribute("src"); src != "" {
+					fmt.Printf("Should load: %s\n", src)
+				}
+			}*/
 
 		var mst *DynamicMemoryDrawer
 		if measureOnly {
@@ -442,23 +453,26 @@ func (e *RenderableDomElement) realRender(containerWidth int, measureOnly bool, 
 				case "block":
 					fallthrough
 				default:
-					// draw the border
-					childContent := c.Render(width)
-					box, contentorigin := c.getCSSBox(childContent)
+					// draw the border, background, and CSS outer box.
+					e.ContentOverlay = c.Render(width) // need the width to calculate the box size
+					box, contentorigin := c.getCSSBox(e.ContentOverlay)
+					e.CSSOuterBox = box
 					sr := box.Bounds()
 					r := image.Rectangle{dot, dot.Add(sr.Size())}
 
 					if measureOnly {
 						mst.GrowBounds(r)
 					} else {
+						// draw the box
 						draw.Draw(
 							dst,
 							r,
-							box,
+							e.CSSOuterBox,
 							sr.Min,
 							draw.Over,
 						)
 					}
+
 					// populate the imagemap by adding the child, then adding the children's
 					// children.
 					// add the child
@@ -471,8 +485,9 @@ func (e *RenderableDomElement) realRender(containerWidth int, measureOnly bool, 
 						imageMap.Add(area.Content, newArea)
 					}
 
+					// now draw the content on top of the outer box
 					contentStart := dot.Add(contentorigin)
-					contentBounds := childContent.Bounds()
+					contentBounds := e.ContentOverlay.Bounds()
 					cr := image.Rectangle{contentStart, contentStart.Add(contentBounds.Size())}
 					if measureOnly {
 						mst.GrowBounds(cr)
@@ -480,7 +495,7 @@ func (e *RenderableDomElement) realRender(containerWidth int, measureOnly bool, 
 						draw.Draw(
 							dst,
 							cr,
-							childContent,
+							e.ContentOverlay,
 							contentBounds.Min,
 							draw.Over,
 						)

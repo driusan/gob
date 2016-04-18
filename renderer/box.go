@@ -551,5 +551,6 @@ func (e RenderableDomElement) getCSSBox(img image.Image) (image.Image, image.Poi
 		contentSize: img.Bounds().Size(),
 		background:  &image.Uniform{bg},
 	}
+	// TODO(driusan): this should return a new RGBA so that it can be composed with image.Draw faster.
 	return box, box.GetContentOrigin()
 }
