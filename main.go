@@ -1,7 +1,6 @@
 package main
 
 import (
-	//"runtime/pprof"
 	"Gob/net"
 	"Gob/renderer"
 	"fmt"
@@ -19,6 +18,7 @@ import (
 	"image/draw"
 	"net/url"
 	"os"
+	"runtime/pprof"
 )
 
 var (
@@ -69,11 +69,9 @@ func paintWindow(s screen.Screen, w screen.Window, v *Viewport, page *Page) {
 }
 
 func main() {
-	/*
-		f, _ := os.Create("test.profile")
-		pprof.StartCPUProfile(f)
-		defer pprof.StopCPUProfile()
-	*/
+	f, _ := os.Create("test.profile")
+	pprof.StartCPUProfile(f)
+	defer pprof.StopCPUProfile()
 
 	filename := "test.html"
 	if len(os.Args) > 1 {

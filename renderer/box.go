@@ -613,9 +613,6 @@ func (e RenderableDomElement) GetBorderRightStyle() string {
 
 func (e *RenderableDomElement) getCSSBox(img image.Image, layoutpass bool) (image.Image, image.Point) {
 	bg := e.GetBackgroundColor()
-	if bg == nil {
-		bg = dfltBackground
-	}
 
 	box := &outerBoxDrawer{
 		Margin: BoxMargins{

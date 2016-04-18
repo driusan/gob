@@ -143,12 +143,14 @@ func (e RenderableDomElement) GetBackgroundColor() color.Color {
 	switch bg, err := e.Styles.GetBackgroundColor(dfltBackground); err {
 	case css.InheritValue:
 		if e.Parent == nil {
-			return dfltBackground
+			//return dfltBackground
+			return color.Transparent //dfltBackground
 			//&color.RGBA{0xE0, 0xE0, 0xE0, 0xFF}
 		}
 		return e.Parent.GetBackgroundColor()
 	case css.NoStyles:
-		return dfltBackground
+		return color.Transparent
+		//return dfltBackground
 	default:
 		return bg
 	}
@@ -161,8 +163,20 @@ func (e RenderableDomElement) GetColor() color.Color {
 	} else {
 		deflt = color.RGBA{0, 0, 0, 0xFF}
 	}
-	cssColor := e.Styles.GetColor(deflt)
-	return cssColor
+	switch cssColor, err := e.Styles.GetColor(deflt); err {
+	case css.InheritValue:
+		if e.Parent == nil {
+			return deflt
+		}
+		return e.Parent.GetColor()
+	case css.NoStyles:
+		if e.Parent == nil {
+			return deflt
+		}
+		return e.Parent.GetColor()
+	default:
+		return cssColor
+	}
 }
 
 func (e RenderableDomElement) GetDisplayProp() string {

@@ -451,70 +451,28 @@ func (e *StyledElement) GetAttribute(attr string) StyleValue {
 	return StyleValue{"", false}
 }
 
-// Follows the cascade to get the colour for the attribute named attr.
-// deflt is the default to return if there is nothing found for the attribute in
-// the cascade. It should be the parent's colour if it's an inherited property,
-// and nil otherwise.
-// error will be NoStyles if deflt is returned
-func (e StyledElement) FollowCascadeToColor(attr string, deflt color.Color) (color.Color, error) {
-	// sort according to CSS cascading rules
-	e.SortStyles()
-
-	// apply each rule
-	for _, rule := range e.rules {
-		if string(rule.Name) == attr {
-			if rule.Value.string == "inherit" {
-				return deflt, InheritValue
-			}
-			val, _ := ConvertColorToRGBA(rule.Value.string)
-			return val, nil
-		}
-	}
-	return deflt, NoStyles
-}
-
 func (e StyledElement) GetBackgroundColor(defaultColour color.Color) (color.Color, error) {
-	val, err := e.FollowCascadeToColor("background", defaultColour)
-	switch err {
-	case NoStyles:
+	switch e.BackgroundColor.string {
+	case "inherit":
 		return defaultColour, InheritValue
-	case InheritValue:
-		return defaultColour, InheritValue
-	case nil:
-		return val, nil
+	case "transparent":
+		return color.Transparent, nil
+	case "":
+		return color.Transparent, NoStyles
 	default:
-		return defaultColour, InheritValue
+		return ConvertColorToRGBA(e.BackgroundColor.string)
 	}
 }
 
-/*
-func (e StyledElement) GetBorderSizeInPx(side string) (int, error) {
-	fSize, _ := e.GetFontSize()
-	return e.FollowCascadeToPx("border-"+side+"-width", fSize)
-
-}
-*/
-func (e StyledElement) GetBorderColor(side string, defaultColour color.Color) (color.Color, error) {
-	val, err := e.FollowCascadeToColor("border-"+side+"-color", defaultColour)
-	switch err {
-	case NoStyles:
+func (e StyledElement) GetColor(defaultColour color.Color) (color.Color, error) {
+	switch e.Color.string {
+	case "inherit":
+		return defaultColour, InheritValue
+	case "transparent":
+		return defaultColour, nil
+	case "":
 		return defaultColour, NoStyles
-	case InheritValue:
-		return defaultColour, InheritValue
-	case nil:
-		return val, nil
 	default:
-		panic("Could not get colour and got an error")
-	}
-}
-func (e StyledElement) GetColor(defaultColour color.Color) color.Color {
-	val, err := e.FollowCascadeToColor("color", defaultColour)
-	switch err {
-	case NoStyles:
-		return defaultColour
-	case nil:
-		return val
-	default:
-		panic("Could not get colour and got an error")
+		return ConvertColorToRGBA(e.Color.string)
 	}
 }

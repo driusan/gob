@@ -95,7 +95,7 @@ func loadHTML(r io.Reader, urlContext *url.URL) *Page {
 		}
 
 		if el.Type == html.ElementNode && el.Data == "body" {
-			background = el.GetBackgroundColor()
+			//background = el.GetBackgroundColor()
 		}
 	})
 

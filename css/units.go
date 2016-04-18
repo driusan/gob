@@ -113,6 +113,7 @@ func sHexToUint8(val byte) uint8 {
 	panic("Invalid character")
 }
 func ConvertColorToRGBA(cssString string) (*color.RGBA, error) {
+
 	black := &color.RGBA{0, 0, 0, 255}
 	if cssString[0:3] == "rgb" {
 		tuple := cssString[4 : len(cssString)-1]
