@@ -4,6 +4,7 @@ import (
 	"Gob/css"
 	"image"
 	"image/color"
+	"image/draw"
 )
 
 type BoxOffset struct {
@@ -66,17 +67,104 @@ func (b *outerBoxDrawer) Bounds() image.Rectangle {
 
 func (b *outerBoxDrawer) RGBA() *image.RGBA {
 	bounds := b.Bounds()
-	img := image.NewRGBA(b.Bounds())
-	//bg := img.ColorModel().Convert(b.backgroundColor)
-	//var rgbaBg color.RGBA
-	//rgbaBg, _ = bg.(color.RGBA)
-	//rgbaBgP := &rgbaBg
-	for x := bounds.Min.X; x < bounds.Max.X; x++ {
-		for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-			img.Set(x, y, b.background.At(x, y))
-		}
-	}
-	return img
+	ri := image.NewRGBA(b.Bounds())
+	/* the zero colour is transparent, this isn't necessary
+	draw.Draw(
+		ri,
+		b.Bounds(),
+		&image.Uniform{color.Transparent},
+		image.ZP,
+		draw.Src,
+	)
+	*/
+
+	// draw the background first, bounded by the margins
+	draw.Draw(
+		ri,
+		image.Rectangle{
+			Min: image.Point{
+				X: b.Margin.Left.Width,
+				Y: b.Margin.Top.Width,
+			},
+			Max: image.Point{
+				X: bounds.Max.X - b.Margin.Right.Width,
+				Y: bounds.Max.Y - b.Margin.Bottom.Width,
+			},
+		},
+		b.background,
+		image.ZP,
+		draw.Src,
+	)
+	// draw the top border
+	draw.Draw(
+		ri,
+		image.Rectangle{
+			Min: image.Point{
+				X: b.Margin.Left.Width,
+				Y: b.Margin.Top.Width,
+			},
+			Max: image.Point{
+				X: bounds.Max.X - b.Margin.Right.Width,
+				Y: b.Margin.Top.Width + b.Border.Top.Width,
+			},
+		},
+		&image.Uniform{b.Border.Top.Color},
+		image.ZP,
+		draw.Src,
+	)
+	// draw the left border
+	draw.Draw(
+		ri,
+		image.Rectangle{
+			Min: image.Point{
+				X: b.Margin.Left.Width,
+				Y: b.Margin.Top.Width,
+			},
+			Max: image.Point{
+				X: b.Margin.Left.Width + b.Border.Left.Width,
+				Y: bounds.Max.Y - b.Margin.Bottom.Width,
+			},
+		},
+		&image.Uniform{b.Border.Left.Color},
+		image.ZP,
+		draw.Src,
+	)
+	// draw the right border
+	draw.Draw(
+		ri,
+		image.Rectangle{
+			Min: image.Point{
+				X: bounds.Max.X - b.Margin.Right.Width - b.Border.Left.Width,
+				Y: b.Margin.Top.Width,
+			},
+			Max: image.Point{
+				X: bounds.Max.X - b.Margin.Right.Width,
+				Y: bounds.Max.Y - b.Border.Left.Width,
+			},
+		},
+		&image.Uniform{b.Border.Right.Color},
+		image.ZP,
+		draw.Src,
+	)
+	// draw the bottom border
+	draw.Draw(
+		ri,
+		image.Rectangle{
+			Min: image.Point{
+				X: b.Margin.Left.Width,
+				Y: bounds.Max.Y - b.Margin.Bottom.Width - b.Border.Bottom.Width,
+			},
+			Max: image.Point{
+				X: bounds.Max.X - b.Margin.Right.Width,
+				Y: bounds.Max.Y - b.Margin.Bottom.Width,
+			},
+		},
+		&image.Uniform{b.Border.Bottom.Color},
+		image.ZP,
+		draw.Over,
+	)
+
+	return ri
 }
 func (b *outerBoxDrawer) GetContentOrigin() image.Point {
 	return image.Point{
@@ -523,7 +611,7 @@ func (e RenderableDomElement) GetBorderRightStyle() string {
 	return val
 }
 
-func (e RenderableDomElement) getCSSBox(img image.Image) (image.Image, image.Point) {
+func (e *RenderableDomElement) getCSSBox(img image.Image, layoutpass bool) (image.Image, image.Point) {
 	bg := e.GetBackgroundColor()
 	if bg == nil {
 		bg = dfltBackground
@@ -551,6 +639,12 @@ func (e RenderableDomElement) getCSSBox(img image.Image) (image.Image, image.Poi
 		contentSize: img.Bounds().Size(),
 		background:  &image.Uniform{bg},
 	}
-	// TODO(driusan): this should return a new RGBA so that it can be composed with image.Draw faster.
-	return box, box.GetContentOrigin()
+	if layoutpass {
+		e.CSSOuterBox = box
+
+		return box, box.GetContentOrigin()
+	}
+
+	e.CSSOuterBox = box.RGBA()
+	return e.CSSOuterBox, box.GetContentOrigin()
 }

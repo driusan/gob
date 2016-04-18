@@ -454,9 +454,9 @@ func (e *RenderableDomElement) realRender(containerWidth int, measureOnly bool, 
 					fallthrough
 				default:
 					// draw the border, background, and CSS outer box.
-					e.ContentOverlay = c.Render(width) // need the width to calculate the box size
-					box, contentorigin := c.getCSSBox(e.ContentOverlay)
-					e.CSSOuterBox = box
+					childContent := c.Render(width) // need the width to calculate the box size
+					c.ContentOverlay = childContent
+					box, contentorigin := c.getCSSBox(childContent, measureOnly)
 					sr := box.Bounds()
 					r := image.Rectangle{dot, dot.Add(sr.Size())}
 
@@ -467,7 +467,7 @@ func (e *RenderableDomElement) realRender(containerWidth int, measureOnly bool, 
 						draw.Draw(
 							dst,
 							r,
-							e.CSSOuterBox,
+							c.CSSOuterBox,
 							sr.Min,
 							draw.Over,
 						)
@@ -487,7 +487,7 @@ func (e *RenderableDomElement) realRender(containerWidth int, measureOnly bool, 
 
 					// now draw the content on top of the outer box
 					contentStart := dot.Add(contentorigin)
-					contentBounds := e.ContentOverlay.Bounds()
+					contentBounds := c.ContentOverlay.Bounds()
 					cr := image.Rectangle{contentStart, contentStart.Add(contentBounds.Size())}
 					if measureOnly {
 						mst.GrowBounds(cr)
@@ -495,7 +495,7 @@ func (e *RenderableDomElement) realRender(containerWidth int, measureOnly bool, 
 						draw.Draw(
 							dst,
 							cr,
-							e.ContentOverlay,
+							c.ContentOverlay,
 							contentBounds.Min,
 							draw.Over,
 						)
