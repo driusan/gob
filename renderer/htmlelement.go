@@ -33,6 +33,9 @@ type RenderableDomElement struct {
 	PrevSibling *RenderableDomElement
 
 	ImageMap       ImageMap
+	FirstPageOnly  bool
+	RenderAbort    chan bool
+	ViewportHeight int
 	contentWidth   int
 	containerWidth int
 }
@@ -331,66 +334,50 @@ func (e *RenderableDomElement) Render(containerWidth int) image.Image {
 	return e.realRender(containerWidth, false, size.Bounds())
 }
 func (e *RenderableDomElement) realRender(containerWidth int, measureOnly bool, r image.Rectangle) image.Image {
-	dot := image.Point{0, 0}
-
-	width := e.GetContentWidth(containerWidth)
-	e.contentWidth = width
-	e.containerWidth = containerWidth
-	height := 0
-
 	var dst draw.Image
-	var mst *DynamicMemoryDrawer
-	if measureOnly {
-		mst = NewDynamicMemoryDrawer(image.Rectangle{image.ZP, image.Point{width, height}})
-		dst = mst
-	} else {
-		dst = image.NewRGBA(r)
-	}
-
-	firstLine := true
-	imageMap := NewImageMap()
-	for c := e.FirstChild; c != nil; c = c.NextSibling {
-		switch c.Type {
-		case html.TextNode:
-			// text nodes are inline elements that didn't match
-			// anything when adding styles, but that's okay,
-			// because their style should be identical to their
-			// parent.
-			c.Styles = e.Styles
-
-			if firstLine == true {
-				dot.X += c.GetTextIndent(width)
-				firstLine = false
+	e.RenderAbort = make(chan bool)
+	select {
+	case <-e.RenderAbort:
+		for c := e.FirstChild; c != nil; c = c.NextSibling {
+			if c.RenderAbort != nil {
+				c.RenderAbort <- true
 			}
+		}
+		return dst
+	default:
+		dot := image.Point{0, 0}
 
-			remainingTextContent := strings.TrimSpace(c.Data)
-			for remainingTextContent != "" {
-				childImage, rt := c.renderLineBox(width-dot.X, remainingTextContent)
-				remainingTextContent = rt
-				sr := childImage.Bounds()
-				r := image.Rectangle{dot, dot.Add(sr.Size())}
-				if measureOnly {
-					mst.GrowBounds(r)
-				} else {
-					draw.Draw(dst, r, childImage, sr.Min, draw.Src)
-				}
-				if r.Max.X >= width {
-					dot.X = 0
-					dot.Y += e.GetLineHeight()
-				} else {
-					dot.X = r.Max.X
-				}
-			}
-		case html.ElementNode:
-			switch c.GetDisplayProp() {
-			case "none":
-				continue
-			case "inline":
+		width := e.GetContentWidth(containerWidth)
+		e.contentWidth = width
+		e.containerWidth = containerWidth
+		height := 0
+
+		var mst *DynamicMemoryDrawer
+		if measureOnly {
+			mst = NewDynamicMemoryDrawer(image.Rectangle{image.ZP, image.Point{width, height}})
+			dst = mst
+		} else {
+			dst = image.NewRGBA(r)
+		}
+
+		firstLine := true
+		imageMap := NewImageMap()
+		for c := e.FirstChild; c != nil; c = c.NextSibling {
+			c.ViewportHeight = e.ViewportHeight
+			switch c.Type {
+			case html.TextNode:
+				// text nodes are inline elements that didn't match
+				// anything when adding styles, but that's okay,
+				// because their style should be identical to their
+				// parent.
+				c.Styles = e.Styles
+
 				if firstLine == true {
 					dot.X += c.GetTextIndent(width)
 					firstLine = false
 				}
-				remainingTextContent := strings.TrimSpace(c.GetTextContent())
+
+				remainingTextContent := strings.TrimSpace(c.Data)
 				for remainingTextContent != "" {
 					childImage, rt := c.renderLineBox(width-dot.X, remainingTextContent)
 					remainingTextContent = rt
@@ -399,25 +386,8 @@ func (e *RenderableDomElement) realRender(containerWidth int, measureOnly bool, 
 					if measureOnly {
 						mst.GrowBounds(r)
 					} else {
-						draw.Draw(dst, r, childImage, sr.Min, draw.Over)
+						draw.Draw(dst, r, childImage, sr.Min, draw.Src)
 					}
-					// populate the imagemap by adding the line box, then adding the children's
-					// children.
-					// add the child
-					imageMap.Add(c, r.Add(image.Point{
-						X: 0, //e.GetPaddingLeft()+e.GetMarginLeftSize()+e.GetBorderLeftWidth(),
-						Y: 0, //e.GetPaddingTop()+e.GetMarginTopSize()+e.GetBorderTopWidth(),
-					})) //childImage.Bounds())
-					//childImageMap := c.ImageMap
-					// add the grandchildren
-
-					/*
-						for _, area := range childImageMap {
-							// translate the coordinate systems from the child's to this one
-							newArea := area.Area.Add(dot)
-							imageMap.Add(area.Content, newArea)
-						}
-					*/
 					if r.Max.X >= width {
 						dot.X = 0
 						dot.Y += e.GetLineHeight()
@@ -425,59 +395,107 @@ func (e *RenderableDomElement) realRender(containerWidth int, measureOnly bool, 
 						dot.X = r.Max.X
 					}
 				}
-			case "block":
-				fallthrough
-			default:
-				// draw the border
-				childContent := c.Render(width)
-				box, contentorigin := c.getCSSBox(childContent)
-				sr := box.Bounds()
-				r := image.Rectangle{dot, dot.Add(sr.Size())}
+			case html.ElementNode:
+				switch c.GetDisplayProp() {
+				case "none":
+					continue
+				case "inline":
+					if firstLine == true {
+						dot.X += c.GetTextIndent(width)
+						firstLine = false
+					}
+					remainingTextContent := strings.TrimSpace(c.GetTextContent())
+					for remainingTextContent != "" {
+						childImage, rt := c.renderLineBox(width-dot.X, remainingTextContent)
+						remainingTextContent = rt
+						sr := childImage.Bounds()
+						r := image.Rectangle{dot, dot.Add(sr.Size())}
+						if measureOnly {
+							mst.GrowBounds(r)
+						} else {
+							draw.Draw(dst, r, childImage, sr.Min, draw.Over)
+						}
+						// populate the imagemap by adding the line box, then adding the children's
+						// children.
+						// add the child
+						imageMap.Add(c, r.Add(image.Point{
+							X: 0, //e.GetPaddingLeft()+e.GetMarginLeftSize()+e.GetBorderLeftWidth(),
+							Y: 0, //e.GetPaddingTop()+e.GetMarginTopSize()+e.GetBorderTopWidth(),
+						})) //childImage.Bounds())
+						//childImageMap := c.ImageMap
+						// add the grandchildren
 
-				if measureOnly {
-					mst.GrowBounds(r)
-				} else {
-					draw.Draw(
-						dst,
-						r,
-						box,
-						sr.Min,
-						draw.Over,
-					)
-				}
-				// populate the imagemap by adding the child, then adding the children's
-				// children.
-				// add the child
-				childImageMap := c.ImageMap
-				imageMap.Add(c, r)
-				// add the grandchildren
-				for _, area := range childImageMap {
-					// translate the coordinate systems from the child's to this one
-					newArea := area.Area.Add(dot).Add(contentorigin)
-					imageMap.Add(area.Content, newArea)
+						/*
+							for _, area := range childImageMap {
+								// translate the coordinate systems from the child's to this one
+								newArea := area.Area.Add(dot)
+								imageMap.Add(area.Content, newArea)
+							}
+						*/
+						if r.Max.X >= width {
+							dot.X = 0
+							dot.Y += e.GetLineHeight()
+						} else {
+							dot.X = r.Max.X
+						}
+					}
+				case "block":
+					fallthrough
+				default:
+					// draw the border
+					childContent := c.Render(width)
+					box, contentorigin := c.getCSSBox(childContent)
+					sr := box.Bounds()
+					r := image.Rectangle{dot, dot.Add(sr.Size())}
+
+					if measureOnly {
+						mst.GrowBounds(r)
+					} else {
+						draw.Draw(
+							dst,
+							r,
+							box,
+							sr.Min,
+							draw.Over,
+						)
+					}
+					// populate the imagemap by adding the child, then adding the children's
+					// children.
+					// add the child
+					childImageMap := c.ImageMap
+					imageMap.Add(c, r)
+					// add the grandchildren
+					for _, area := range childImageMap {
+						// translate the coordinate systems from the child's to this one
+						newArea := area.Area.Add(dot).Add(contentorigin)
+						imageMap.Add(area.Content, newArea)
+					}
+
+					contentStart := dot.Add(contentorigin)
+					contentBounds := childContent.Bounds()
+					cr := image.Rectangle{contentStart, contentStart.Add(contentBounds.Size())}
+					if measureOnly {
+						mst.GrowBounds(cr)
+					} else {
+						draw.Draw(
+							dst,
+							cr,
+							childContent,
+							contentBounds.Min,
+							draw.Over,
+						)
+					}
+
+					dot.X = 0
+					dot.Y = r.Max.Y
 				}
 
-				contentStart := dot.Add(contentorigin)
-				contentBounds := childContent.Bounds()
-				cr := image.Rectangle{contentStart, contentStart.Add(contentBounds.Size())}
-				if measureOnly {
-					mst.GrowBounds(cr)
-				} else {
-					draw.Draw(
-						dst,
-						cr,
-						childContent,
-						contentBounds.Min,
-						draw.Over,
-					)
-				}
-
-				dot.X = 0
-				dot.Y = r.Max.Y
 			}
-
+			if e.FirstPageOnly && dot.Y > e.ViewportHeight {
+				return dst
+			}
 		}
+		e.ImageMap = imageMap
+		return dst
 	}
-	e.ImageMap = imageMap
-	return dst
 }

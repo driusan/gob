@@ -114,7 +114,7 @@ func matchBasicSelector(el *html.Node, s string) bool {
 	} else {
 		elementMatchTag = s
 	}
-	if elementMatchTag != "" && el.Data != elementMatchTag {
+	if elementMatchTag != "" && strings.ToLower(el.Data) != strings.ToLower(elementMatchTag) {
 		return false
 	}
 	if remainingData == "" {

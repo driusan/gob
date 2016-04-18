@@ -150,7 +150,7 @@ func main() {
 				paintWindow(s, w, &v, page)
 			case size.Event:
 				v.Size = e
-				v.Content = page.Content.Render(e.Size().X)
+				renderNewPageIntoViewport(s, w, &v, page)
 			case touch.Event:
 				fmt.Printf("Touch event!")
 			case mouse.Event:
@@ -164,9 +164,9 @@ func main() {
 							el.OnClick()
 							if el.Type == html.ElementNode && el.Data == "a" {
 								p, err := loadNewPage(page.URL, el.GetAttribute("href"))
+								page = p
 								if err == nil && p != nil {
-									page = p
-									v.Content = p.Content.Render(v.Size.Size().X)
+									renderNewPageIntoViewport(s, w, &v, p)
 								}
 							}
 						default:
@@ -183,7 +183,6 @@ func main() {
 	})
 }
 func loadNewPage(context *url.URL, path string) (*Page, error) {
-	fmt.Printf("Inew newPage\n")
 	u, err := url.Parse(path)
 	if err != nil {
 		return nil, err
@@ -194,9 +193,21 @@ func loadNewPage(context *url.URL, path string) (*Page, error) {
 		return nil, err
 	}
 	defer r.Close()
-	fmt.Printf("Loading new page %s\n", newURL)
 	p := loadHTML(r, newURL)
 	p.URL = newURL
-	fmt.Printf("Loaded new page %s\n", newURL)
 	return p, nil
+}
+
+func renderNewPageIntoViewport(s screen.Screen, w screen.Window, v *Viewport, page *Page) {
+	page.Content.FirstPageOnly = true
+	windowSize := v.Size.Size()
+	v.Content = page.Content.Render(windowSize.X)
+	paintWindow(s, w, v, page)
+
+	page.Content.FirstPageOnly = false
+	go func() {
+		v.Content = page.Content.Render(windowSize.X)
+		paintWindow(s, w, v, page)
+	}()
+
 }

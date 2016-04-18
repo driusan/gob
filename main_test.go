@@ -83,7 +83,7 @@ a:hover {
 func BenchmarkParseAndRender(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		f := strings.NewReader(content)
-		parsedhtml := loadHTML(f,nil)
+		parsedhtml := loadHTML(f, nil)
 		parsedhtml.Content.Render(1024)
 	}
 }
@@ -91,12 +91,12 @@ func BenchmarkParseAndRender(b *testing.B) {
 func BenchmarkParseOnly(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		f := strings.NewReader(content)
-		loadHTML(f,nil)
+		loadHTML(f, nil)
 	}
 }
 func BenchmarkRenderOnly(b *testing.B) {
 	f := strings.NewReader(content)
-	parsedhtml := loadHTML(f,nil)
+	parsedhtml := loadHTML(f, nil)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		parsedhtml.Content.Render(1024)
