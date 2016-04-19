@@ -181,3 +181,65 @@ func ConvertColorToRGBA(cssString string) (*color.RGBA, error) {
 	}
 	return black, NoStyles
 }
+
+func IsColor(c string) bool {
+	c = strings.TrimSpace(c)
+	switch c {
+	case "inherit", "transparent", "maroon", "red", "orange", "yellow", "olive", "purple",
+		"fuchsia", "white", "lime", "green", "navy", "blue", "aqua", "teal",
+		"black", "silver", "gray", "grey":
+		return true
+	}
+	switch length := len(c); length {
+	case 0:
+		return false
+	case 4, 7:
+		if c[0] == '#' {
+			for _, letter := range c[1:] {
+				if (letter >= '0' && letter <= '9') ||
+					(letter >= 'a' && letter <= 'f') ||
+					(letter >= 'A' && letter <= 'F') {
+					continue
+				}
+			}
+			return true
+		}
+		return false
+	default:
+		if length > 4 && c[0:4] == "rgb(" {
+			return true
+		}
+		return false
+	}
+}
+func IsURL(u string) bool {
+	u = strings.TrimSpace(u)
+	if len(u) <= 4 {
+		return false
+	}
+	return u[0:4] == "url("
+}
+func IsPercentage(p string) bool {
+	p = strings.TrimSpace(p)
+	if p == "" {
+		return false
+	}
+	return p[len(p)-1] == '%'
+}
+
+func IsLength(l string) bool {
+	l = strings.TrimSpace(l)
+	if l == "0" {
+		return true
+	}
+	if len(l) < 2 {
+		return false
+	}
+	switch l[len(l)-2:] {
+	case "in", "cm", "mm", "pt", "pc", "px":
+		return true
+	case "em", "ex":
+		return true
+	}
+	return false
+}

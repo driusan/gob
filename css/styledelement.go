@@ -279,10 +279,48 @@ func (e *StyledElement) expandBoxSideShorthand(attrib StyleAttribute, s StyleRul
 		e.rules = append(e.rules, s)
 	}
 }
+func (e *StyledElement) expandBackgroundShorthand(s StyleRule) {
+	values := strings.Fields(s.Value.string)
+
+	for _, val := range values {
+		if val == "none" || IsURL(val) {
+			s.Name = "background-image"
+			s.Value.string = val
+			e.rules = append(e.rules, s)
+		} else if IsColor(val) {
+			s.Name = "background-color"
+			s.Value.string = val
+			e.rules = append(e.rules, s)
+		}
+		switch val {
+		case "repeat", "repeat-x", "repeat-y", "no-repeat":
+			s.Name = "background-repeat"
+			s.Value.string = val
+			e.rules = append(e.rules, s)
+		case "scroll", "fixed":
+			s.Name = "background-attachment"
+			s.Value.string = val
+			e.rules = append(e.rules, s)
+		case "left", "right", "top", "center", "bottom":
+			s.Name = "background-position"
+			s.Value.string = val
+			e.rules = append(e.rules, s)
+		default:
+			if IsPercentage(val) || IsLength(val) {
+				s.Name = "background-position"
+				s.Value.string = val
+				e.rules = append(e.rules, s)
+			}
+		}
+	}
+}
+
 func (e *StyledElement) AddStyle(s StyleRule) {
 	switch s.Name {
 	case "padding", "margin":
 		e.expandBoxSideShorthand(s.Name, s)
+	case "background":
+		e.expandBackgroundShorthand(s)
 	case "border-width":
 		// border width expands to border-side-width, not
 		// border-width-side, so we can't use the normal helper
@@ -292,6 +330,7 @@ func (e *StyledElement) AddStyle(s StyleRule) {
 		e.expandBoxBorderShorthand("color", s)
 	case "border-style":
 		e.expandBoxBorderShorthand("style", s)
+
 	default:
 		e.rules = append(e.rules, s)
 	}
