@@ -12,23 +12,15 @@ import (
 )
 
 type CacheWriter struct {
-	Src   io.ReadCloser
-	Cache io.WriteCloser
+	Tee     io.Reader
+	ToClose io.Closer
 }
 
 func (cw *CacheWriter) Read(p []byte) (int, error) {
-	n, err := cw.Src.Read(p)
-	if cw.Cache != nil {
-		cw.Cache.Write(p)
-	}
-	return n, err
+	return cw.Tee.Read(p)
 }
 func (cw *CacheWriter) Close() error {
-	if cw.Cache != nil {
-		cw.Cache.Close()
-	}
-
-	return cw.Src.Close()
+	return cw.ToClose.Close()
 }
 
 func escapeString(s string) string {
@@ -50,13 +42,13 @@ func GetCacheWriter(source io.ReadCloser, cachedir string, resource *url.URL) io
 		}
 
 	}
-	var writer io.WriteCloser
 	if dir != "" {
 		filename := filepath.Join(dir, escapeString(resource.Path)+"?"+escapeString(resource.RawQuery))
-		writer, _ = os.Create(filename)
+		writer, _ := os.Create(filename)
+		return &CacheWriter{
+			Tee:     io.TeeReader(source, writer),
+			ToClose: writer,
+		}
 	}
-	return &CacheWriter{
-		Src:   source,
-		Cache: writer,
-	}
+	return source
 }

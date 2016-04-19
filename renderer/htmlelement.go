@@ -3,13 +3,18 @@ package renderer
 import (
 	"Gob/css"
 	"Gob/dom"
-	//	"fmt"
+	"Gob/net"
+	"fmt"
 	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
 	"golang.org/x/net/html"
 	"image"
 	"image/color"
 	"image/draw"
+	_ "image/jpeg"
+	_ "image/png"
+	"net/url"
+	"strconv"
 	"strings"
 )
 
@@ -37,6 +42,7 @@ type RenderableDomElement struct {
 	ContentOverlay image.Image
 
 	ImageMap       ImageMap
+	PageLocation   *url.URL
 	FirstPageOnly  bool
 	RenderAbort    chan bool
 	ViewportHeight int
@@ -370,12 +376,46 @@ func (e *RenderableDomElement) realRender(containerWidth int, measureOnly bool, 
 		e.contentWidth = width
 		e.containerWidth = containerWidth
 		height := 0
-		/*
-			if e.Type == html.ElementNode && e.Data == "img" {
-				if src := e.GetAttribute("src"); src != "" {
-					fmt.Printf("Should load: %s\n", src)
+
+		if e.Type == html.ElementNode && strings.ToLower(e.Data) == "img" {
+			var width, height int
+			var loadedImage bool
+			for _, attr := range e.Attr {
+				if loadedImage {
+					return e.ContentOverlay
 				}
-			}*/
+				switch attr.Key {
+				case "src":
+					fmt.Printf("Should load: %s\n", attr.Val)
+					u, err := url.Parse(attr.Val)
+					if err != nil {
+						panic("At the disco")
+						loadedImage = true
+						break
+					}
+					newURL := e.PageLocation.ResolveReference(u)
+					r, err := net.GetURLReader(newURL)
+					if err != nil {
+						panic(err)
+					}
+					content, format, err := image.Decode(r)
+					if err == nil {
+						e.ContentOverlay = content
+					} else {
+						fmt.Printf("Format: %s Err: %s", format, err)
+						panic(err)
+					}
+
+					loadedImage = true
+
+				case "width":
+					width, _ = strconv.Atoi(attr.Val)
+				case "height":
+					height, _ = strconv.Atoi(attr.Val)
+				}
+			}
+			fmt.Printf("Dimensions: %s", width, height)
+		}
 
 		var mst *DynamicMemoryDrawer
 		if measureOnly {

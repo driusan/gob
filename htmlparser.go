@@ -37,6 +37,9 @@ func loadHTML(r io.Reader, urlContext *url.URL) *Page {
 			break
 		}
 	}
+	if body == nil {
+		panic("Couldn't find body HTML element")
+	}
 
 	styles2 := css.ParseStylesheet(styles, css.AuthorSrc)
 
@@ -46,6 +49,7 @@ func loadHTML(r io.Reader, urlContext *url.URL) *Page {
 	userAgentStyles := css.ParseStylesheet(string(sheet), css.UserAgentSrc)
 
 	renderable.Walk(func(el *renderer.RenderableDomElement) {
+		el.PageLocation = urlContext
 		for _, rule := range userAgentStyles {
 			if rule.Matches((*html.Node)(el.Element)) {
 				el.Styles.AddStyle(rule)
@@ -79,8 +83,7 @@ func loadHTML(r io.Reader, urlContext *url.URL) *Page {
 
 		// Set the font size for this element, because em and ex
 		// units depend on it.
-		val := el.Styles.GetAttribute("font-size")
-		switch strVal := val.String(); strVal {
+		switch strVal := el.Styles.FontSize.GetValue(); strVal {
 		case "":
 			// nothing specified, so inherit from parent, or
 			// fall back on default if there is no parent.
