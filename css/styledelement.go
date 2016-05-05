@@ -5,7 +5,7 @@ import (
 	"github.com/golang/freetype/truetype"
 	"golang.org/x/image/font"
 	"image/color"
-	"io/ioutil"
+	//"io/ioutil"
 	"sort"
 	"strings"
 )
@@ -18,7 +18,9 @@ var SansSerifFont *truetype.Font
 var sansSerifFontSizeCache map[int]font.Face
 
 func init() {
-	fontBytes, _ := ioutil.ReadFile("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+	//fontBytes, _ := ioutil.ReadFile("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+	fontBytes, _ := Asset("DejaVuSans.ttf")
+	//fontBytes, e := Asset("DejaVuSans.ttf")
 	SansSerifFont, _ = truetype.Parse(fontBytes)
 	sansSerifFontSizeCache = make(map[int]font.Face)
 }
