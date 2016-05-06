@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 )
 
+var client http.Client
+
 func ParseURL(urlS string) (*url.URL, error) {
 	// First check if it's a file
 	if _, err := os.Stat(urlS); !os.IsNotExist(err) {
@@ -43,7 +45,11 @@ func GetURLReader(u *url.URL) (io.ReadCloser, error) {
 			//fmt.Printf("Using cache for %s\n", u)
 			return cached, nil
 		}
-		resp, err := http.Get(u.String())
+
+		req, _ := http.NewRequest("GET", u.String(), nil)
+		req.Header.Add("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537..36 (KHTML, like Gecko) Chrome/39.0.2171.27 Safari/537.36")
+		resp, err := client.Do(req)
+		//resp, err := http.Get(u.String())
 		if err != nil {
 			return nil, err
 		}
