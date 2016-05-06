@@ -11,9 +11,11 @@ import (
 	"image"
 	"image/color"
 	"image/draw"
+	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -21,6 +23,16 @@ import (
 const (
 	DefaultFontSize = 16
 )
+
+/*
+func debugJpeg(dst image.Image, measureOnly bool) {
+	if measureOnly == false {
+		f, _ := os.Create("test.jpg")
+		jpeg.Encode(f, dst, nil)
+		f.Close()
+	}
+}
+*/
 
 // A RenderableElement is something that can be rendered to
 // an image.
@@ -377,44 +389,49 @@ func (e *RenderableDomElement) realRender(containerWidth int, measureOnly bool, 
 		e.containerWidth = containerWidth
 		height := 0
 
-		if e.Type == html.ElementNode && strings.ToLower(e.Data) == "img" {
-			var width, height int
-			var loadedImage bool
-			for _, attr := range e.Attr {
-				if loadedImage {
-					return e.ContentOverlay
-				}
-				switch attr.Key {
-				case "src":
-					fmt.Printf("Should load: %s\n", attr.Val)
-					u, err := url.Parse(attr.Val)
-					if err != nil {
-						panic("At the disco")
+		// special cases
+		if e.Type == html.ElementNode {
+			switch strings.ToLower(e.Data) {
+			case "img":
+				var width, height int
+				var loadedImage bool
+				for _, attr := range e.Attr {
+					if loadedImage {
+						return e.ContentOverlay
+					}
+					switch attr.Key {
+					case "src":
+						fmt.Printf("Should load: %s\n", attr.Val)
+						u, err := url.Parse(attr.Val)
+						if err != nil {
+							panic("At the disco")
+							loadedImage = true
+							break
+						}
+						newURL := e.PageLocation.ResolveReference(u)
+						r, err := net.GetURLReader(newURL)
+						if err != nil {
+							panic(err)
+						}
+						content, format, err := image.Decode(r)
+						if err == nil {
+							e.ContentOverlay = content
+						} else {
+							fmt.Fprintf(os.Stderr, "Unknown image format: %s Err: %s", format, err)
+						}
+
 						loadedImage = true
-						break
-					}
-					newURL := e.PageLocation.ResolveReference(u)
-					r, err := net.GetURLReader(newURL)
-					if err != nil {
-						panic(err)
-					}
-					content, format, err := image.Decode(r)
-					if err == nil {
-						e.ContentOverlay = content
-					} else {
-						fmt.Printf("Format: %s Err: %s", format, err)
-						panic(err)
-					}
 
-					loadedImage = true
-
-				case "width":
-					width, _ = strconv.Atoi(attr.Val)
-				case "height":
-					height, _ = strconv.Atoi(attr.Val)
+					case "width":
+						width, _ = strconv.Atoi(attr.Val)
+					case "height":
+						height, _ = strconv.Atoi(attr.Val)
+					}
 				}
+				fmt.Printf("Dimensions: %s", width, height)
+			case "br":
+				height = e.GetLineHeight()
 			}
-			fmt.Printf("Dimensions: %s", width, height)
 		}
 
 		var mst *DynamicMemoryDrawer
@@ -452,6 +469,7 @@ func (e *RenderableDomElement) realRender(containerWidth int, measureOnly bool, 
 						mst.GrowBounds(r)
 					} else {
 						draw.Draw(dst, r, childImage, sr.Min, draw.Src)
+						//debugJpeg(dst, measureOnly)
 					}
 					if r.Max.X >= width {
 						dot.X = 0
@@ -479,24 +497,16 @@ func (e *RenderableDomElement) realRender(containerWidth int, measureOnly bool, 
 							mst.GrowBounds(r)
 						} else {
 							draw.Draw(dst, r, childImage, sr.Min, draw.Over)
+							//debugJpeg(dst, measureOnly)
 						}
 						// populate the imagemap by adding the line box, then adding the children's
 						// children.
 						// add the child
 						imageMap.Add(c, r.Add(image.Point{
-							X: 0, //e.GetPaddingLeft()+e.GetMarginLeftSize()+e.GetBorderLeftWidth(),
-							Y: 0, //e.GetPaddingTop()+e.GetMarginTopSize()+e.GetBorderTopWidth(),
-						})) //childImage.Bounds())
-						//childImageMap := c.ImageMap
-						// add the grandchildren
+							X: 0,
+							Y: 0,
+						}))
 
-						/*
-							for _, area := range childImageMap {
-								// translate the coordinate systems from the child's to this one
-								newArea := area.Area.Add(dot)
-								imageMap.Add(area.Content, newArea)
-							}
-						*/
 						if r.Max.X >= width {
 							dot.X = 0
 							dot.Y += e.GetLineHeight()
