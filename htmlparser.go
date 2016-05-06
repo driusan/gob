@@ -149,6 +149,9 @@ func fontSizeToPx(val string, parent *renderer.RenderableDomElement) int {
 	case "inherit":
 		psize, _ := parent.Styles.GetFontSize()
 		return psize
+	// 0 doesn't need a unit
+	case "0":
+		return 0
 	}
 	// handle percentages,
 	if val[len(val)-1] == '%' {
