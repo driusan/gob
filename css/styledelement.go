@@ -4,6 +4,7 @@ import (
 	//	"fmt"
 	"github.com/golang/freetype/truetype"
 	"golang.org/x/image/font"
+	//"golang.org/x/image/font/basicfont"
 	"image/color"
 	//"io/ioutil"
 	"sort"
@@ -147,6 +148,7 @@ func (e StyledElement) GetFontFace(fsize int) font.Face {
 			Size:    float64(fsize),
 			DPI:     72,
 			Hinting: font.HintingFull})
+	//face := basicfont.Face7x13
 	sansSerifFontSizeCache[fsize] = face
 	return face
 
