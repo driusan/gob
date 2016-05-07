@@ -204,7 +204,9 @@ func (e RenderableDomElement) GetDisplayProp() string {
 	if cssVal := e.Styles.DisplayProp(); cssVal != "" {
 		return cssVal
 	}
+	// CSS Level 1 default is block, CSS Level 2 is inline
 	return "block"
+	//return "inline"
 }
 
 func (e RenderableDomElement) GetTextDecoration() string {
@@ -432,13 +434,6 @@ func (e *RenderableDomElement) realRender(containerWidth int, measureOnly bool, 
 						*/
 					}
 				}
-			case "br":
-				// the user style sheets specify that it's a block, so this should be enough to cause
-				// a line break of size 1em.
-				height = e.GetLineHeight()
-				width = 1
-			case "em":
-				fmt.Printf("Debug!")
 			}
 		}
 
@@ -486,6 +481,11 @@ func (e *RenderableDomElement) realRender(containerWidth int, measureOnly bool, 
 					}
 				}
 			case html.ElementNode:
+				if c.Data == "br" {
+					dot.X = 0
+					dot.Y += c.GetLineHeight()
+					continue
+				}
 				switch c.GetDisplayProp() {
 				case "none":
 					continue
@@ -514,6 +514,14 @@ func (e *RenderableDomElement) realRender(containerWidth int, measureOnly bool, 
 				case "block":
 					fallthrough
 				default:
+					if dot.X != 0 {
+						// This means the previous child was an inline item, and we should position dot
+						// as if there were an implicit box around it.
+						dot.X = 0
+						if c.PrevSibling != nil {
+							dot.Y += c.PrevSibling.GetLineHeight()
+						}
+					}
 					// draw the border, background, and CSS outer box.
 					childContent, _ := c.realRender(width, true, image.ZR, image.ZP)
 					if measureOnly == false {
