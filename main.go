@@ -153,23 +153,38 @@ func main() {
 				fmt.Printf("Touch event!")
 			case mouse.Event:
 				//fmt.Printf("Mouse event at %d, %d! %e", e.X, e.Y, e)
-				if page.Content != nil && page.Content.ImageMap != nil {
+				switch e.Button {
+				case mouse.ButtonWheelDown:
+					v.Cursor.Y += 10
+					if v.Cursor.Y < 0 {
+						v.Cursor.Y = 0
+					}
+					paintWindow(s, w, &v, page)
+				case mouse.ButtonWheelUp:
+					v.Cursor.Y -= 10
+					if v.Cursor.Y < 0 {
+						v.Cursor.Y = 0
+					}
+					paintWindow(s, w, &v, page)
+				default:
+					if page.Content != nil && page.Content.ImageMap != nil {
 
-					el := page.Content.ImageMap.At(int(e.X)+v.Cursor.X, int(e.Y)+v.Cursor.Y)
-					if el != nil {
-						switch e.Direction {
-						case mouse.DirRelease:
-							el.OnClick()
-							if el.Type == html.ElementNode && el.Data == "a" {
-								p, err := loadNewPage(page.URL, el.GetAttribute("href"))
-								page = p
-								if err == nil && p != nil {
-									renderNewPageIntoViewport(s, w, &v, p)
+						el := page.Content.ImageMap.At(int(e.X)+v.Cursor.X, int(e.Y)+v.Cursor.Y)
+						if el != nil {
+							switch e.Direction {
+							case mouse.DirRelease:
+								el.OnClick()
+								if el.Type == html.ElementNode && el.Data == "a" {
+									p, err := loadNewPage(page.URL, el.GetAttribute("href"))
+									page = p
+									if err == nil && p != nil {
+										renderNewPageIntoViewport(s, w, &v, p)
+									}
 								}
-							}
-						default:
-							if el.Type == html.ElementNode && el.Data == "a" {
-								fmt.Printf("Hovering over link %s\n", el.GetAttribute("href"))
+							default:
+								if el.Type == html.ElementNode && el.Data == "a" {
+									fmt.Printf("Hovering over link %s\n", el.GetAttribute("href"))
+								}
 							}
 						}
 					}
