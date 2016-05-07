@@ -16,7 +16,7 @@ import (
 	_ "image/png"
 	"net/url"
 	"os"
-	"strconv"
+	//"strconv"
 	"strings"
 )
 
@@ -366,10 +366,12 @@ func (e RenderableDomElement) GetContentWidth(containerWidth int) int {
 	}
 }
 func (e *RenderableDomElement) Render(containerWidth int) image.Image {
-	size := e.realRender(containerWidth, true, image.ZR)
-	return e.realRender(containerWidth, false, size.Bounds())
+	size, _ := e.realRender(containerWidth, true, image.ZR, image.Point{0, 0})
+	img, _ := e.realRender(containerWidth, false, size.Bounds(), image.Point{0, 0})
+	return img
 }
-func (e *RenderableDomElement) realRender(containerWidth int, measureOnly bool, r image.Rectangle) image.Image {
+
+func (e *RenderableDomElement) realRender(containerWidth int, measureOnly bool, r image.Rectangle, dot image.Point) (image.Image, image.Point) {
 	var dst draw.Image
 	e.RenderAbort = make(chan bool)
 	select {
@@ -380,9 +382,9 @@ func (e *RenderableDomElement) realRender(containerWidth int, measureOnly bool, 
 			}
 		}
 		close(e.RenderAbort)
-		return dst
+		return dst, image.ZP
 	default:
-		dot := image.Point{0, 0}
+		dot := image.Point{dot.X, dot.Y}
 
 		width := e.GetContentWidth(containerWidth)
 		e.contentWidth = width
@@ -393,11 +395,10 @@ func (e *RenderableDomElement) realRender(containerWidth int, measureOnly bool, 
 		if e.Type == html.ElementNode {
 			switch strings.ToLower(e.Data) {
 			case "img":
-				var width, height int
 				var loadedImage bool
 				for _, attr := range e.Attr {
 					if loadedImage {
-						return e.ContentOverlay
+						return e.ContentOverlay, dot
 					}
 					switch attr.Key {
 					case "src":
@@ -422,15 +423,22 @@ func (e *RenderableDomElement) realRender(containerWidth int, measureOnly bool, 
 
 						loadedImage = true
 
-					case "width":
-						width, _ = strconv.Atoi(attr.Val)
-					case "height":
-						height, _ = strconv.Atoi(attr.Val)
+						/*
+							case "width":
+								width, _ = strconv.Atoi(attr.Val)
+							case "height":
+								height, _ = strconv.Atoi(attr.Val)
+							}
+						*/
 					}
 				}
-				fmt.Printf("Dimensions: %s", width, height)
 			case "br":
+				// the user style sheets specify that it's a block, so this should be enough to cause
+				// a line break of size 1em.
 				height = e.GetLineHeight()
+				width = 1
+			case "em":
+				fmt.Printf("Debug!")
 			}
 		}
 
@@ -469,7 +477,6 @@ func (e *RenderableDomElement) realRender(containerWidth int, measureOnly bool, 
 						mst.GrowBounds(r)
 					} else {
 						draw.Draw(dst, r, childImage, sr.Min, draw.Src)
-						//debugJpeg(dst, measureOnly)
 					}
 					if r.Max.X >= width {
 						dot.X = 0
@@ -487,33 +494,23 @@ func (e *RenderableDomElement) realRender(containerWidth int, measureOnly bool, 
 						dot.X += c.GetTextIndent(width)
 						firstLine = false
 					}
-					remainingTextContent := strings.TrimSpace(c.GetTextContent())
-					for remainingTextContent != "" {
-						childImage, rt := c.renderLineBox(width-dot.X, remainingTextContent)
-						remainingTextContent = rt
-						sr := childImage.Bounds()
-						r := image.Rectangle{dot, dot.Add(sr.Size())}
-						if measureOnly {
-							mst.GrowBounds(r)
-						} else {
-							draw.Draw(dst, r, childImage, sr.Min, draw.Over)
-							//debugJpeg(dst, measureOnly)
-						}
-						// populate the imagemap by adding the line box, then adding the children's
-						// children.
-						// add the child
-						imageMap.Add(c, r.Add(image.Point{
-							X: 0,
-							Y: 0,
-						}))
+					size, _ := c.realRender(width, true, image.ZR, dot)
+					childContent, newDot := c.realRender(width, measureOnly, size.Bounds(), dot)
+					dot.X = newDot.X
+					dot.Y = newDot.Y
 
-						if r.Max.X >= width {
-							dot.X = 0
-							dot.Y += e.GetLineHeight()
-						} else {
-							dot.X = r.Max.X
-						}
+					if measureOnly == false {
+						c.ContentOverlay = childContent
+						bounds := childContent.Bounds()
+						draw.Draw(
+							dst,
+							image.Rectangle{image.ZP, bounds.Max},
+							c.ContentOverlay,
+							bounds.Min,
+							draw.Over,
+						)
 					}
+
 				case "block":
 					fallthrough
 				default:
@@ -571,10 +568,10 @@ func (e *RenderableDomElement) realRender(containerWidth int, measureOnly bool, 
 
 			}
 			if e.FirstPageOnly && dot.Y > e.ViewportHeight {
-				return dst
+				return dst, dot
 			}
 		}
 		e.ImageMap = imageMap
-		return dst
+		return dst, dot
 	}
 }
