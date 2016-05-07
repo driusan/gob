@@ -515,7 +515,10 @@ func (e *RenderableDomElement) realRender(containerWidth int, measureOnly bool, 
 					fallthrough
 				default:
 					// draw the border, background, and CSS outer box.
-					childContent := c.Render(width) // need the width to calculate the box size
+					childContent, _ := c.realRender(width, true, image.ZR, image.ZP)
+					if measureOnly == false {
+						childContent, _ = c.realRender(width, measureOnly, childContent.Bounds(), image.ZP)
+					}
 					c.ContentOverlay = childContent
 					box, contentorigin := c.getCSSBox(childContent, measureOnly)
 					sr := box.Bounds()
