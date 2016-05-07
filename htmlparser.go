@@ -7,6 +7,7 @@ import (
 	"golang.org/x/net/html"
 	"strconv"
 	//	"strings"
+	"image/color"
 	"io"
 	"io/ioutil"
 	"net/url"
@@ -99,6 +100,9 @@ func loadHTML(r io.Reader, urlContext *url.URL) *Page {
 
 		if el.Type == html.ElementNode && el.Data == "body" {
 			background = el.GetBackgroundColor()
+			if background == color.Transparent {
+				background = color.RGBA{0xE0, 0xE0, 0xE0, 0xFF}
+			}
 		}
 	})
 
