@@ -175,6 +175,7 @@ func (e *RenderableDomElement) Render(containerWidth int) image.Image {
 func (e *RenderableDomElement) realRender(containerWidth int, layoutPass bool, r image.Rectangle, dot image.Point) (image.Image, image.Point) {
 	var dst draw.Image
 	e.RenderAbort = make(chan bool)
+	leftFloatStack, rightFloatStack := make(FloatStack, 0), make(FloatStack, 0)
 	select {
 	case <-e.RenderAbort:
 		for c := e.FirstChild; c != nil; c = c.NextSibling {
@@ -248,7 +249,11 @@ func (e *RenderableDomElement) realRender(containerWidth int, layoutPass bool, r
 		imageMap := NewImageMap()
 		for c := e.FirstChild; c != nil; c = c.NextSibling {
 			c.ViewportHeight = e.ViewportHeight
+			if dot.X < leftFloatStack.Width() {
+				dot.X = leftFloatStack.Width()
+			}
 			switch c.Type {
+
 			case html.TextNode:
 				// text nodes are inline elements that didn't match
 				// anything when adding styles, but that's okay,
@@ -256,6 +261,11 @@ func (e *RenderableDomElement) realRender(containerWidth int, layoutPass bool, r
 				// parent.
 				c.Styles = e.Styles
 
+				lfWidth := leftFloatStack.Width()
+				rfWidth := rightFloatStack.Width()
+				if dot.X < lfWidth {
+					dot.X = lfWidth
+				}
 				if firstLine == true {
 					dot.X += c.GetTextIndent(width)
 					firstLine = false
@@ -263,7 +273,30 @@ func (e *RenderableDomElement) realRender(containerWidth int, layoutPass bool, r
 
 				remainingTextContent := strings.TrimSpace(c.Data)
 				for remainingTextContent != "" {
-					childImage, rt := c.renderLineBox(width-dot.X, remainingTextContent)
+					if width-dot.X-rfWidth <= 0 {
+						lfHeight := leftFloatStack.NextFloatHeight()
+						rfHeight := rightFloatStack.NextFloatHeight()
+						if len(leftFloatStack) == 0 && len(rightFloatStack) == 0 {
+							panic("Not enough space to render any element and no floats to remove.")
+						}
+						if lfHeight <= 0 && rfHeight <= 0 {
+							panic("Floats don't have any height to clear")
+						}
+						if lfHeight > 0 && lfHeight < rfHeight {
+							dot.Y += lfHeight + 1
+							leftFloatStack = leftFloatStack.ClearFloats(dot)
+							dot.X = leftFloatStack.Width()
+						} else if rfHeight > 0 {
+
+							dot.Y += rfHeight + 1
+							rightFloatStack = rightFloatStack.ClearFloats(dot)
+						} else {
+							panic("Clearing floats didn't make any space.")
+						}
+						lfWidth = leftFloatStack.Width()
+						rfWidth = rightFloatStack.Width()
+					}
+					childImage, rt := c.renderLineBox(width-dot.X-rfWidth, remainingTextContent)
 					remainingTextContent = rt
 					sr := childImage.Bounds()
 					r := image.Rectangle{dot, dot.Add(sr.Size())}
@@ -272,10 +305,20 @@ func (e *RenderableDomElement) realRender(containerWidth int, layoutPass bool, r
 					} else {
 						draw.Draw(dst, r, childImage, sr.Min, draw.Src)
 					}
-					if r.Max.X >= width {
-						dot.X = 0
+					if r.Max.X >= width-rfWidth {
+						// there's no space left on this line, so advance dot to the next line.
 						dot.Y += e.GetLineHeight()
+						// clear the floats that have been passed, and then move dot to the edge
+						// of the left float.
+						leftFloatStack = leftFloatStack.ClearFloats(dot)
+						rightFloatStack = rightFloatStack.ClearFloats(dot)
+						lfWidth = leftFloatStack.Width()
+						rfWidth = rightFloatStack.Width()
+
+						dot.X = lfWidth
 					} else {
+						// there's still space on this line, so move dot to the end
+						// of the rendered text.
 						dot.X = r.Max.X
 					}
 					// add this line box to the image map.
@@ -329,7 +372,6 @@ func (e *RenderableDomElement) realRender(containerWidth int, layoutPass bool, r
 					}
 					dot.X = newDot.X
 					dot.Y = newDot.Y
-
 				case "block":
 					fallthrough
 				default:
@@ -345,6 +387,7 @@ func (e *RenderableDomElement) realRender(containerWidth int, layoutPass bool, r
 							}
 						}
 					}
+
 					// draw the border, background, and CSS outer box.
 					childContent, _ := c.realRender(width, true, image.ZR, image.ZP)
 					if layoutPass == false {
@@ -358,7 +401,28 @@ func (e *RenderableDomElement) realRender(containerWidth int, layoutPass bool, r
 					if layoutPass {
 						mst.GrowBounds(r)
 					} else {
-						// draw the box. Normal flow.
+						// move the drawing rectangle to the appropriate place based on the float property..
+						// just adjust r, so that the imagemap still works.
+						switch float {
+						case "right":
+							size := sr.Size()
+							rightFloatX := width - rightFloatStack.Width()
+							r = image.Rectangle{
+								Min: image.Point{rightFloatX - size.X, 0},
+								Max: image.Point{rightFloatX, size.Y},
+							}
+							contentorigin = contentorigin.Add(image.Point{rightFloatX - size.X, 0})
+						case "left":
+							size := sr.Size()
+							leftFloatX := leftFloatStack.Width()
+							r = image.Rectangle{
+								Min: image.Point{leftFloatX, 0},
+								Max: image.Point{leftFloatX + size.X, size.Y},
+							}
+							contentorigin = contentorigin.Add(image.Point{leftFloatX, 0})
+						default:
+							// draw the box with normal flow.
+						}
 						draw.Draw(
 							dst,
 							r,
@@ -366,6 +430,15 @@ func (e *RenderableDomElement) realRender(containerWidth int, layoutPass bool, r
 							sr.Min,
 							draw.Over,
 						)
+
+					}
+					if sr.Size().Y > 0 {
+						switch float {
+						case "left":
+							leftFloatStack = append(leftFloatStack, c)
+						case "right":
+							rightFloatStack = append(rightFloatStack, c)
+						}
 					}
 
 					// populate the imagemap by adding the child, then adding the children's
@@ -399,7 +472,6 @@ func (e *RenderableDomElement) realRender(containerWidth int, layoutPass bool, r
 					switch float {
 					case "left", "right":
 						// floated boxes don't affect dot.
-						fallthrough
 					case "none":
 						fallthrough
 					default:
@@ -413,8 +485,12 @@ func (e *RenderableDomElement) realRender(containerWidth int, layoutPass bool, r
 			if e.FirstPageOnly && dot.Y > e.ViewportHeight {
 				return dst, dot
 			}
+			leftFloatStack = leftFloatStack.ClearFloats(dot)
+			rightFloatStack = rightFloatStack.ClearFloats(dot)
 		}
 		e.ImageMap = imageMap
+		//	fmt.Printf("Left Floats: %s", leftFloatStack)
+		//	fmt.Printf("Right Floats: %s", rightFloatStack)
 		return dst, dot
 	}
 }
