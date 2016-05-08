@@ -52,83 +52,6 @@ type RenderableDomElement struct {
 	containerWidth int
 }
 
-func getFontHeight(face font.Face) int {
-	metrics := face.Metrics()
-	return (metrics.Ascent + metrics.Descent).Ceil()
-}
-func stringSize(fntDrawer font.Drawer, textContent string) (int, error) {
-	var size int
-	words := strings.Fields(textContent)
-	fSize := getFontHeight(fntDrawer.Face)
-	//firstRune, _ := utf8.DecodeRuneInString(textContent)
-
-	for _, word := range words {
-		wordSizeInPx := fntDrawer.MeasureString(word).Ceil()
-		size += wordSizeInPx
-
-		// Add a three per em space between words, an em-quad after a period,
-		// and an en-quad after other punctuation
-		switch word[len(word)-1] {
-		case ',', ';', ':', '!', '?':
-			size += (fSize / 2)
-		case '.':
-			size += fSize
-		default:
-			size += (fSize / 3)
-		}
-	}
-	return size, nil
-}
-
-func (e *RenderableDomElement) GetLineHeight() int {
-	// inheritd == yes
-	// percentage relative to the font size of the element itself
-	fSize := e.GetFontSize()
-	if e.Styles == nil {
-		if e.Parent == nil {
-			fontFace := e.Styles.GetFontFace(fSize)
-			return getFontHeight(fontFace)
-		}
-		//return e.Parent.GetLineHeight()
-		fontFace := e.Styles.GetFontFace(fSize)
-		return getFontHeight(fontFace)
-	}
-	stringVal := e.Styles.LineHeight.GetValue()
-	if stringVal == "" {
-		if e.Parent == nil {
-			fontFace := e.Styles.GetFontFace(fSize)
-			return getFontHeight(fontFace)
-		}
-		//return e.Parent.GetLineHeight()
-		fontFace := e.Styles.GetFontFace(fSize)
-		return getFontHeight(fontFace)
-
-	}
-	lHeightSize, err := css.ConvertUnitToPx(fSize, fSize, stringVal)
-	if err != nil {
-		fontFace := e.Styles.GetFontFace(fSize)
-		return getFontHeight(fontFace)
-	}
-	fontFace := e.Styles.GetFontFace(lHeightSize)
-	return getFontHeight(fontFace)
-}
-
-func (e *RenderableDomElement) GetFontSize() int {
-	fromCSS, err := e.Styles.GetFontSize()
-	switch err {
-	case css.NoStyles, css.InheritValue:
-		if e.Parent == nil {
-			return DefaultFontSize
-		}
-		return e.Parent.GetFontSize()
-	case nil:
-		return fromCSS
-	default:
-		panic("Could not determine font size")
-
-	}
-}
-
 func (e *RenderableDomElement) Walk(callback func(*RenderableDomElement)) {
 	if e == nil {
 		return
@@ -147,87 +70,6 @@ func (e *RenderableDomElement) Walk(callback func(*RenderableDomElement)) {
 	}
 }
 
-func (e RenderableDomElement) GetBackgroundColor() color.Color {
-	switch bg, err := e.Styles.GetBackgroundColor(dfltBackground); err {
-	case css.InheritValue:
-		if e.Parent == nil {
-			//return dfltBackground
-			return color.Transparent //dfltBackground
-			//&color.RGBA{0xE0, 0xE0, 0xE0, 0xFF}
-		}
-		return e.Parent.GetBackgroundColor()
-	case css.NoStyles:
-		return color.Transparent
-		//return dfltBackground
-	default:
-		return bg
-	}
-}
-
-func (e RenderableDomElement) GetColor() color.Color {
-	var deflt color.RGBA
-	if e.Type == html.ElementNode && e.Data == "a" {
-		deflt = color.RGBA{0, 0, 0xFF, 0xFF}
-	} else {
-		deflt = color.RGBA{0, 0, 0, 0xFF}
-	}
-	switch cssColor, err := e.Styles.GetColor(deflt); err {
-	case css.InheritValue:
-		if e.Parent == nil {
-			return deflt
-		}
-		return e.Parent.GetColor()
-	case css.NoStyles:
-		if e.Parent == nil {
-			return deflt
-		}
-		return e.Parent.GetColor()
-	default:
-		return cssColor
-	}
-}
-
-func (e RenderableDomElement) GetDisplayProp() string {
-	if e.Type == html.TextNode {
-		return "inline"
-	}
-	if cssVal := e.Styles.DisplayProp(); cssVal != "" {
-		return cssVal
-	}
-	// CSS Level 1 default is block, CSS Level 2 is inline
-	return "block"
-	//return "inline"
-}
-
-func (e RenderableDomElement) GetTextDecoration() string {
-	if e.Styles == nil {
-		return "none"
-	}
-
-	switch decoration := e.Styles.TextDecoration.GetValue(); decoration {
-	case "inherit":
-		return e.Parent.GetTextDecoration()
-	default:
-		return strings.TrimSpace(decoration)
-	}
-}
-func (e RenderableDomElement) GetTextTransform() string {
-	if e.Styles == nil {
-		return "none"
-	}
-
-	switch transformation := e.Styles.TextTransform.GetValue(); transformation {
-	case "inherit":
-		return e.Parent.GetTextTransform()
-	case "capitalize", "uppercase", "lowercase", "none":
-		return transformation
-	default:
-		if e.Parent == nil {
-			return "none"
-		}
-		return e.Parent.GetTextTransform()
-	}
-}
 func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent string) (img *image.RGBA, unconsumed string) {
 	switch e.GetTextTransform() {
 	case "capitalize":
@@ -313,57 +155,24 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 	return
 }
 
-func (e RenderableDomElement) GetTextIndent(containerWidth int) int {
-	// it's inherited, with the initial value of 0
-	if e.Styles == nil {
-		if e.Parent == nil {
-			return 0
-		}
-		return e.Parent.GetTextIndent(containerWidth)
-	}
-	val := e.Styles.TextIndent.GetValue()
-	if val == "" {
-		if e.Parent == nil {
-			return 0
-		}
-		return e.Parent.GetTextIndent(containerWidth)
-	}
-	px, err := css.ConvertUnitToPx(e.GetFontSize(), containerWidth, val)
-	if err != nil {
-		return 0
-	}
-	return px
-}
-
-func (e RenderableDomElement) GetContentWidth(containerWidth int) int {
-	width := containerWidth - (e.GetMarginLeftSize() + e.GetMarginRightSize() + e.GetBorderLeftWidth() + e.GetBorderRightWidth() + e.GetPaddingLeft() + e.GetPaddingRight())
-	if e.Styles == nil {
-		return width
-	}
-	cssVal := e.Styles.Width.GetValue()
-	switch cssVal {
-	case "inherit":
-		if e.Parent == nil {
-			return width
-		}
-		return e.Parent.GetContentWidth(containerWidth)
-	case "", "auto":
-		return width
-	default:
-		calVal, err := css.ConvertUnitToPx(e.GetFontSize(), containerWidth, cssVal)
-		if err == nil {
-			return calVal
-		}
-		return width
-	}
-}
 func (e *RenderableDomElement) Render(containerWidth int) image.Image {
 	size, _ := e.realRender(containerWidth, true, image.ZR, image.Point{0, 0})
 	img, _ := e.realRender(containerWidth, false, size.Bounds(), image.Point{0, 0})
 	return img
 }
 
-func (e *RenderableDomElement) realRender(containerWidth int, measureOnly bool, r image.Rectangle, dot image.Point) (image.Image, image.Point) {
+// realRender either calculates the size of elements, or draws them, depending on if it's a layoutPass
+// or not. It's done in one method because the logic is largely the same.
+//
+// If it's a layout pass, it will return an empty image large enough to be passed to a render pass. If it's
+// a render pass, the final size, r, must be passed from the layout pass so that it can allocate an appropriately
+// sized image.
+//
+// dot is the starting location of dot (a moving cursor used for drawing elements, representing the top-left corner
+// to draw at.), and it returns both an image, and the final location of dot after drawing the element. This is
+// required because inline elements might render multiple line blocks, and the whole inline isn't necessarily
+// square, so you can't just take the bounds of the rendered image.
+func (e *RenderableDomElement) realRender(containerWidth int, layoutPass bool, r image.Rectangle, dot image.Point) (image.Image, image.Point) {
 	var dst draw.Image
 	e.RenderAbort = make(chan bool)
 	select {
@@ -428,7 +237,7 @@ func (e *RenderableDomElement) realRender(containerWidth int, measureOnly bool, 
 		}
 
 		var mst *DynamicMemoryDrawer
-		if measureOnly {
+		if layoutPass {
 			mst = NewDynamicMemoryDrawer(image.Rectangle{image.ZP, image.Point{width, height}})
 			dst = mst
 		} else {
@@ -458,7 +267,7 @@ func (e *RenderableDomElement) realRender(containerWidth int, measureOnly bool, 
 					remainingTextContent = rt
 					sr := childImage.Bounds()
 					r := image.Rectangle{dot, dot.Add(sr.Size())}
-					if measureOnly {
+					if layoutPass {
 						mst.GrowBounds(r)
 					} else {
 						draw.Draw(dst, r, childImage, sr.Min, draw.Src)
@@ -487,9 +296,9 @@ func (e *RenderableDomElement) realRender(containerWidth int, measureOnly bool, 
 						firstLine = false
 					}
 					size, _ := c.realRender(width, true, image.ZR, dot)
-					childContent, newDot := c.realRender(width, measureOnly, size.Bounds(), dot)
+					childContent, newDot := c.realRender(width, layoutPass, size.Bounds(), dot)
 
-					if measureOnly == false {
+					if layoutPass == false {
 						c.ContentOverlay = childContent
 						bounds := childContent.Bounds()
 						draw.Draw(
@@ -524,28 +333,32 @@ func (e *RenderableDomElement) realRender(containerWidth int, measureOnly bool, 
 				case "block":
 					fallthrough
 				default:
+					float := c.GetFloat()
 					if dot.X != 0 {
 						// This means the previous child was an inline item, and we should position dot
 						// as if there were an implicit box around it.
-						dot.X = 0
-						if c.PrevSibling != nil {
-							dot.Y += c.PrevSibling.GetLineHeight()
+						// floated elements don't affect dot, so only do this if it's not floated.
+						if float == "none" {
+							dot.X = 0
+							if c.PrevSibling != nil {
+								dot.Y += c.PrevSibling.GetLineHeight()
+							}
 						}
 					}
 					// draw the border, background, and CSS outer box.
 					childContent, _ := c.realRender(width, true, image.ZR, image.ZP)
-					if measureOnly == false {
-						childContent, _ = c.realRender(width, measureOnly, childContent.Bounds(), image.ZP)
+					if layoutPass == false {
+						childContent, _ = c.realRender(width, layoutPass, childContent.Bounds(), image.ZP)
 					}
 					c.ContentOverlay = childContent
-					box, contentorigin := c.getCSSBox(childContent, measureOnly)
+					box, contentorigin := c.getCSSBox(childContent, layoutPass)
 					sr := box.Bounds()
 					r := image.Rectangle{dot, dot.Add(sr.Size())}
 
-					if measureOnly {
+					if layoutPass {
 						mst.GrowBounds(r)
 					} else {
-						// draw the box
+						// draw the box. Normal flow.
 						draw.Draw(
 							dst,
 							r,
@@ -571,7 +384,7 @@ func (e *RenderableDomElement) realRender(containerWidth int, measureOnly bool, 
 					contentStart := dot.Add(contentorigin)
 					contentBounds := c.ContentOverlay.Bounds()
 					cr := image.Rectangle{contentStart, contentStart.Add(contentBounds.Size())}
-					if measureOnly {
+					if layoutPass {
 						mst.GrowBounds(cr)
 					} else {
 						draw.Draw(
@@ -583,8 +396,17 @@ func (e *RenderableDomElement) realRender(containerWidth int, measureOnly bool, 
 						)
 					}
 
-					dot.X = 0
-					dot.Y = r.Max.Y
+					switch float {
+					case "left", "right":
+						// floated boxes don't affect dot.
+						fallthrough
+					case "none":
+						fallthrough
+					default:
+
+						dot.X = 0
+						dot.Y = r.Max.Y
+					}
 				}
 
 			}
