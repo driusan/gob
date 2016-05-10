@@ -212,11 +212,7 @@ func loadNewPage(context *url.URL, path string) (*Page, error) {
 }
 
 func renderNewPageIntoViewport(s screen.Screen, w screen.Window, v *Viewport, page *Page) {
-	page.Content.FirstPageOnly = true
 	windowSize := v.Size.Size()
-	v.Content = page.Content.Render(windowSize.X)
-	paintWindow(s, w, v, page)
-
 	page.Content.FirstPageOnly = false
 	go func() {
 		v.Content = page.Content.Render(windowSize.X)
