@@ -1,7 +1,7 @@
 package css
 
 import (
-	"Gob/net"
+	"github.com/driusan/Gob/net"
 	"golang.org/x/net/html"
 	"io/ioutil"
 	"net/url"

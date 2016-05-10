@@ -1,8 +1,8 @@
 package renderer
 
 import (
-	"Gob/css"
-	"Gob/dom"
+	"github.com/driusan/Gob/css"
+	"github.com/driusan/Gob/dom"
 	"golang.org/x/net/html"
 )
 

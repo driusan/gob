@@ -1,17 +1,17 @@
 package main
 
 import (
-	"Gob/css"
-	"Gob/renderer"
 	"fmt"
+	"github.com/driusan/Gob/css"
+	"github.com/driusan/Gob/renderer"
 	"golang.org/x/net/html"
-	"strconv"
-	//	"strings"
 	"image/color"
 	"io"
 	"io/ioutil"
 	"net/url"
 	"os"
+	"strconv"
+	"strings"
 )
 
 func loadHTML(r io.Reader, urlContext *url.URL) *Page {
@@ -98,8 +98,9 @@ func loadHTML(r io.Reader, urlContext *url.URL) *Page {
 			el.Styles.SetFontSize(fontSizeToPx(strVal, el.Parent))
 		}
 
-		if el.Type == html.ElementNode && el.Data == "body" {
+		if el.Type == html.ElementNode && strings.ToLower(el.Data) == "body" {
 			background = el.GetBackgroundColor()
+			fmt.Print("Background color of body: %s\n", background)
 			if background == color.Transparent {
 				background = color.RGBA{0xE0, 0xE0, 0xE0, 0xFF}
 			}

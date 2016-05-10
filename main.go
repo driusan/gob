@@ -1,9 +1,9 @@
 package main
 
 import (
-	"Gob/net"
-	"Gob/renderer"
 	"fmt"
+	"github.com/driusan/Gob/net"
+	"github.com/driusan/Gob/renderer"
 	"golang.org/x/exp/shiny/driver"
 	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/mobile/event/key"

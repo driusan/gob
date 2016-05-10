@@ -1,7 +1,7 @@
 package css
 
 import (
-	//	"fmt"
+	"fmt"
 	"github.com/golang/freetype/truetype"
 	"golang.org/x/image/font"
 	//"golang.org/x/image/font/basicfont"
@@ -494,6 +494,29 @@ func (e *StyledElement) GetAttribute(attr string) StyleValue {
 	return StyleValue{"", false}
 }
 
+// Returns the URL as a string, and an error. Retrieving the URL
+// is left as an exercise for the caller, since the CSS package doesn't
+// know the host/path to resolve relative URLs
+func (e StyledElement) GetBackgroundImage() (string, error) {
+	bgi := e.BackgroundImage.GetValue()
+	switch bgi {
+	case "", "none":
+		return "", NoStyles
+	case "inherit":
+		return "", InheritValue
+	}
+	fmt.Printf("Background Image Value: %s\n", bgi)
+	if strings.Count(bgi, "\"") >= 2 {
+		realURL := bgi[strings.IndexRune(bgi, '"')+1 : strings.LastIndex(bgi, "\"")]
+		return realURL, nil
+	}
+	if strings.Count(bgi, "'") >= 2 {
+		realURL := bgi[strings.IndexRune(bgi, '\'')+1 : strings.LastIndex(bgi, "'")]
+		return realURL, nil
+	}
+	realURL := bgi[strings.IndexRune(bgi, '(')+1 : strings.LastIndex(bgi, ")")]
+	return realURL, nil
+}
 func (e StyledElement) GetBackgroundColor(defaultColour color.Color) (color.Color, error) {
 	switch e.BackgroundColor.string {
 	case "inherit":

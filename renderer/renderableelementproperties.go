@@ -1,7 +1,7 @@
 package renderer
 
 import (
-	"Gob/css"
+	"github.com/driusan/Gob/css"
 	"golang.org/x/image/font"
 	"golang.org/x/net/html"
 	"image/color"

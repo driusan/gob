@@ -1,7 +1,7 @@
 package main
 
 import (
-	"Gob/net"
+	"github.com/driusan/Gob/net"
 )
 
 func loadPage(filename string) (*Page, error) {

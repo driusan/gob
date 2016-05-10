@@ -1,10 +1,13 @@
 package renderer
 
 import (
-	"Gob/css"
+	"fmt"
+	"github.com/driusan/Gob/css"
+	"github.com/driusan/Gob/net"
 	"image"
 	"image/color"
 	"image/draw"
+	"net/url"
 )
 
 type BoxOffset struct {
@@ -611,8 +614,37 @@ func (e RenderableDomElement) GetBorderRightStyle() string {
 	return val
 }
 
+func (e *RenderableDomElement) GetBackgroundImage() image.Image {
+	iURL, err := e.Styles.GetBackgroundImage()
+	switch err {
+	case css.InheritValue:
+		return e.Parent.GetBackgroundImage()
+	case css.Invalid, css.NoStyles:
+		return nil
+	}
+	fmt.Printf("Should load background image: %s (%v)\n", iURL, err)
+	u, err := url.Parse(iURL)
+	if err != nil {
+		return nil
+	}
+	newURL := e.PageLocation.ResolveReference(u)
+	r, err := net.GetURLReader(newURL)
+	if err != nil {
+		return nil
+	}
+	content, _, err := image.Decode(r)
+	if err != nil {
+		return nil
+	}
+	return content
+
+}
 func (e *RenderableDomElement) getCSSBox(img image.Image, layoutpass bool) (image.Image, image.Point) {
-	bg := e.GetBackgroundColor()
+	bgi := e.GetBackgroundImage()
+	if bgi == nil {
+		bg := e.GetBackgroundColor()
+		bgi = &image.Uniform{bg}
+	}
 
 	box := &outerBoxDrawer{
 		Margin: BoxMargins{
@@ -634,7 +666,7 @@ func (e *RenderableDomElement) getCSSBox(img image.Image, layoutpass bool) (imag
 			Bottom: BoxPadding{Width: e.GetPaddingBottom()},
 		},
 		contentSize: img.Bounds().Size(),
-		background:  &image.Uniform{bg},
+		background:  bgi,
 	}
 	if layoutpass {
 		e.CSSOuterBox = box

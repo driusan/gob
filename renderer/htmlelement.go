@@ -1,10 +1,10 @@
 package renderer
 
 import (
-	"Gob/css"
-	"Gob/dom"
-	"Gob/net"
 	"fmt"
+	"github.com/driusan/Gob/css"
+	"github.com/driusan/Gob/dom"
+	"github.com/driusan/Gob/net"
 	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
 	"golang.org/x/net/html"
@@ -204,10 +204,10 @@ func (e *RenderableDomElement) realRender(containerWidth int, layoutPass bool, r
 					}
 					switch attr.Key {
 					case "src":
-						fmt.Printf("Should load: %s\n", attr.Val)
+						// Seeing this print way too many times.. something's wrong.
+						//fmt.Printf("Should load: %s\n", attr.Val)
 						u, err := url.Parse(attr.Val)
 						if err != nil {
-							panic("At the disco")
 							loadedImage = true
 							break
 						}
