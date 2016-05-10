@@ -191,7 +191,8 @@ func (e *RenderableDomElement) realRender(containerWidth int, layoutPass bool, r
 		width := e.GetContentWidth(containerWidth)
 		e.contentWidth = width
 		e.containerWidth = containerWidth
-		height := 0
+
+		height := e.GetContentHeight()
 
 		// special cases
 		if e.Type == html.ElementNode {
@@ -224,14 +225,6 @@ func (e *RenderableDomElement) realRender(containerWidth int, layoutPass bool, r
 						}
 
 						loadedImage = true
-
-						/*
-							case "width":
-								width, _ = strconv.Atoi(attr.Val)
-							case "height":
-								height, _ = strconv.Atoi(attr.Val)
-							}
-						*/
 					}
 				}
 			}

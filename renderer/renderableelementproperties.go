@@ -241,3 +241,24 @@ func (e RenderableDomElement) GetContentWidth(containerWidth int) int {
 		return width
 	}
 }
+func (e RenderableDomElement) GetContentHeight() int {
+	if e.Styles == nil {
+		return 0
+	}
+	cssVal := e.Styles.Height.GetValue()
+	switch cssVal {
+	case "inherit":
+		if e.Parent == nil {
+			return 0
+		}
+		return e.Parent.GetContentHeight()
+	case "", "auto":
+		return 0
+	default:
+		calVal, err := css.ConvertUnitToPx(e.GetFontSize(), 0, cssVal)
+		if err == nil {
+			return calVal
+		}
+		return 0
+	}
+}
