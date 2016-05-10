@@ -100,7 +100,7 @@ func loadHTML(r io.Reader, urlContext *url.URL) *Page {
 
 		if el.Type == html.ElementNode && strings.ToLower(el.Data) == "body" {
 			background = el.GetBackgroundColor()
-			fmt.Print("Background color of body: %s\n", background)
+			//fmt.Print("Background color of body: %s\n", background)
 			if background == color.Transparent {
 				background = color.RGBA{0xE0, 0xE0, 0xE0, 0xFF}
 			}

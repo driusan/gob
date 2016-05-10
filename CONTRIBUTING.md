@@ -64,11 +64,11 @@ image/font defines constants that correspond 1:1 with the CSS properties, I have
 that they interact with the implementation in the truetype implementation..
 
 #### Background:
-- background-image related properties (-repeat, -attachment, -position) not supported. Defaults to acting as if
-  the repeat is "none", not "repeat", as the spec says it should.
+- background-image-attachment and background-image-position not supported. 
 
-These will probably need an RGBA image allocated and drawn in RenderableDOMElement (for non-layout passes). 
-The x/image/draw.Copy function should cover most of the work.
+Attachment: fixed would require re-rendering the page for every scroll event. It's probably not
+realistic until the layout/draw is more separated (see note in z-index property.). image-position
+should just involve doing the math in RenderableDomElement.getCSSBox.
 
 #### Text Properties:
 - missing word-spacing
@@ -84,7 +84,7 @@ the output of renderLineBox into, I don't know what's involved in vertical-align
 and the text being centered in the lineheight just involves working out the math
 from the font metrics.
 
-Box properties:
+#### Box properties:
 - missing "auto" support for margin
 - missing width and height explicitly set in CSS
 - missing thin/medium/thick border keywords
@@ -97,7 +97,7 @@ should be trivial to add in RenderableDomElement.getCSSBox. Border styles would 
 working out the appropriate image mask in getCSSBox. The shorthands just need to be parsed
 and added in the css package.
 
-Display model
+#### Display model
 - missing clear property
 - missing display: list-item 
 - missing list-item related properties (list-style-type/list-style-image/list-style-position and list-style shorthand properties)
@@ -108,7 +108,7 @@ Clear should just involve setting dot appropriately near the start of a layout/r
 List-item should be trivial to add by adding a couple if statements as it's fairly similar to
 block. (it just needs to draw an image and adjust dot.)
 
-Other:
+#### Other:
 - missing @import
 - missing comments
 
@@ -122,8 +122,9 @@ These are mostly missing because shiny doesn't currently provide any way to get 
 which is required to calculate them.
 
 
-Missing from CSS 2.2:
-General:
+### Missing from CSS 2.2:
+
+#### General:
 - everything should be reviewed to make sure it's not subtly incompatible with what's implemented.
 - shorthand properties should reset to initial value before setting.
 - missing @media and media types (should support all, screen, continuous, visual, interactive)
@@ -132,7 +133,7 @@ General:
 @media probably requires a proper tokenizer too. counter-increment/reset should be easy to
 add by storing a map[countername]uint somewhere.
 
-Selectors:
+#### Selectors:
 - Missing E > F selector
 - missing E + F selector
 - missing :first-child selector
@@ -147,7 +148,7 @@ Selectors:
 The rest can be added fairly easily by adding to the existing selector tests in the css package
 and then implementing the in the (css/CSSSelector.)Matches(html.Node) function
 
-Box model:
+#### Box model:
 - missing direction and unicode-bidi properties
 - missing inline-block and table (and table related) display types
 - initial value of display changed to "inline", but this causes performance issues..
@@ -159,7 +160,6 @@ Box model:
 
 I don't know what's involve in the direction properties. inline-block can probably be implemented
 by a couple if statements around how dot is advanced in the normal block render path.
-
 
 position and related will just involve translating the drawing rectangle without touching dot in
 the render method, similarly to how floats do.
@@ -174,7 +174,7 @@ for draw) that render doesn't need to be concerned with anything but looping and
 suspect refactoring to the "better" way will be required in order do handle input elements is any kind 
 of performant way..
 
-Visual Effects:
+#### Visual Effects:
 - missing overflow property
 - missing clip property
 - missing visibility property
@@ -182,21 +182,21 @@ Visual Effects:
 Overflow will require coming up with a way to draw a scrollbar and scroll. The rest should just require passing
 an appropriate mask to Draw in the render method.
 
-Generated Content:
+#### Generated Content:
 - missing :before and :after pseudo-elements
 - missing content property
 - missing quotes property
 
 Same issues as CSS1 pseudo-elements.
 
-Lists:
+#### Lists:
 - list-style-type needs more options
 - white-space should have pre-line wrap option added
 
 These are mostly just cases where the spec exploded in size and the extra options
 need to be supported.
 
-Tables:
+#### Tables:
 - missing display: types for tables
 - missing caption-side attribute
 - missing table-layout property
@@ -208,10 +208,11 @@ table and related display/property types will probably require writing a (or man
 switch statement that need to be written. It's probably a significant amount of work, but largely
 independent of the rest of the codebase. 
 
-UI:
+#### UI:
 - missing cursor property
 - missing system colours? (Not In CSS3?)
 - missing outline/outline-width/outline-style/outline-color properties
 
-Shiny doesn't support any way to set the cursor. System colours are deprecated in CSS.
-Outline I haven't looked into, but I suspect could share a lot of code with borders.
+Shiny doesn't support any way to set the cursor. System colours are deprecated in CSS (and
+shiny doesn't have any way to retrieve them..)
+Outline I haven't looked into, but I suspect it could share a lot of code with borders.

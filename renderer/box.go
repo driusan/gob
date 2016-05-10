@@ -6,8 +6,10 @@ import (
 	"github.com/driusan/Gob/net"
 	"image"
 	"image/color"
+	// the standard draw package doesn't have Copy, which we need for background Repeat.
 	"image/draw"
 	"net/url"
+	"strings"
 )
 
 type BoxOffset struct {
@@ -614,6 +616,17 @@ func (e RenderableDomElement) GetBorderRightStyle() string {
 	return val
 }
 
+func (e *RenderableDomElement) GetBackgroundRepeat() string {
+	repeat := e.Styles.BackgroundRepeat.GetValue()
+	switch strings.ToLower(repeat) {
+	case "inherit":
+		return e.Parent.GetBackgroundRepeat()
+	case "repeat", "repeat-x", "repeat-y", "no-repeat":
+		return repeat
+	default:
+		return "repeat"
+	}
+}
 func (e *RenderableDomElement) GetBackgroundImage() image.Image {
 	iURL, err := e.Styles.GetBackgroundImage()
 	switch err {
@@ -644,6 +657,104 @@ func (e *RenderableDomElement) getCSSBox(img image.Image, layoutpass bool) (imag
 	if bgi == nil {
 		bg := e.GetBackgroundColor()
 		bgi = &image.Uniform{bg}
+	} else {
+		bg := e.GetBackgroundColor()
+		solidbg := &image.Uniform{bg}
+		if layoutpass == false {
+			// if it's a non-layout pass, we need to construct the background image based on the
+			// repeat and make sure that the background-color shines through any transparent
+			// parts of the background image
+
+			// allocate a new image of the appropriate size
+			csize := img.Bounds().Size()
+			bgCanvas := image.NewRGBA(image.Rectangle{
+				image.ZP,
+				image.Point{
+					csize.X + e.GetPaddingLeft() + e.GetPaddingRight() + e.GetBorderLeftWidth() + e.GetBorderRightWidth(),
+					csize.Y + e.GetPaddingTop() + e.GetPaddingBottom() + e.GetBorderTopWidth() + e.GetBorderBottomWidth(),
+				}})
+
+			// draw the background colour over the whole image, so that the transparent parts
+			// are correct.
+			draw.Draw(
+				bgCanvas,
+				bgCanvas.Bounds(),
+				solidbg,
+				image.ZP,
+				draw.Src,
+			)
+
+			bgiSize := bgi.Bounds().Size()
+
+			// now draw the background image based on the background-repeat.
+			switch e.GetBackgroundRepeat() {
+			case "no-repeat":
+				draw.Draw(
+					bgCanvas,
+					bgCanvas.Bounds(),
+					bgi,
+					image.ZP,
+					draw.Over,
+				)
+			case "repeat-x":
+				for x := 0; ; x += bgiSize.X {
+					draw.Draw(
+						bgCanvas,
+						image.Rectangle{
+							image.Point{x, 0},
+							image.Point{x + bgiSize.X, bgiSize.Y},
+						},
+						bgi,
+						image.ZP,
+						draw.Over,
+					)
+					if x > csize.X {
+						break
+					}
+				}
+			case "repeat-y":
+				for y := 0; ; y += bgiSize.X {
+					draw.Draw(
+						bgCanvas,
+						image.Rectangle{
+							image.Point{0, y},
+							image.Point{bgiSize.X, y + bgiSize.Y},
+						},
+						bgi,
+						image.ZP,
+						draw.Over,
+					)
+					if y > csize.Y {
+						break
+					}
+				}
+			case "repeat":
+				fallthrough
+			default:
+				for x := 0; ; x += bgiSize.X {
+					for y := 0; ; y += bgiSize.Y {
+						draw.Draw(
+							bgCanvas,
+							image.Rectangle{
+								image.Point{x, y},
+								image.Point{x + bgiSize.X, y + bgiSize.Y},
+							},
+							bgi,
+							image.ZP,
+							draw.Over,
+						)
+						if y > csize.Y {
+							break
+						}
+					}
+					if x > csize.X {
+						break
+					}
+				}
+
+			}
+			bgi = bgCanvas
+		}
 	}
 
 	box := &outerBoxDrawer{
