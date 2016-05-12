@@ -393,26 +393,27 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 
 				r := image.Rectangle{dot, dot.Add(sr.Size())}
 
-				mst.GrowBounds(r)
 				switch float {
 				case "right":
 					size := sr.Size()
 					rightFloatX := width - rightFloatStack.Width()
 					r = image.Rectangle{
-						Min: image.Point{rightFloatX - size.X, 0},
-						Max: image.Point{rightFloatX, size.Y},
+						Min: image.Point{rightFloatX - size.X, dot.Y},
+						Max: image.Point{rightFloatX, size.Y+dot.Y},
 					}
 					//c.BoxContentOrigin = contentorigin.Add(image.Point{rightFloatX - size.X, 0})
 				case "left":
 					size := sr.Size()
 					leftFloatX := leftFloatStack.Width()
 					r = image.Rectangle{
-						Min: image.Point{leftFloatX, 0},
-						Max: image.Point{leftFloatX + size.X, size.Y},
+						Min: image.Point{leftFloatX, dot.Y},
+						Max: image.Point{leftFloatX + size.X, size.Y+dot.Y},
 					}
 					//c.BoxContentOrigin = contentorigin.Add(image.Point{leftFloatX, 0})
 				}
+				mst.GrowBounds(r)
 				c.BoxDrawRectangle = r
+
 				if sr.Size().Y > 0 {
 					switch float {
 					case "left":
