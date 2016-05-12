@@ -1,0 +1,7 @@
+When whitespace nowrap is set, it incorrectly grows the parent's box
+instead of overflowing, and words that are past the end of the box aren't
+rendered at all. 
+
+The LayoutPass needs to more cleanly separate ContentOverlay from
+the CSS box.
+

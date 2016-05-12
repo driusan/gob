@@ -1,7 +1,7 @@
 package renderer
 
 import (
-	"fmt"
+	//	"fmt"
 	"github.com/driusan/Gob/css"
 	"github.com/driusan/Gob/net"
 	"image"
@@ -635,7 +635,6 @@ func (e *RenderableDomElement) GetBackgroundImage() image.Image {
 	case css.Invalid, css.NoStyles:
 		return nil
 	}
-	fmt.Printf("Should load background image: %s (%v)\n", iURL, err)
 	u, err := url.Parse(iURL)
 	if err != nil {
 		return nil

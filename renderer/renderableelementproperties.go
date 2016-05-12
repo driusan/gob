@@ -161,7 +161,6 @@ func (e RenderableDomElement) GetDisplayProp() string {
 		return cssVal
 	}
 	// CSS Level 1 default is block, CSS Level 2 is inline
-	//return "block"
 	return "inline"
 }
 
@@ -348,4 +347,20 @@ func (e *RenderableDomElement) GetFontFamily() css.FontFamily {
 }
 func (e *RenderableDomElement) GetFontFace(fsize int) font.Face {
 	return e.Styles.GetFontFace(fsize, e.GetFontFamily(), e.GetFontWeight(), e.GetFontStyle())
+}
+
+func (e *RenderableDomElement) GetWhiteSpace() string {
+	switch s := strings.ToLower(e.Styles.WhiteSpace.GetValue()); s {
+	case "normal", "pre", "nowrap":
+		return s
+	case "pre-wrap", "pre-line":
+		panic("Unimplemented WhiteSpace value: " + s)
+	}
+	// default is inherited, inherit will also fall through
+	// to here.
+	if e.Parent == nil {
+		return "normal"
+	}
+	return e.Parent.GetWhiteSpace()
+
 }

@@ -1,0 +1,3 @@
+text is not floating around floats, but instead writes over it.
+
+The code for floats should probably be rewritten in terms of (image.Rectangle).Overlaps() of the BoxDrawRectangle instead of guessing based on width()

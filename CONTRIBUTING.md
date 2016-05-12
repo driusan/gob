@@ -100,8 +100,6 @@ and added in the css package.
 - missing clear property
 - missing display: list-item 
 - missing list-item related properties (list-style-type/list-style-image/list-style-position and list-style shorthand properties)
-- missing white-space: normal/pre/nowrap (everything is rendered as normal)
-- weird spacing after inline element (text-decorations go too far, adding space when there shouldn't be)
 
 Clear should just involve setting dot appropriately near the start of a layout/render pass.
 List-item should be trivial to add by adding a couple if statements as it's fairly similar to
@@ -150,7 +148,6 @@ and then implementing the in the (css/CSSSelector.)Matches(html.Node) function
 #### Box model:
 - missing direction and unicode-bidi properties
 - missing inline-block and table (and table related) display types
-- initial value of display changed to "inline", but this causes performance issues..
 - missing position attribute
 - missing top/right/bottom/left attributes (for positioned elements.)
 - missing z-index property
@@ -163,15 +160,10 @@ by a couple if statements around how dot is advanced in the normal block render 
 position and related will just involve translating the drawing rectangle without touching dot in
 the render method, similarly to how floats do.
 
-The performance issues will need to be debugged and benchmarked, but are low priority until things 
-are rendering correctly.
-
-z-index can either be done the stupid way (keep track of the smallest and largest index in the layout
-pass, and then just do a loop only drawing one z-index at a time in the render pass), but the better
-way to do it would probably be to have the layout pass store enough information (such as the rectangle
-for draw) that render doesn't need to be concerned with anything but looping and calling DrawMask. I
-suspect refactoring to the "better" way will be required in order do handle input elements is any kind 
-of performant way..
+z-index should just require keeping track of the max/min child z-index and
+ranging through them, only drawing the appropriate ones in the DrawPass,
+but there's no point implementing it until position is implemented, since
+things can't overlap otherwise.
 
 #### Visual Effects:
 - missing overflow property

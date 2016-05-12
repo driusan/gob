@@ -96,7 +96,6 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 	case "lowercase":
 		textContent = strings.ToLower(textContent)
 	}
-	words := strings.Fields(textContent)
 	fSize := e.GetFontSize()
 	fontFace := e.GetFontFace(fSize)
 	var dot int
@@ -110,9 +109,38 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 		Face: fontFace,
 	}
 
-	ssize, _ := stringSize(fntDrawer, textContent)
-	if ssize > remainingWidth {
-		ssize = remainingWidth
+	var ssize int
+
+	// words are used for normal, nowrap,
+	var words []string
+	// lines are used for pre, pre-wrap, and pre-line
+	var lines []string
+	whitespace := e.GetWhiteSpace()
+	switch whitespace {
+	case "pre":
+		lines = strings.Split(textContent, "\n")
+		ssize = fntDrawer.MeasureString(lines[0]).Ceil()
+		unconsumed = strings.Join(lines[1:], "\n")
+	case "pre-wrap":
+		panic("pre-wrap not yet implemented")
+		lines = strings.Split(textContent, "\n")
+		words = strings.Fields(lines[0])
+		ssize = fntDrawer.MeasureString(lines[0]).Ceil()
+	case "nowrap":
+		// same as normal, but don't cap the size
+		// at remaining width
+		words = strings.Fields(textContent)
+		ssize, _ = stringSize(fntDrawer, textContent)
+	case "pre-line":
+		panic("pre-line not yet implemented")
+	case "normal":
+		fallthrough
+	default:
+		words = strings.Fields(textContent)
+		ssize, _ = stringSize(fntDrawer, textContent)
+		if ssize > remainingWidth {
+			ssize = remainingWidth
+		}
 	}
 	lineheight := e.GetLineHeight()
 	img = image.NewRGBA(image.Rectangle{image.ZP, image.Point{ssize, lineheight}})
@@ -141,8 +169,17 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 			}
 		}
 	}
+
+	if whitespace == "pre" {
+		fntDrawer.DrawString(lines[0])
+		return
+	}
+	if whitespace == "nowrap" {
+		//fmt.Printf("No wrap! %s", words)
+	}
+
 	for i, word := range words {
-		wordSizeInPx := int(fntDrawer.MeasureString(word)) >> 6
+		wordSizeInPx := fntDrawer.MeasureString(word).Ceil()
 		if dot+wordSizeInPx > remainingWidth {
 			if i == 0 {
 				// make sure at least one word gets consumed to avoid an infinite loop.
@@ -271,50 +308,64 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 			}
 
 			remainingTextContent := strings.TrimSpace(c.Data)
+			whitespace := e.GetWhiteSpace()
 			for remainingTextContent != "" {
-				if width-dot.X-rfWidth <= 0 {
-					lfHeight := leftFloatStack.NextFloatHeight()
-					rfHeight := rightFloatStack.NextFloatHeight()
-					if len(leftFloatStack) == 0 && len(rightFloatStack) == 0 {
-						panic("Not enough space to render any element and no floats to remove.")
+				if whitespace == "normal" {
+					if width-dot.X-rfWidth <= 0 {
+						lfHeight := leftFloatStack.NextFloatHeight()
+						rfHeight := rightFloatStack.NextFloatHeight()
+						if len(leftFloatStack) == 0 && len(rightFloatStack) == 0 {
+							panic("Not enough space to render any element and no floats to remove.")
+						}
+						if lfHeight <= 0 && rfHeight <= 0 {
+							panic("Floats don't have any height to clear")
+						}
+						if lfHeight > 0 && lfHeight < rfHeight {
+							dot.Y += lfHeight + 1
+							leftFloatStack = leftFloatStack.ClearFloats(dot)
+							dot.X = leftFloatStack.Width()
+						} else if rfHeight > 0 {
+							dot.Y += rfHeight + 1
+							rightFloatStack = rightFloatStack.ClearFloats(dot)
+						} else {
+							panic("Clearing floats didn't make any space.")
+						}
+						lfWidth = leftFloatStack.Width()
+						rfWidth = rightFloatStack.Width()
 					}
-					if lfHeight <= 0 && rfHeight <= 0 {
-						panic("Floats don't have any height to clear")
-					}
-					if lfHeight > 0 && lfHeight < rfHeight {
-						dot.Y += lfHeight + 1
-						leftFloatStack = leftFloatStack.ClearFloats(dot)
-						dot.X = leftFloatStack.Width()
-					} else if rfHeight > 0 {
-						dot.Y += rfHeight + 1
-						rightFloatStack = rightFloatStack.ClearFloats(dot)
-					} else {
-						panic("Clearing floats didn't make any space.")
-					}
-					lfWidth = leftFloatStack.Width()
-					rfWidth = rightFloatStack.Width()
 				}
 				childImage, rt := c.renderLineBox(width-dot.X-rfWidth, remainingTextContent)
 				remainingTextContent = rt
 				sr := childImage.Bounds()
 				r := image.Rectangle{dot, dot.Add(sr.Size())}
 				mst.GrowBounds(r)
-				c.lineBoxes = append(c.lineBoxes, lineBox{childImage, dot})
-				if r.Max.X >= width-rfWidth {
-					// there's no space left on this line, so advance dot to the next line.
-					dot.Y += e.GetLineHeight()
-					// clear the floats that have been passed, and then move dot to the edge
-					// of the left float.
-					leftFloatStack = leftFloatStack.ClearFloats(dot)
-					rightFloatStack = rightFloatStack.ClearFloats(dot)
-					lfWidth = leftFloatStack.Width()
-					rfWidth = rightFloatStack.Width()
 
+				c.lineBoxes = append(c.lineBoxes, lineBox{childImage, dot})
+				switch e.GetWhiteSpace() {
+				case "pre":
+					dot.Y += e.GetLineHeight()
 					dot.X = lfWidth
-				} else {
-					// there's still space on this line, so move dot to the end
-					// of the rendered text.
+				case "nowrap":
 					dot.X = r.Max.X
+				case "normal":
+					fallthrough
+				default:
+					if r.Max.X >= width-rfWidth {
+						// there's no space left on this line, so advance dot to the next line.
+						dot.Y += e.GetLineHeight()
+						// clear the floats that have been passed, and then move dot to the edge
+						// of the left float.
+						leftFloatStack = leftFloatStack.ClearFloats(dot)
+						rightFloatStack = rightFloatStack.ClearFloats(dot)
+						lfWidth = leftFloatStack.Width()
+						rfWidth = rightFloatStack.Width()
+
+						dot.X = lfWidth
+					} else {
+						// there's still space on this line, so move dot to the end
+						// of the rendered text.
+						dot.X = r.Max.X
+					}
 				}
 				// add this line box to the image map.
 				imageMap.Add(c, r)
@@ -372,7 +423,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				fallthrough
 			default:
 				float := c.GetFloat()
-				if dot.X != 0 && display != "inline-block"{
+				if dot.X != 0 && display != "inline-block" {
 					// This means the previous child was an inline item, and we should position dot
 					// as if there were an implicit box around it.
 					// floated elements don't affect dot, so only do this if it's not floated.
@@ -399,7 +450,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 					rightFloatX := width - rightFloatStack.Width()
 					r = image.Rectangle{
 						Min: image.Point{rightFloatX - size.X, dot.Y},
-						Max: image.Point{rightFloatX, size.Y+dot.Y},
+						Max: image.Point{rightFloatX, size.Y + dot.Y},
 					}
 					//c.BoxContentOrigin = contentorigin.Add(image.Point{rightFloatX - size.X, 0})
 				case "left":
@@ -407,7 +458,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 					leftFloatX := leftFloatStack.Width()
 					r = image.Rectangle{
 						Min: image.Point{leftFloatX, dot.Y},
-						Max: image.Point{leftFloatX + size.X, size.Y+dot.Y},
+						Max: image.Point{leftFloatX + size.X, size.Y + dot.Y},
 					}
 					//c.BoxContentOrigin = contentorigin.Add(image.Point{leftFloatX, 0})
 				}
@@ -454,8 +505,8 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 							dot.Y = r.Max.Y
 						}
 					} else {
-					dot.X = 0
-					dot.Y = r.Max.Y
+						dot.X = 0
+						dot.Y = r.Max.Y
 					}
 
 				}

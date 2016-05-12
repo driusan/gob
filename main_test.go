@@ -1,9 +1,9 @@
 package main
 
 import (
+	"image"
 	"strings"
 	"testing"
-	"image"
 	//"fmt"
 	//"golang.org/x/mobile/event/size"
 	//"os"

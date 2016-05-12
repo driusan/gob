@@ -1,7 +1,7 @@
 package css
 
 import (
-	"fmt"
+	//"fmt"
 	"github.com/driusan/fonts"
 	"github.com/golang/freetype/truetype"
 	"golang.org/x/image/font"
@@ -594,7 +594,7 @@ func (e StyledElement) GetBackgroundImage() (string, error) {
 	case "inherit":
 		return "", InheritValue
 	}
-	fmt.Printf("Background Image Value: %s\n", bgi)
+	//fmt.Printf("Background Image Value: %s\n", bgi)
 	if strings.Count(bgi, "\"") >= 2 {
 		realURL := bgi[strings.IndexRune(bgi, '"')+1 : strings.LastIndex(bgi, "\"")]
 		return realURL, nil
