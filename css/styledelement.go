@@ -138,42 +138,41 @@ type StyledElement struct {
 
 	// New CSS Level 2 Attributes
 	// Table related properties
-	TableLayout StyleValue
+	TableLayout    StyleValue
 	BorderCollapse StyleValue
-	BorderSpacing StyleValue
-	EmptyCells StyleValue
-	CaptionSide StyleValue
+	BorderSpacing  StyleValue
+	EmptyCells     StyleValue
+	CaptionSide    StyleValue
 
 	// Visual Formatting related properties
 	Position StyleValue
-	Top StyleValue
-	Bottom StyleValue
-	Left StyleValue
-	Right StyleValue
+	Top      StyleValue
+	Bottom   StyleValue
+	Left     StyleValue
+	Right    StyleValue
 
-	Overflow StyleValue
+	Overflow   StyleValue
 	Visibility StyleValue
-	Clip StyleValue
-	ZIndex StyleValue
+	Clip       StyleValue
+	ZIndex     StyleValue
 
 	MinHeight StyleValue
 	MaxHeight StyleValue
-	MinWidth StyleValue
-	MaxWidth StyleValue
+	MinWidth  StyleValue
+	MaxWidth  StyleValue
 
 	// Generated content related properties
-	Content StyleValue
+	Content          StyleValue
 	CounterIncrement StyleValue
-	CounterReset StyleValue
-	Quotes StyleValue
+	CounterReset     StyleValue
+	Quotes           StyleValue
 
 	// UI Related properties
 	Cursor StyleValue
 
 	// Other
-	Direction StyleValue
+	Direction   StyleValue
 	UnicodeBidi StyleValue
-
 
 	// The rules that match this element.
 	rules    []StyleRule

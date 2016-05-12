@@ -226,20 +226,20 @@ func (e *RenderableDomElement) Render(containerWidth int) image.Image {
 // required because inline elements might render multiple line blocks, and the whole inline isn't necessarily
 // square, so you can't just take the bounds of the rendered image.
 func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle, dot image.Point) (image.Image, image.Point) {
-	var dst draw.Image
+	var overlayed *DynamicMemoryDrawer
 	defer func() {
-		if dst != nil {
-			e.OverlayedContent = image.NewRGBA(dst.Bounds())
+		if overlayed != nil {
+			e.OverlayedContent = image.NewRGBA(overlayed.Bounds())
 		}
 	}()
 	e.RenderAbort = make(chan bool)
 	leftFloatStack, rightFloatStack := make(FloatStack, 0), make(FloatStack, 0)
 
-	width := e.GetContentWidth(containerWidth)
+	width := e.GetContainerWidth(containerWidth)
 	e.contentWidth = width
 	e.containerWidth = containerWidth
 
-	height := e.GetContentHeight()
+	height := e.GetMinHeight()
 
 	// special cases
 	if e.Type == html.ElementNode {
@@ -277,9 +277,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 		}
 	}
 
-	var mst *DynamicMemoryDrawer
-	mst = NewDynamicMemoryDrawer(image.Rectangle{image.ZP, image.Point{width, height}})
-	dst = mst
+	overlayed = NewDynamicMemoryDrawer(image.Rectangle{image.ZP, image.Point{width, height}})
 
 	firstLine := true
 	imageMap := NewImageMap()
@@ -338,7 +336,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				remainingTextContent = rt
 				sr := childImage.Bounds()
 				r := image.Rectangle{dot, dot.Add(sr.Size())}
-				mst.GrowBounds(r)
+				overlayed.GrowBounds(r)
 
 				c.lineBoxes = append(c.lineBoxes, lineBox{childImage, dot})
 				switch e.GetWhiteSpace() {
@@ -377,8 +375,12 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				continue
 			}
 			switch display := c.GetDisplayProp(); display {
-			case "none":
+			case "none", "table-column", "table-column-group":
+				// the spec says column and column-group are
+				// treated the same as none.
 				continue
+			default:
+				fallthrough
 			case "inline":
 				if firstLine == true {
 					dot.X += c.GetTextIndent(width)
@@ -419,9 +421,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				}
 				dot.X = newDot.X
 				dot.Y = newDot.Y
-			case "block", "inline-block":
-				fallthrough
-			default:
+			case "block", "inline-block", "table", "table-inline":
 				float := c.GetFloat()
 				if dot.X != 0 && display != "inline-block" {
 					// This means the previous child was an inline item, and we should position dot
@@ -462,7 +462,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 					}
 					//c.BoxContentOrigin = contentorigin.Add(image.Point{leftFloatX, 0})
 				}
-				mst.GrowBounds(r)
+				overlayed.GrowBounds(r)
 				c.BoxDrawRectangle = r
 
 				if sr.Size().Y > 0 {
@@ -490,7 +490,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				contentStart := dot.Add(contentorigin)
 				contentBounds := c.ContentOverlay.Bounds()
 				cr := image.Rectangle{contentStart, contentStart.Add(contentBounds.Size())}
-				mst.GrowBounds(cr)
+				overlayed.GrowBounds(cr)
 
 				switch float {
 				case "left", "right":
@@ -517,7 +517,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 		rightFloatStack = rightFloatStack.ClearFloats(dot)
 	}
 	e.ImageMap = imageMap
-	return dst, dot
+	return overlayed, dot
 }
 
 // realRender either calculates the size of elements, or draws them, depending on if it's a layoutPass

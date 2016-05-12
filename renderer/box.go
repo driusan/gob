@@ -651,7 +651,7 @@ func (e *RenderableDomElement) GetBackgroundImage() image.Image {
 	return content
 
 }
-func (e *RenderableDomElement) getCSSBox(img image.Image, layoutpass bool) (image.Image, image.Point) {
+func (e *RenderableDomElement) getCSSBox(content image.Image, layoutpass bool) (image.Image, image.Point) {
 	bgi := e.GetBackgroundImage()
 	if bgi == nil {
 		bg := e.GetBackgroundColor()
@@ -665,7 +665,7 @@ func (e *RenderableDomElement) getCSSBox(img image.Image, layoutpass bool) (imag
 			// parts of the background image
 
 			// allocate a new image of the appropriate size
-			csize := img.Bounds().Size()
+			csize := content.Bounds().Size()
 			bgCanvas := image.NewRGBA(image.Rectangle{
 				image.ZP,
 				image.Point{
@@ -775,7 +775,7 @@ func (e *RenderableDomElement) getCSSBox(img image.Image, layoutpass bool) (imag
 			Right:  BoxPadding{Width: e.GetPaddingRight()},
 			Bottom: BoxPadding{Width: e.GetPaddingBottom()},
 		},
-		contentSize: img.Bounds().Size(),
+		contentSize: content.Bounds().Size(),
 		background:  bgi,
 	}
 	if layoutpass {

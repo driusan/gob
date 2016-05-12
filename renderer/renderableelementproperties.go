@@ -216,7 +216,7 @@ func (e RenderableDomElement) GetTextIndent(containerWidth int) int {
 	return px
 }
 
-func (e RenderableDomElement) GetContentWidth(containerWidth int) int {
+func (e RenderableDomElement) GetContainerWidth(containerWidth int) int {
 	width := containerWidth - (e.GetMarginLeftSize() + e.GetMarginRightSize() + e.GetBorderLeftWidth() + e.GetBorderRightWidth() + e.GetPaddingLeft() + e.GetPaddingRight())
 	if e.Styles == nil {
 		return width
@@ -227,7 +227,7 @@ func (e RenderableDomElement) GetContentWidth(containerWidth int) int {
 		if e.Parent == nil {
 			return width
 		}
-		return e.Parent.GetContentWidth(containerWidth)
+		return e.Parent.GetContainerWidth(containerWidth)
 	case "", "auto":
 		return width
 	default:
@@ -238,18 +238,18 @@ func (e RenderableDomElement) GetContentWidth(containerWidth int) int {
 		return width
 	}
 }
-func (e RenderableDomElement) GetContentHeight() int {
+func (e RenderableDomElement) GetMinHeight() int {
 	if e.Styles == nil {
 		return 0
 	}
-	cssVal := e.Styles.Height.GetValue()
+	cssVal := e.Styles.MinHeight.GetValue()
 	switch cssVal {
 	case "inherit":
 		if e.Parent == nil {
 			return 0
 		}
-		return e.Parent.GetContentHeight()
-	case "", "auto":
+		return e.Parent.GetMinHeight()
+	case "":
 		return 0
 	default:
 		calVal, err := css.ConvertUnitToPx(e.GetFontSize(), 0, cssVal)
