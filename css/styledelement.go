@@ -136,6 +136,45 @@ type StyledElement struct {
 	ListStylePosition StyleValue
 	// ListStyle StyleValue
 
+	// New CSS Level 2 Attributes
+	// Table related properties
+	TableLayout StyleValue
+	BorderCollapse StyleValue
+	BorderSpacing StyleValue
+	EmptyCells StyleValue
+	CaptionSide StyleValue
+
+	// Visual Formatting related properties
+	Position StyleValue
+	Top StyleValue
+	Bottom StyleValue
+	Left StyleValue
+	Right StyleValue
+
+	Overflow StyleValue
+	Visibility StyleValue
+	Clip StyleValue
+	ZIndex StyleValue
+
+	MinHeight StyleValue
+	MaxHeight StyleValue
+	MinWidth StyleValue
+	MaxWidth StyleValue
+
+	// Generated content related properties
+	Content StyleValue
+	CounterIncrement StyleValue
+	CounterReset StyleValue
+	Quotes StyleValue
+
+	// UI Related properties
+	Cursor StyleValue
+
+	// Other
+	Direction StyleValue
+	UnicodeBidi StyleValue
+
+
 	// The rules that match this element.
 	rules    []StyleRule
 	fontSize int
