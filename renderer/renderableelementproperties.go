@@ -42,30 +42,28 @@ func (e *RenderableDomElement) GetLineHeight() int {
 	fSize := e.GetFontSize()
 	if e.Styles == nil {
 		if e.Parent == nil {
-			fontFace := e.Styles.GetFontFace(fSize)
+			fontFace := e.GetFontFace(fSize)
 			return getFontHeight(fontFace)
 		}
-		//return e.Parent.GetLineHeight()
-		fontFace := e.Styles.GetFontFace(fSize)
+		fontFace := e.GetFontFace(fSize)
 		return getFontHeight(fontFace)
 	}
 	stringVal := e.Styles.LineHeight.GetValue()
 	if stringVal == "" {
 		if e.Parent == nil {
-			fontFace := e.Styles.GetFontFace(fSize)
+			fontFace := e.GetFontFace(fSize)
 			return getFontHeight(fontFace)
 		}
-		//return e.Parent.GetLineHeight()
-		fontFace := e.Styles.GetFontFace(fSize)
+		fontFace := e.GetFontFace(fSize)
 		return getFontHeight(fontFace)
 
 	}
 	lHeightSize, err := css.ConvertUnitToPx(fSize, fSize, stringVal)
 	if err != nil {
-		fontFace := e.Styles.GetFontFace(fSize)
+		fontFace := e.GetFontFace(fSize)
 		return getFontHeight(fontFace)
 	}
-	fontFace := e.Styles.GetFontFace(lHeightSize)
+	fontFace := e.GetFontFace(lHeightSize)
 	return getFontHeight(fontFace)
 }
 
@@ -163,8 +161,8 @@ func (e RenderableDomElement) GetDisplayProp() string {
 		return cssVal
 	}
 	// CSS Level 1 default is block, CSS Level 2 is inline
-	return "block"
-	//return "inline"
+	//return "block"
+	return "inline"
 }
 
 func (e RenderableDomElement) GetTextDecoration() string {
@@ -261,4 +259,93 @@ func (e RenderableDomElement) GetContentHeight() int {
 		}
 		return 0
 	}
+}
+
+func (e *RenderableDomElement) GetFontWeight() font.Weight {
+	switch e.Styles.FontWeight.GetValue() {
+	case "normal":
+		return font.WeightNormal
+	case "100":
+		return font.WeightThin
+	case "200":
+		return font.WeightExtraLight
+	case "300":
+		return font.WeightLight
+	case "400":
+		return font.WeightNormal
+	case "500":
+		return font.WeightMedium
+	case "600":
+		return font.WeightSemiBold
+	case "700", "bold":
+		return font.WeightBold
+	case "800":
+		return font.WeightExtraBold
+	case "900":
+		return font.WeightBlack
+	case "bolder":
+		if e.Parent == nil {
+			return font.WeightMedium
+		}
+		parent := e.Parent.GetFontWeight()
+		if parent == font.WeightBlack {
+			return font.WeightBlack
+		}
+		return parent + 1
+	case "lighter":
+		if e.Parent == nil {
+			return font.WeightLight
+		}
+		parent := e.Parent.GetFontWeight()
+		if parent == font.WeightThin {
+			return font.WeightThin
+		}
+		return parent + 1
+	case "inherit":
+		fallthrough
+	default:
+		//inherit
+		if e.Parent == nil {
+			return font.WeightNormal
+		}
+		return e.Parent.GetFontWeight()
+
+	}
+}
+func (e *RenderableDomElement) GetFontStyle() font.Style {
+	switch s := e.Styles.FontStyle.GetValue(); s {
+	case "normal":
+		return font.StyleNormal
+	case "italic":
+		return font.StyleItalic
+	case "oblique":
+		return font.StyleOblique
+	case "inherit":
+		fallthrough
+	default:
+		if e.Parent == nil {
+			return font.StyleNormal
+		}
+		return e.Parent.GetFontStyle()
+
+	}
+}
+
+func (e *RenderableDomElement) GetFontFamily() css.FontFamily {
+	switch s := strings.ToLower(e.Styles.FontStyle.GetValue()); s {
+	case "sans-serif", "serif", "monospace":
+		return css.FontFamily(s)
+	case "fantasy", "cursive":
+		//unhandled font families that are nonetheless valid.
+		// fallback on sans-serif
+		return css.FontFamily("sans-serif")
+	}
+	if e.Parent == nil {
+		return css.FontFamily("sans-serif")
+	}
+	return e.Parent.GetFontFamily()
+
+}
+func (e *RenderableDomElement) GetFontFace(fsize int) font.Face {
+	return e.Styles.GetFontFace(fsize, e.GetFontFamily(), e.GetFontWeight(), e.GetFontStyle())
 }

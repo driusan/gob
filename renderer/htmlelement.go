@@ -98,7 +98,7 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 	}
 	words := strings.Fields(textContent)
 	fSize := e.GetFontSize()
-	fontFace := e.Styles.GetFontFace(fSize)
+	fontFace := e.GetFontFace(fSize)
 	var dot int
 	clr := e.GetColor()
 	if clr == nil {

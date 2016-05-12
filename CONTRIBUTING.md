@@ -52,16 +52,15 @@ some kind of state that the renderer can track, and :first-line/:first-letter is
 as, there's currently no obvious way to create pseudo-elements in the render tree.
 
 #### Fonts:
-- missing font-family property
-- missing font-style property
+- incomplete font-family property
 - missing font-variant property
-- missing font-weight property
 - missing font short-hand property
 
-font-family is trivial and just needs to load the correct asset in (css/StyledElement).GetFontFace 
-(and possibly find a good, free font to use for each family.) The rest are missing because, while
-image/font defines constants that correspond 1:1 with the CSS properties, I haven't found any way
-that they interact with the implementation in the truetype implementation..
+Only the DejaVu fonts are used, which means cursive and fantasy font-families fallback on sans-serif.
+The font-weight of the DejaVu Sans-Serif isn't necessarily properly implemented, because I haven't
+looked up how the "ExtraLight" weight corresponds to CSS font weights to implement it in accordance
+with the spec.
+
 
 #### Background:
 - background-image-attachment and background-image-position not supported. 

@@ -2,6 +2,7 @@ package css
 
 import (
 	"fmt"
+	"github.com/driusan/fonts"
 	"github.com/golang/freetype/truetype"
 	"golang.org/x/image/font"
 	//"golang.org/x/image/font/basicfont"
@@ -15,15 +16,20 @@ const (
 	DefaultFontSize = 16
 )
 
-var SansSerifFont *truetype.Font
-var sansSerifFontSizeCache map[int]font.Face
+type fontStyle struct {
+	fontFamily FontFamily
+	fontWeight font.Weight
+	fontStyle  font.Style
+	fontSize   int
+	//font-variant not supported. Need a good small-caps font to implement..
+}
+
+var parsedFontCache map[string]*truetype.Font
+var fontCache map[fontStyle]font.Face
 
 func init() {
-	//fontBytes, _ := ioutil.ReadFile("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
-	fontBytes, _ := Asset("DejaVuSans.ttf")
-	//fontBytes, e := Asset("DejaVuSans.ttf")
-	SansSerifFont, _ = truetype.Parse(fontBytes)
-	sansSerifFontSizeCache = make(map[int]font.Face)
+	fontCache = make(map[fontStyle]font.Face)
+	parsedFontCache = make(map[string]*truetype.Font)
 }
 
 type StyleSource uint8
@@ -138,18 +144,101 @@ type StyledElement struct {
 func (e *StyledElement) SetFontSize(size int) {
 	e.fontSize = size
 }
-func (e StyledElement) GetFontFace(fsize int) font.Face {
-	if face, ok := sansSerifFontSizeCache[fsize]; ok {
+
+type FontFamily string
+
+func (e StyledElement) GetFontFace(fsize int, fontFamily FontFamily, weight font.Weight, style font.Style) font.Face {
+	fStyle := fontStyle{
+		fontFamily: fontFamily,
+		fontWeight: weight,
+		fontStyle:  style,
+		fontSize:   fsize,
+	}
+	if face, ok := fontCache[fStyle]; ok {
 		return face
 	}
 
-	face := truetype.NewFace(SansSerifFont,
+	var ttfFile string
+	switch fStyle.fontFamily {
+	default:
+		fallthrough
+	case "serif":
+		switch style {
+		default:
+			fallthrough
+		case font.StyleNormal:
+			if weight <= font.WeightNormal {
+				ttfFile = "DejaVuSerif.ttf"
+			} else { // weight > font.WeightNormal
+				ttfFile = "DejaVuSerif-Bold.ttf"
+			}
+		case font.StyleItalic, font.StyleOblique:
+			if weight <= font.WeightNormal {
+				ttfFile = "DejaVuSerif-Italic.ttf"
+			} else { //fontWeight > font.WeightNormal
+				ttfFile = "DejaVuSerif-BoldItalic.ttf"
+			}
+
+		}
+	case "sans-serif":
+		switch style {
+		default:
+			fallthrough
+		case font.StyleNormal:
+			// TODO: Look up the weight of DejaVuSans-ExtraLight and use
+			// it as appropriate
+			if weight <= font.WeightNormal {
+				ttfFile = "DejaVuSans.ttf"
+			} else { //fontWeight > font.WeightNormal
+				ttfFile = "DejaVuSans-Bold.ttf"
+			}
+		case font.StyleItalic, font.StyleOblique:
+			if weight <= font.WeightNormal {
+				ttfFile = "DejaVuSans-Oblique.ttf"
+			} else { //fontWeight > font.WeightNormal {
+				ttfFile = "DejaVuSans-BoldOblique.ttf"
+			}
+
+		}
+	case "monospace":
+		switch style {
+		default:
+			fallthrough
+		case font.StyleNormal:
+			// TODO: Look up the weight of DejaVuSans-ExtraLight and use
+			// it as appropriate
+			if weight <= font.WeightNormal {
+				ttfFile = "DejaVuSansMono.ttf"
+			} else { //if fontWeight > font.WeightNormal {
+				ttfFile = "DejaVuSansMono-Bold.ttf"
+			}
+		case font.StyleItalic, font.StyleOblique:
+			if weight <= font.WeightNormal {
+				ttfFile = "DejaVuSansMono-Oblique.ttf"
+			} else { //if fontWeight > font.WeightNormal {
+				ttfFile = "DejaVuSansMono-BoldOblique.ttf"
+			}
+
+		}
+
+	}
+
+	var ft *truetype.Font
+	if fb, ok := parsedFontCache[ttfFile]; ok {
+		ft = fb
+	} else {
+		fontBytes, err := fonts.Asset(ttfFile)
+		if err != nil {
+			panic(err)
+		}
+		ft, _ = truetype.Parse(fontBytes)
+	}
+	face := truetype.NewFace(ft,
 		&truetype.Options{
 			Size:    float64(fsize),
 			DPI:     72,
 			Hinting: font.HintingFull})
-	//face := basicfont.Face7x13
-	sansSerifFontSizeCache[fsize] = face
+	fontCache[fStyle] = face
 	return face
 
 }
