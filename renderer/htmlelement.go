@@ -182,7 +182,7 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 
 	for i, word := range words {
 		wordSizeInPx := fntDrawer.MeasureString(word).Ceil()
-		if dot+wordSizeInPx > remainingWidth {
+		if dot+wordSizeInPx > remainingWidth && whitespace != "nowrap"{
 			if i == 0 {
 				// make sure at least one word gets consumed to avoid an infinite loop.
 				// this isn't ideal, since some words will disappear, but if we reach this
