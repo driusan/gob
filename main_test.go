@@ -3,6 +3,7 @@ package main
 import (
 	"strings"
 	"testing"
+	"image"
 	//"fmt"
 	//"golang.org/x/mobile/event/size"
 	//"os"
@@ -100,5 +101,23 @@ func BenchmarkRenderOnly(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		parsedhtml.Content.Render(1024)
+	}
+}
+
+func BenchmarkRenderLayoutOnly(b *testing.B) {
+	f := strings.NewReader(content)
+	parsedhtml := loadHTML(f, nil)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		parsedhtml.Content.LayoutPass(1024, image.ZR, image.Point{0, 0})
+	}
+}
+func BenchmarkRenderDrawOnly(b *testing.B) {
+	f := strings.NewReader(content)
+	parsedhtml := loadHTML(f, nil)
+	parsedhtml.Content.LayoutPass(1024, image.ZR, image.Point{0, 0})
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		parsedhtml.Content.DrawPass()
 	}
 }
