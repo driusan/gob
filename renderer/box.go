@@ -651,7 +651,30 @@ func (e *RenderableDomElement) GetBackgroundImage() image.Image {
 	return content
 
 }
-func (e *RenderableDomElement) getCSSBox(content image.Image, layoutpass bool) (image.Image, image.Point) {
+func (e *RenderableDomElement) calcCSSBox(content image.Image) (image.Image, image.Point) {
+	// calculate the size of the box.
+	size := content.Bounds().Size()
+	if width := e.GetWidth(); width >= 0 {
+		size.X = width
+	}
+	if height := e.GetHeight(); height >= 0 {
+		size.Y = height
+	}
+
+	if minheight := e.GetMinHeight(); size.Y < minheight {
+		size.Y = minheight
+	}
+	if minwidth := e.GetMinWidth(); size.X < minwidth {
+		size.X = minwidth
+	}
+	if maxheight := e.GetMaxHeight(); maxheight >= 0 && size.Y > maxheight {
+		size.Y = maxheight
+	}
+	if maxwidth := e.GetMaxWidth(); maxwidth >= 0 && size.X > maxwidth {
+		size.X = maxwidth
+	}
+
+	// calculate the background image for the content box.
 	bgi := e.GetBackgroundImage()
 	if bgi == nil {
 		bg := e.GetBackgroundColor()
@@ -659,65 +682,83 @@ func (e *RenderableDomElement) getCSSBox(content image.Image, layoutpass bool) (
 	} else {
 		bg := e.GetBackgroundColor()
 		solidbg := &image.Uniform{bg}
-		if layoutpass == false {
-			// if it's a non-layout pass, we need to construct the background image based on the
-			// repeat and make sure that the background-color shines through any transparent
-			// parts of the background image
+		// we need to construct the background image based on the
+		// repeat and make sure that the background-color shines through any transparent
+		// parts of the background image
 
-			// allocate a new image of the appropriate size
-			csize := content.Bounds().Size()
-			bgCanvas := image.NewRGBA(image.Rectangle{
-				image.ZP,
-				image.Point{
-					csize.X + e.GetPaddingLeft() + e.GetPaddingRight() + e.GetBorderLeftWidth() + e.GetBorderRightWidth(),
-					csize.Y + e.GetPaddingTop() + e.GetPaddingBottom() + e.GetBorderTopWidth() + e.GetBorderBottomWidth(),
-				}})
+		// allocate a new image of the appropriate size
+		csize := size
+		bgCanvas := image.NewRGBA(image.Rectangle{
+			image.ZP,
+			image.Point{
+				csize.X + e.GetPaddingLeft() + e.GetPaddingRight() + e.GetBorderLeftWidth() + e.GetBorderRightWidth(),
+				csize.Y + e.GetPaddingTop() + e.GetPaddingBottom() + e.GetBorderTopWidth() + e.GetBorderBottomWidth(),
+			}})
 
-			// draw the background colour over the whole image, so that the transparent parts
-			// are correct.
+		// draw the background colour over the whole image, so that the transparent parts
+		// are correct.
+		draw.Draw(
+			bgCanvas,
+			bgCanvas.Bounds(),
+			solidbg,
+			image.ZP,
+			draw.Src,
+		)
+
+		bgiSize := bgi.Bounds().Size()
+
+		// now draw the background image based on the background-repeat.
+		switch e.GetBackgroundRepeat() {
+		case "no-repeat":
 			draw.Draw(
 				bgCanvas,
 				bgCanvas.Bounds(),
-				solidbg,
+				bgi,
 				image.ZP,
-				draw.Src,
+				draw.Over,
 			)
-
-			bgiSize := bgi.Bounds().Size()
-
-			// now draw the background image based on the background-repeat.
-			switch e.GetBackgroundRepeat() {
-			case "no-repeat":
+		case "repeat-x":
+			for x := 0; ; x += bgiSize.X {
 				draw.Draw(
 					bgCanvas,
-					bgCanvas.Bounds(),
+					image.Rectangle{
+						image.Point{x, 0},
+						image.Point{x + bgiSize.X, bgiSize.Y},
+					},
 					bgi,
 					image.ZP,
 					draw.Over,
 				)
-			case "repeat-x":
-				for x := 0; ; x += bgiSize.X {
-					draw.Draw(
-						bgCanvas,
-						image.Rectangle{
-							image.Point{x, 0},
-							image.Point{x + bgiSize.X, bgiSize.Y},
-						},
-						bgi,
-						image.ZP,
-						draw.Over,
-					)
-					if x > csize.X {
-						break
-					}
+				if x > csize.X {
+					break
 				}
-			case "repeat-y":
-				for y := 0; ; y += bgiSize.X {
+			}
+		case "repeat-y":
+			for y := 0; ; y += bgiSize.X {
+				draw.Draw(
+					bgCanvas,
+					image.Rectangle{
+						image.Point{0, y},
+						image.Point{bgiSize.X, y + bgiSize.Y},
+					},
+					bgi,
+					image.ZP,
+					draw.Over,
+				)
+				if y > csize.Y {
+					break
+				}
+			}
+		case "repeat":
+			fallthrough
+		default:
+			for x := 0; ; x += bgiSize.X {
+				for y := 0; ; y += bgiSize.Y {
 					draw.Draw(
 						bgCanvas,
 						image.Rectangle{
-							image.Point{0, y},
-							image.Point{bgiSize.X, y + bgiSize.Y},
+							image.Point{x, y},
+							image.Point{x + bgiSize.X, y + bgiSize.Y},
 						},
 						bgi,
 						image.ZP,
@@ -727,35 +768,14 @@ func (e *RenderableDomElement) getCSSBox(content image.Image, layoutpass bool) (
 						break
 					}
 				}
-			case "repeat":
-				fallthrough
-			default:
-				for x := 0; ; x += bgiSize.X {
-					for y := 0; ; y += bgiSize.Y {
-						draw.Draw(
-							bgCanvas,
-							image.Rectangle{
-								image.Point{x, y},
-								image.Point{x + bgiSize.X, y + bgiSize.Y},
-							},
-							bgi,
-							image.ZP,
-							draw.Over,
-						)
-						if y > csize.Y {
-							break
-						}
-					}
-					if x > csize.X {
-						break
-					}
+				if x > csize.X {
+					break
 				}
-
 			}
-			bgi = bgCanvas
-		}
-	}
 
+		}
+		bgi = bgCanvas
+	}
 	box := &outerBoxDrawer{
 		Margin: BoxMargins{
 			Top:    BoxMargin{Width: e.GetMarginTopSize()},
@@ -775,15 +795,9 @@ func (e *RenderableDomElement) getCSSBox(content image.Image, layoutpass bool) (
 			Right:  BoxPadding{Width: e.GetPaddingRight()},
 			Bottom: BoxPadding{Width: e.GetPaddingBottom()},
 		},
-		contentSize: content.Bounds().Size(),
+		contentSize: size,
 		background:  bgi,
 	}
-	if layoutpass {
-		e.CSSOuterBox = box
-
-		return box, box.GetContentOrigin()
-	}
-
 	e.CSSOuterBox = box.RGBA()
 	return e.CSSOuterBox, box.GetContentOrigin()
 }

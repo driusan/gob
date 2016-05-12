@@ -238,6 +238,111 @@ func (e RenderableDomElement) GetContainerWidth(containerWidth int) int {
 		return width
 	}
 }
+func (e RenderableDomElement) GetMaxHeight() int {
+	if e.Styles == nil {
+		return -1
+	}
+	cssVal := e.Styles.MaxHeight.GetValue()
+	switch cssVal {
+	case "inherit":
+		if e.Parent == nil {
+			return -1
+		}
+		return e.Parent.GetMaxHeight()
+	case "":
+		return -1
+	default:
+		calVal, err := css.ConvertUnitToPx(e.GetFontSize(), 0, cssVal)
+		if err == nil {
+			return calVal
+		}
+		return -1
+	}
+}
+func (e RenderableDomElement) GetMaxWidth() int {
+	if e.Styles == nil {
+		return -1
+	}
+	cssVal := e.Styles.MaxWidth.GetValue()
+	switch cssVal {
+	case "inherit":
+		if e.Parent == nil {
+			return -1
+		}
+		return e.Parent.GetMaxWidth()
+	case "":
+		return -1
+	default:
+		calVal, err := css.ConvertUnitToPx(e.GetFontSize(), 0, cssVal)
+		if err == nil {
+			return calVal
+		}
+		return -1
+	}
+}
+func (e RenderableDomElement) GetHeight() int {
+	if e.Styles == nil {
+		return -1
+	}
+	cssVal := e.Styles.Height.GetValue()
+	switch cssVal {
+	case "inherit":
+		if e.Parent == nil {
+			return -1
+		}
+		return e.Parent.GetHeight()
+	case "", "auto":
+		return -1
+	default:
+		calVal, err := css.ConvertUnitToPx(e.GetFontSize(), e.containerHeight, cssVal)
+		if err == nil {
+			return calVal
+		}
+		return -1
+	}
+}
+func (e RenderableDomElement) GetWidth() int {
+	if e.Styles == nil {
+		return -1
+	}
+	cssVal := e.Styles.Width.GetValue()
+	switch cssVal {
+	case "inherit":
+		if e.Parent == nil {
+			return -1
+		}
+		return e.Parent.GetWidth()
+	case "", "auto":
+		return -1
+	default:
+		calVal, err := css.ConvertUnitToPx(e.GetFontSize(), e.containerWidth, cssVal)
+		if err == nil {
+			return calVal
+		}
+		return -1
+	}
+}
+func (e RenderableDomElement) GetMinWidth() int {
+	if e.Styles == nil {
+		return 0
+	}
+	cssVal := e.Styles.MinWidth.GetValue()
+	switch cssVal {
+	case "inherit":
+		if e.Parent == nil {
+			return 0
+		}
+		return e.Parent.GetMinWidth()
+	case "":
+		return 0
+	default:
+		calVal, err := css.ConvertUnitToPx(e.GetFontSize(), 0, cssVal)
+		if err == nil {
+			return calVal
+		}
+		return 0
+	}
+}
 func (e RenderableDomElement) GetMinHeight() int {
 	if e.Styles == nil {
 		return 0

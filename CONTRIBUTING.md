@@ -85,16 +85,16 @@ from the font metrics.
 
 #### Box properties:
 - missing "auto" support for margin
-- missing width and height explicitly set in CSS
 - missing thin/medium/thick border keywords
 - only "solid" border-style works
 - missing border-right/left/top/bottom shorthand
 
-The auto/width/height claims aren't actually true, they are somewhat implemented, but
-not according to the spec and they haven't been tested. The thin/medium/thick keywords
-should be trivial to add in RenderableDomElement.getCSSBox. Border styles would involve
-working out the appropriate image mask in getCSSBox. The shorthands just need to be parsed
-and added in the css package.
+The auto claim isn't ctually true, it is somewhat implemented, but
+not according to the spec and they hasn't been tested.
+
+The thin/medium/thick keywords should be trivial to add in RenderableDomElement.getCSSBox.
+
+Border styles would involve working out the appropriate image mask in getCSSBox. The shorthands just need to be parsed and added in the css package.
 
 #### Display model
 - missing clear property
@@ -151,8 +151,6 @@ and then implementing the in the (css/CSSSelector.)Matches(html.Node) function
 - missing position attribute
 - missing top/right/bottom/left attributes (for positioned elements.)
 - missing z-index property
-- missing min-width and max-width properties
-- missing min-height and max-height properties
 
 I don't know what's involve in the direction properties. inline-block can probably be implemented
 by a couple if statements around how dot is advanced in the normal block render path.

@@ -58,7 +58,9 @@ type RenderableDomElement struct {
 	RenderAbort    chan bool
 	ViewportHeight int
 	contentWidth   int
-	containerWidth int
+
+	containerWidth  int
+	containerHeight int
 
 	lineBoxes []lineBox
 }
@@ -438,7 +440,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				// draw the border, background, and CSS outer box.
 				childContent, _ := c.LayoutPass(width, image.ZR, image.ZP)
 				c.ContentOverlay = childContent
-				box, contentorigin := c.getCSSBox(childContent, true)
+				box, contentorigin := c.calcCSSBox(childContent)
 				c.BoxContentOrigin = contentorigin
 				sr := box.Bounds()
 
@@ -584,17 +586,18 @@ func (e *RenderableDomElement) DrawPass() image.Image {
 				// draw the border, background, and CSS outer box.
 				childContent := c.DrawPass()
 				c.ContentOverlay = childContent
-				box, _ := c.getCSSBox(childContent, false)
-				sr := box.Bounds()
+				if c.CSSOuterBox != nil {
+					sr := c.CSSOuterBox.Bounds()
 
-				// draw the box onto the overlayed content
-				draw.Draw(
-					e.OverlayedContent,
-					c.BoxDrawRectangle,
-					c.CSSOuterBox,
-					sr.Min,
-					draw.Over,
-				)
+					// draw the box onto the overlayed content
+					draw.Draw(
+						e.OverlayedContent,
+						c.BoxDrawRectangle,
+						c.CSSOuterBox,
+						sr.Min,
+						draw.Over,
+					)
+				}
 
 				// now draw the content on top of the outer box
 				contentStart := c.BoxDrawRectangle.Min.Add(c.BoxContentOrigin)
