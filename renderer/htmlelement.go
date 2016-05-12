@@ -325,7 +325,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				dot.Y += c.GetLineHeight()
 				continue
 			}
-			switch c.GetDisplayProp() {
+			switch display := c.GetDisplayProp(); display {
 			case "none":
 				continue
 			case "inline":
@@ -368,11 +368,11 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				}
 				dot.X = newDot.X
 				dot.Y = newDot.Y
-			case "block":
+			case "block", "inline-block":
 				fallthrough
 			default:
 				float := c.GetFloat()
-				if dot.X != 0 {
+				if dot.X != 0 && display != "inline-block"{
 					// This means the previous child was an inline item, and we should position dot
 					// as if there were an implicit box around it.
 					// floated elements don't affect dot, so only do this if it's not floated.
@@ -447,9 +447,17 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				case "none":
 					fallthrough
 				default:
-
+					if display == "inline-block" {
+						dot.X = r.Max.X
+						if dot.X > width {
+							dot.X = 0
+							dot.Y = r.Max.Y
+						}
+					} else {
 					dot.X = 0
 					dot.Y = r.Max.Y
+					}
+
 				}
 			}
 
