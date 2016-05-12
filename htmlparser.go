@@ -179,6 +179,9 @@ func fontSizeToPx(val string, parent *renderer.RenderableDomElement) int {
 		// when calculating font size
 		f, err := strconv.ParseFloat(string(val[0:len(val)-2]), 64)
 		if err == nil {
+			if parent == nil {
+				return DefaultFontSize
+			}
 			psize, _ := parent.Styles.GetFontSize()
 			return int(f * float64(psize))
 		}
