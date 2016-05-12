@@ -485,12 +485,18 @@ func (e *RenderableDomElement) DrawPass() image.Image {
 	}
 
 	for c := e.FirstChild; c != nil; c = c.NextSibling {
+		if e.FirstPageOnly && c.BoxDrawRectangle.Min.Y > e.ViewportHeight {
+			return e.OverlayedContent
+		}
 		switch c.Type {
 
 		case html.TextNode:
 			for _, box := range c.lineBoxes {
 				sr := box.Image.Bounds()
 				r := image.Rectangle{box.origin, box.origin.Add(sr.Size())}
+				if e.FirstPageOnly && r.Min.Y > e.ViewportHeight {
+					return e.OverlayedContent
+				}
 				draw.Draw(e.OverlayedContent, r, box.Image, sr.Min, draw.Src)
 			}
 		case html.ElementNode:
