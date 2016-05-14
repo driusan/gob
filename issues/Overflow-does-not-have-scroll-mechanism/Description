@@ -1,0 +1,3 @@
+There overflow "auto" and "scroll" properties aren't implemented,
+because there's no scroll mechanism implemented. As a result, they
+fall back on "visible" so that content doesn't disappear.

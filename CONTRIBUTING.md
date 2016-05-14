@@ -164,7 +164,6 @@ but there's no point implementing it until position is implemented, since
 things can't overlap otherwise.
 
 #### Visual Effects:
-- missing overflow property
 - missing clip property
 - missing visibility property
 

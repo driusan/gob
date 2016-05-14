@@ -49,8 +49,8 @@ type RenderableDomElement struct {
 	// The location within the parent to draw the OverlayedContent
 	//DrawRectangle    image.Rectangle
 	//BoxOrigin        image.Point
-	BoxDrawRectangle image.Rectangle
-	BoxContentOrigin image.Point
+	BoxDrawRectangle    image.Rectangle
+	BoxContentRectangle image.Rectangle
 
 	ImageMap       ImageMap
 	PageLocation   *url.URL
@@ -182,7 +182,7 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 
 	for i, word := range words {
 		wordSizeInPx := fntDrawer.MeasureString(word).Ceil()
-		if dot+wordSizeInPx > remainingWidth && whitespace != "nowrap"{
+		if dot+wordSizeInPx > remainingWidth && whitespace != "nowrap" {
 			if i == 0 {
 				// make sure at least one word gets consumed to avoid an infinite loop.
 				// this isn't ideal, since some words will disappear, but if we reach this
@@ -600,16 +600,31 @@ func (e *RenderableDomElement) DrawPass() image.Image {
 				}
 
 				// now draw the content on top of the outer box
-				contentStart := c.BoxDrawRectangle.Min.Add(c.BoxContentOrigin)
+				contentStart := c.BoxDrawRectangle.Min.Add(c.BoxContentRectangle.Min)
 				contentBounds := c.ContentOverlay.Bounds()
 				cr := image.Rectangle{contentStart, contentStart.Add(contentBounds.Size())}
-				draw.Draw(
-					e.OverlayedContent,
-					cr,
-					c.ContentOverlay,
-					contentBounds.Min,
-					draw.Over,
-				)
+				switch c.GetOverflow() {
+				default:
+					fallthrough
+				case "visible":
+					draw.Draw(
+						e.OverlayedContent,
+						cr,
+						c.ContentOverlay,
+						contentBounds.Min,
+						draw.Over,
+					)
+				case "hidden":
+					draw.DrawMask(
+						e.OverlayedContent,
+						cr,
+						c.ContentOverlay,
+						contentBounds.Min,
+						c.BoxContentRectangle,
+						c.BoxContentRectangle.Min,
+						draw.Over,
+					)
+				}
 
 			}
 

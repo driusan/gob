@@ -583,6 +583,14 @@ func (e *StyledElement) populateValues() {
 			e.Width = rule.Value
 		case "height":
 			e.Height = rule.Value
+		case "min-width":
+			e.MinWidth = rule.Value
+		case "min-height":
+			e.MinHeight = rule.Value
+		case "max-width":
+			e.MaxWidth = rule.Value
+		case "max-height":
+			e.MaxHeight = rule.Value
 
 		case "float":
 			e.Float = rule.Value
@@ -599,7 +607,11 @@ func (e *StyledElement) populateValues() {
 			e.ListStyleImage = rule.Value
 		case "list-style-position":
 			e.ListStylePosition = rule.Value
+
+		case "overflow":
+			e.Overflow = rule.Value
 		}
+
 	}
 }
 

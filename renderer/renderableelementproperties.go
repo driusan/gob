@@ -1,10 +1,12 @@
 package renderer
 
 import (
+	"fmt"
 	"github.com/driusan/Gob/css"
 	"golang.org/x/image/font"
 	"golang.org/x/net/html"
 	"image/color"
+	"os"
 	"strings"
 )
 
@@ -468,4 +470,22 @@ func (e *RenderableDomElement) GetWhiteSpace() string {
 	}
 	return e.Parent.GetWhiteSpace()
 
+}
+func (e *RenderableDomElement) GetOverflow() string {
+	switch s := strings.ToLower(e.Styles.Overflow.GetValue()); s {
+	case "visible", "":
+		return "visible"
+	case "hidden":
+		return s
+	case "scroll", "auto":
+		fmt.Fprintf(os.Stderr, "Unimplemented WhiteSpace value: %s. Defaulting to visible.", s)
+		return "visible"
+	case "inherit":
+		if e.Parent == nil {
+			return "visible"
+		}
+		return e.Parent.GetOverflow()
+	default:
+		return "visible"
+	}
 }
