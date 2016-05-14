@@ -16,8 +16,8 @@ import (
 	_ "image/png"
 	"net/url"
 	"os"
-	//"strconv"
 	"strings"
+	//"strconv"
 )
 
 const (
@@ -212,7 +212,8 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 }
 
 func (e *RenderableDomElement) Render(containerWidth int) image.Image {
-	e.LayoutPass(containerWidth, image.ZR, image.Point{0, 0})
+	leftFloatStack, rightFloatStack := make(FloatStack, 0), make(FloatStack, 0)
+	e.LayoutPass(containerWidth, image.ZR, image.Point{0, 0}, leftFloatStack, rightFloatStack)
 	return e.DrawPass()
 }
 
@@ -227,7 +228,7 @@ func (e *RenderableDomElement) Render(containerWidth int) image.Image {
 // to draw at.), and it returns both an image, and the final location of dot after drawing the element. This is
 // required because inline elements might render multiple line blocks, and the whole inline isn't necessarily
 // square, so you can't just take the bounds of the rendered image.
-func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle, dot image.Point) (image.Image, image.Point) {
+func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle, dot image.Point, leftFloatStack, rightFloatStack FloatStack) (image.Image, image.Point) {
 	var overlayed *DynamicMemoryDrawer
 	defer func() {
 		if overlayed != nil {
@@ -235,7 +236,6 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 		}
 	}()
 	e.RenderAbort = make(chan bool)
-	leftFloatStack, rightFloatStack := make(FloatStack, 0), make(FloatStack, 0)
 
 	width := e.GetContainerWidth(containerWidth)
 	e.contentWidth = width
@@ -288,6 +288,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 		if dot.X < leftFloatStack.Width() {
 			dot.X = leftFloatStack.Width()
 		}
+		float := c.GetFloat()
 		switch c.Type {
 
 		case html.TextNode:
@@ -388,7 +389,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 					dot.X += c.GetTextIndent(width)
 					firstLine = false
 				}
-				_, newDot := c.LayoutPass(width, image.ZR, dot)
+				_, newDot := c.LayoutPass(width, image.ZR, dot, leftFloatStack, rightFloatStack)
 
 				/*
 					if layoutPass == false {
@@ -424,7 +425,6 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				dot.X = newDot.X
 				dot.Y = newDot.Y
 			case "block", "inline-block", "table", "table-inline":
-				float := c.GetFloat()
 				if dot.X != 0 && display != "inline-block" {
 					// This means the previous child was an inline item, and we should position dot
 					// as if there were an implicit box around it.
@@ -438,10 +438,10 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				}
 
 				// draw the border, background, and CSS outer box.
-				childContent, _ := c.LayoutPass(width, image.ZR, image.ZP)
+				childContent, _ := c.LayoutPass(width, image.ZR, image.ZP, leftFloatStack, rightFloatStack)
 				c.ContentOverlay = childContent
-				box, contentorigin := c.calcCSSBox(childContent)
-				c.BoxContentOrigin = contentorigin
+				box, contentbox := c.calcCSSBox(childContent)
+				c.BoxContentRectangle = contentbox
 				sr := box.Bounds()
 
 				r := image.Rectangle{dot, dot.Add(sr.Size())}
@@ -484,12 +484,12 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				// add the grandchildren
 				for _, area := range childImageMap {
 					// translate the coordinate systems from the child's to this one
-					newArea := area.Area.Add(dot).Add(contentorigin)
+					newArea := area.Area.Add(dot).Add(contentbox.Min)
 					imageMap.Add(area.Content, newArea)
 				}
 
 				// now draw the content on top of the outer box
-				contentStart := dot.Add(contentorigin)
+				contentStart := dot.Add(contentbox.Min)
 				contentBounds := c.ContentOverlay.Bounds()
 				cr := image.Rectangle{contentStart, contentStart.Add(contentBounds.Size())}
 				overlayed.GrowBounds(cr)
@@ -515,8 +515,10 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 			}
 
 		}
-		leftFloatStack = leftFloatStack.ClearFloats(dot)
-		rightFloatStack = rightFloatStack.ClearFloats(dot)
+		if float == "none" {
+			leftFloatStack = leftFloatStack.ClearFloats(dot)
+			rightFloatStack = rightFloatStack.ClearFloats(dot)
+		}
 	}
 	e.ImageMap = imageMap
 	return overlayed, dot
@@ -586,10 +588,10 @@ func (e *RenderableDomElement) DrawPass() image.Image {
 				// draw the border, background, and CSS outer box.
 				childContent := c.DrawPass()
 				c.ContentOverlay = childContent
+				//var drawMask image.Image
+				//maskP := image.ZP
 				if c.CSSOuterBox != nil {
 					sr := c.CSSOuterBox.Bounds()
-
-					// draw the box onto the overlayed content
 					draw.Draw(
 						e.OverlayedContent,
 						c.BoxDrawRectangle,

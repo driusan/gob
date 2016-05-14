@@ -29,7 +29,8 @@ func (f FloatStack) ClearFloats(dot image.Point) FloatStack {
 	var removed = f
 
 	for i, child := range f {
-		if (child.BoxDrawRectangle.Max.Y) > dot.Y {
+		if dot.Y > (child.BoxDrawRectangle.Max.Y) {
+			//if (child.BoxDrawRectangle.Max.Y) > dot.Y {
 			removed = append(f[:i], f[i+1:]...)
 		}
 	}
