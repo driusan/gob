@@ -318,8 +318,12 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 						if len(leftFloatStack) == 0 && len(rightFloatStack) == 0 {
 							panic("Not enough space to render any element and no floats to remove.")
 						}
+
 						if lfHeight <= 0 && rfHeight <= 0 {
-							panic("Floats don't have any height to clear")
+							remainingTextContent = ""
+							continue
+
+							//panic("Floats don't have any height to clear")
 						}
 						if lfHeight > 0 && lfHeight < rfHeight {
 							dot.Y += lfHeight + 1
