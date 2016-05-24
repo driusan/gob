@@ -393,7 +393,12 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 					dot.X += c.GetTextIndent(width)
 					firstLine = false
 				}
-				_, newDot := c.LayoutPass(width, image.ZR, dot, leftFloatStack, rightFloatStack)
+				childContent, newDot := c.LayoutPass(width, image.ZR, dot, leftFloatStack, rightFloatStack)
+				c.ContentOverlay = childContent
+				_, contentbox := c.calcCSSBox(childContent)
+				c.BoxContentRectangle = contentbox
+		//cr := image.Rectangle{contentStart, contentStart.Add(contentBounds.Size())}
+				overlayed.GrowBounds(contentbox)
 
 				/*
 					if layoutPass == false {
