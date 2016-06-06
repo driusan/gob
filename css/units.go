@@ -15,6 +15,12 @@ var (
 	InheritValue   = errors.New("Value should be inherited")
 )
 
+var PixelsPerPt float64
+
+func init() {
+	// Assume 96 DPI unless someone tells us otherwise at this resolution.
+	PixelsPerPt = (96.0 / 12.0)
+}
 func ConvertUnitToPx(fontsize int, percentbasis int, cssString string) (int, error) {
 	if len(cssString) < 2 {
 		return fontsize, Invalid
@@ -56,11 +62,39 @@ func ConvertUnitToPx(fontsize int, percentbasis int, cssString string) (int, err
 		// used a decimal.
 		f, err := strconv.ParseFloat(string(val[0:len(val)-2]), 64)
 		if err == nil {
-			return int(f), nil
+			return int(f * PixelsPerPt * 0.75), nil
 		}
 		return fontsize, Invalid
-	case "in", "cm", "mm", "pt", "pc":
-		return fontsize, NotImplemented
+	case "in":
+		f, err := strconv.ParseFloat(string(val[0:len(val)-2]), 64)
+		if err == nil {
+			return int(f * PixelsPerPt * 72), nil
+		}
+		return int(fontsize), Invalid
+	case "cm":
+		f, err := strconv.ParseFloat(string(val[0:len(val)-2]), 64)
+		if err == nil {
+			return int(f * PixelsPerPt * 72.0 / 2.54), nil
+		}
+		return int(fontsize), Invalid
+	case "mm":
+		f, err := strconv.ParseFloat(string(val[0:len(val)-2]), 64)
+		if err == nil {
+			return int(f * PixelsPerPt * 72.0 / 25.4), nil
+		}
+		return int(fontsize), Invalid
+	case "pt":
+		f, err := strconv.ParseFloat(string(val[0:len(val)-2]), 64)
+		if err == nil {
+			return int(f * PixelsPerPt), nil
+		}
+		return int(fontsize), Invalid
+	case "pc":
+		f, err := strconv.ParseFloat(string(val[0:len(val)-2]), 64)
+		if err == nil {
+			return int(f * PixelsPerPt * 12), nil
+		}
+		return int(fontsize), Invalid
 	}
 	return fontsize, NotImplemented
 }

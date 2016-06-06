@@ -274,7 +274,7 @@ func (e StyledElement) GetFontFace(fsize int, fontFamily FontFamily, weight font
 	face := truetype.NewFace(ft,
 		&truetype.Options{
 			Size:    float64(fsize),
-			DPI:     72,
+			DPI:     PixelsPerPt * 72,
 			Hinting: font.HintingFull})
 	fontCache[fStyle] = face
 	return face

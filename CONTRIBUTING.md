@@ -89,7 +89,7 @@ from the font metrics.
 - only "solid" border-style works
 - missing border-right/left/top/bottom shorthand
 
-The auto claim isn't ctually true, it is somewhat implemented, but
+The auto claim isn't actually true, it is somewhat implemented, but
 not according to the spec and they hasn't been tested.
 
 The thin/medium/thick keywords should be trivial to add in RenderableDomElement.getCSSBox.
@@ -112,11 +112,6 @@ block. (it just needs to draw an image and adjust dot.)
 The css tokenizer is mostly a hack based on the strings package. Import is easy enought to hack in,
 but comments probably need a real tokenizer and should just go straight to implementing the CSS3Syntax
 spec.
-
-- missing in/cm/mm/pt/pc units
-
-These are mostly missing because shiny doesn't currently provide any way to get the screen resolution,
-which is required to calculate them.
 
 
 ### Missing from CSS 2.2:

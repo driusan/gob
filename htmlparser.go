@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	//"fmt"
 	"github.com/driusan/Gob/css"
 	"github.com/driusan/Gob/renderer"
 	"golang.org/x/net/html"
@@ -9,7 +9,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/url"
-	"os"
 	"strconv"
 	"strings"
 )
@@ -172,55 +171,13 @@ func fontSizeToPx(val string, parent *renderer.RenderableDomElement) int {
 		return DefaultFontSize
 	}
 
-	// all other units are 2 characters long
-	switch unit := string(val[len(val)-2:]); unit {
-	case "em":
-		// 1em is basically a scaling factor for the parent font
-		// when calculating font size
-		f, err := strconv.ParseFloat(string(val[0:len(val)-2]), 64)
-		if err == nil {
-			if parent == nil {
-				return DefaultFontSize
-			}
-			psize, _ := parent.Styles.GetFontSize()
-			return int(f * float64(psize))
-		}
-		return DefaultFontSize
-	case "ex":
-		// 1ex is supposed to be the height of a lower case x, but
-		// the spec says you can use 1ex = 0.5em if calculating
-		// the size of an x is impossible or impracticle. Since
-		// I'm too lazy to figure out how to do that, it's impracticle.
-		f, err := strconv.ParseFloat(string(val[0:len(val)-2]), 64)
-		if err == nil {
-			psize, _ := parent.Styles.GetFontSize()
-			return int(f * float64(psize) / 2.0)
-		}
-		return DefaultFontSize
-	case "px":
-		// parse px as a float then cast, just in case someone
-		// used a decimal.
-		f, err := strconv.ParseFloat(string(val[0:len(val)-2]), 64)
-		if err == nil {
-			return int(f)
-		}
-		return DefaultFontSize
-	case "in", "cm", "mm", "pt", "pc":
-		fmt.Fprintf(os.Stderr, "Unhandled unit for font size: %s. Using default.\n", unit)
+	psize, err := parent.Styles.GetFontSize()
+	if err != nil {
+		psize = DefaultFontSize
+	}
+	size, err := css.ConvertUnitToPx(DefaultFontSize, psize, val)
+	if err != nil {
 		return DefaultFontSize
 	}
-
-	// If nothing's been handled and there's no parent, use the default.
-	if parent == nil {
-		return DefaultFontSize
-	}
-
-	// if there is a parent, use it if we can.
-	switch psize, err := parent.Styles.GetFontSize(); err {
-	case nil:
-		return psize
-	default:
-		return DefaultFontSize
-	}
-
+	return size
 }

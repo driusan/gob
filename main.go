@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/driusan/Gob/css"
 	"github.com/driusan/Gob/net"
 	"github.com/driusan/Gob/renderer"
 	"golang.org/x/exp/shiny/driver"
@@ -148,6 +149,9 @@ func main() {
 				paintWindow(s, w, &v, page)
 			case size.Event:
 				v.Size = e
+				if e.PixelsPerPt != 0 {
+					css.PixelsPerPt = float64(e.PixelsPerPt)
+				}
 				renderNewPageIntoViewport(s, w, &v, page)
 			case touch.Event:
 				fmt.Printf("Touch event!")
