@@ -1,7 +1,9 @@
 package css
 
 import (
+	"fmt"
 	//"Gob/dom"
+	"github.com/gorilla/css/scanner"
 	"golang.org/x/net/html"
 	"strings"
 )
@@ -52,33 +54,209 @@ func ParseBlock(val string) map[StyleAttribute]StyleValue {
 	return m
 }
 
+type parsingContext uint8
+
+const (
+	matchingUnknown = parsingContext(iota)
+	matchingSelector
+	matchingAttribute
+	matchingValue
+	appendingSelector // The next TokenIdent should be appended to the current selector
+)
+
+func appendStyles(s []StyleRule, selectors []CSSSelector, attr StyleAttribute, val StyleValue, src StyleSource) ([]StyleRule, error) {
+	if attr == "" {
+		return s, nil
+	}
+	for _, sel := range selectors {
+		s = append(s, StyleRule{
+			Selector: CSSSelector(strings.TrimSpace(string(sel))),
+			Name:     attr,
+			Value:    val,
+			Src:      src,
+		})
+	}
+	return s, nil
+}
 func ParseStylesheet(val string, src StyleSource) Stylesheet {
 	s := make([]StyleRule, 0)
-	selectorStart := 0
-	blockStart := -1
-	var selectors []CSSSelector
-	for idx, chr := range val {
-		switch chr {
-		case '}':
-			selectorStart = idx + 1
-			blockVals := ParseBlock(val[blockStart:idx])
-			for _, sel := range selectors {
-				for name, val := range blockVals {
-					s = append(s, StyleRule{
-						Selector: sel,
-						Name:     name,
-						Value:    val,
-						Src:      src,
-					})
+	//currentRule := StyleRule{Src: src}
 
+	var blockSelectors []CSSSelector
+	var curSelector CSSSelector
+	var curAttribute StyleAttribute
+	var curValue StyleValue
+	var context parsingContext = matchingSelector
+	spaceIfMatch := false
+	scn := scanner.New(val)
+	for {
+		token := scn.Next()
+		if token.Type == scanner.TokenEOF { //|| token.Type == scanner.TokenError {
+			break
+		}
+		fmt.Printf("Token: %v\n", token)
+		switch token.Type {
+		// Different kinds of comments
+		case scanner.TokenCDO, scanner.TokenCDC:
+			continue
+		case scanner.TokenComment:
+			//fmt.Printf("Comment: %v\n")
+			continue
+		case scanner.TokenS:
+			if context == matchingSelector {
+				// if we get another Ident, it's an E F type selector.
+				// if not, the , will set it back to matching
+				context = appendingSelector
+				spaceIfMatch = true
+			}
+			// whitespace tokens. Ignore them.
+			continue
+		case scanner.TokenIdent:
+			switch context {
+			case matchingSelector:
+				curSelector = CSSSelector(token.Value)
+				spaceIfMatch = false
+			case appendingSelector:
+				if spaceIfMatch {
+					curSelector += " "
+					spaceIfMatch = false
+				}
+				curSelector += CSSSelector(token.Value)
+				context = matchingSelector
+			case matchingAttribute:
+				curAttribute = StyleAttribute(token.Value)
+				context = matchingValue
+			case matchingValue:
+				if token.Value == "important" {
+					curValue.Important = true
+				} else {
+					if curValue.string == "" {
+						curValue.string = token.Value
+					} else {
+						curValue.string += " " + token.Value
+					}
 				}
 			}
-		case '{':
-			blockStart = idx + 1
-			selectors = parseSelectors(val[selectorStart:idx])
+			//fmt.Printf("TokenIdent: %s\n", token.Value)
+			//curSelector = CSSSelector(token.Value)
+			//matchingSelectors = true
+		case scanner.TokenChar:
+			switch context {
+			case matchingSelector, appendingSelector:
+				switch token.Value {
+				case ",":
+					if curSelector != "" {
+						blockSelectors = append(blockSelectors, curSelector)
+					}
+					curSelector = ""
+					context = matchingSelector
+					spaceIfMatch = false
+				case "*":
+					curSelector += CSSSelector(token.Value)
+					context = matchingSelector
+					spaceIfMatch = false
 
+				case "=":
+					curSelector += CSSSelector(token.Value)
+					// the actual value is a TokenString, not a TokenIdent,
+					// so the context doesn't need to change to appending.
+					context = matchingSelector
+					spaceIfMatch = false
+
+				case ">", "[", "+", ":", ".", "~":
+					curSelector += CSSSelector(token.Value)
+					context = appendingSelector
+					spaceIfMatch = false
+
+				case "]", ")":
+					curSelector += CSSSelector(token.Value)
+					context = matchingSelector
+					spaceIfMatch = false
+
+				case "{":
+					if curSelector != "" {
+						blockSelectors = append(blockSelectors, curSelector)
+					}
+					context = matchingAttribute
+					curValue = StyleValue{}
+					curAttribute = ""
+					spaceIfMatch = false
+
+					fmt.Printf("Selectors for block: %s\n", blockSelectors)
+				}
+			case matchingAttribute:
+				switch token.Value {
+				case "}":
+					spaceIfMatch = false
+
+					if curAttribute != "" {
+						s, _ = appendStyles(s, blockSelectors, curAttribute, curValue, src)
+					}
+					// End of a block, so reset everything to the 0 value
+					// after appending the rules.
+					blockSelectors = nil
+					curSelector = ""
+					curAttribute = ""
+					curValue = StyleValue{}
+					context = matchingSelector
+				}
+			case matchingValue:
+				switch token.Value {
+				case ";":
+					if curAttribute != "" {
+						s, _ = appendStyles(s, blockSelectors, curAttribute, curValue, src)
+					}
+					curAttribute = ""
+					curValue = StyleValue{}
+					context = matchingAttribute
+
+				case "}":
+
+					if curAttribute != "" {
+						s, _ = appendStyles(s, blockSelectors, curAttribute, curValue, src)
+					}
+					// End of a block, so reset everything to the 0 value
+					// after appending the rules.
+					blockSelectors = nil
+					curSelector = ""
+					curAttribute = ""
+					curValue = StyleValue{}
+					context = matchingSelector
+				}
+			}
+		case scanner.TokenString, scanner.TokenHash, scanner.TokenNumber:
+			switch context {
+			case matchingSelector, appendingSelector:
+				curSelector += CSSSelector(token.Value)
+				spaceIfMatch = false
+			case matchingValue:
+				curValue.string += token.Value
+
+			}
+		case scanner.TokenIncludes, scanner.TokenPrefixMatch,
+			scanner.TokenSuffixMatch, scanner.TokenSubstringMatch,
+			scanner.TokenDashMatch, scanner.TokenFunction:
+			switch context {
+			case matchingSelector, appendingSelector:
+				curSelector += CSSSelector(token.Value)
+				spaceIfMatch = false
+
+			}
+		case scanner.TokenDimension, scanner.TokenPercentage, scanner.TokenURI:
+			switch context {
+			case matchingValue:
+				if curValue.string == "" {
+					curValue.string = token.Value
+				} else {
+					curValue.string += " " + token.Value
+				}
+			}
+		default:
+			fmt.Printf("%s = %s: %v\n", token.Type, token.Value, token)
 		}
+
 	}
+	fmt.Printf("Selectors for block: %s\n", blockSelectors)
 	return s
 }
 
