@@ -186,6 +186,10 @@ func ParseStylesheet(val string, src StyleSource) Stylesheet {
 				}
 			case matchingAttribute:
 				switch token.Value {
+				case ":":
+					curValue = StyleValue{}
+					context = matchingValue
+					spaceIfMatch = false
 				case "}":
 					spaceIfMatch = false
 
@@ -202,6 +206,11 @@ func ParseStylesheet(val string, src StyleSource) Stylesheet {
 				}
 			case matchingValue:
 				switch token.Value {
+				case ",":
+					curValue.string += token.Value
+					spaceIfMatch = true
+				case ")":
+					curValue.string += token.Value
 				case ";":
 					if curAttribute != "" {
 						s, _ = appendStyles(s, blockSelectors, curAttribute, curValue, src)
@@ -230,7 +239,16 @@ func ParseStylesheet(val string, src StyleSource) Stylesheet {
 				curSelector += CSSSelector(token.Value)
 				spaceIfMatch = false
 			case matchingValue:
-				curValue.string += token.Value
+				if curValue.string == "" {
+					curValue.string += token.Value
+				} else {
+					if spaceIfMatch {
+						curValue.string += " "
+						spaceIfMatch = false
+					}
+					curValue.string += token.Value
+
+				}
 
 			}
 		case scanner.TokenIncludes, scanner.TokenPrefixMatch,
@@ -240,6 +258,13 @@ func ParseStylesheet(val string, src StyleSource) Stylesheet {
 			case matchingSelector, appendingSelector:
 				curSelector += CSSSelector(token.Value)
 				spaceIfMatch = false
+			case matchingValue:
+				spaceIfMatch = false
+				if curValue.string == "" {
+					curValue.string = token.Value
+				} else {
+					curValue.string += " " + token.Value
+				}
 
 			}
 		case scanner.TokenDimension, scanner.TokenPercentage, scanner.TokenURI:
@@ -248,7 +273,11 @@ func ParseStylesheet(val string, src StyleSource) Stylesheet {
 				if curValue.string == "" {
 					curValue.string = token.Value
 				} else {
-					curValue.string += " " + token.Value
+					if spaceIfMatch {
+						curValue.string += " "
+						spaceIfMatch = false
+					}
+					curValue.string += token.Value
 				}
 			}
 		default:

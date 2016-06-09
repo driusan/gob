@@ -185,6 +185,7 @@ a {
 	hello: "string" important;
 	abc: url("yay");
 	multi: fff f		 fff;
+	c: rgb(255, 255, 255);
 }`, AuthorSrc)
 	assertName(t, sty[0], "height")
 	assertName(t, sty[1], "width")
@@ -194,6 +195,7 @@ a {
 	assertName(t, sty[5], "hello")
 	assertName(t, sty[6], "abc")
 	assertName(t, sty[7], "multi")
+	assertName(t, sty[8], "c")
 
 	assertValue(t, sty[0], StyleValue{"300px", false})
 	assertValue(t, sty[1], StyleValue{"5%", false})
@@ -203,4 +205,5 @@ a {
 	assertValue(t, sty[5], StyleValue{"\"string\"", true})
 	assertValue(t, sty[6], StyleValue{"url(\"yay\")", false})
 	assertValue(t, sty[7], StyleValue{"fff f fff", false})
+	assertValue(t, sty[8], StyleValue{"rgb(255, 255, 255)", false})
 }
