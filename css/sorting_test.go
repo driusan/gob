@@ -31,3 +31,37 @@ func TestCSSSourceSorting(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestSpecificitySorting(t *testing.T) {
+	var vals []StyleRule = []StyleRule{
+		StyleRule{Selector: "foo", Src: AuthorSrc},
+		StyleRule{Selector: "#foo", Src: AuthorSrc},
+		StyleRule{Selector: "hello hello", Src: AuthorSrc},
+		StyleRule{Selector: "foo .hello", Src: AuthorSrc},
+	}
+
+	sort.Sort(byCSSPrecedence(vals))
+	if vals[0].Selector != "#foo" {
+		t.Errorf("Unexpected Selector at index 0: %s, not #foo\n", vals[0].Selector)
+
+	}
+	if vals[1].Selector != "foo .hello" {
+		t.Errorf("Unexpected Selector at index 1: %s, not foo .hello\n", vals[1].Selector)
+	}
+	if vals[2].Selector != "hello hello" {
+		t.Errorf("Unexpected Selector at index 2: %s, not hello hello\n", vals[2].Selector)
+
+	}
+	if vals[3].Selector != "foo" {
+		t.Errorf("Unexpected Selector at index 3: %s, not foo\n", vals[3].Selector)
+
+	}
+
+	/*type StyleRule struct {
+		Selector CSSSelector
+		Name     StyleAttribute
+		Value    StyleValue
+		Src      StyleSource
+	}*/
+
+}

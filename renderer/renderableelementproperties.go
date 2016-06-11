@@ -86,16 +86,22 @@ func (e *RenderableDomElement) GetFontSize() int {
 }
 
 func (e RenderableDomElement) GetBackgroundColor() color.Color {
-	switch bg, err := e.Styles.GetBackgroundColor(dfltBackground); err {
-	case css.InheritValue:
+	switch bgc := e.Styles.BackgroundColor.GetValue(); bgc {
+	case "inherit":
 		if e.Parent == nil {
-			return color.Transparent
+			return dfltBackground
 		}
 		return e.Parent.GetBackgroundColor()
-	case css.NoStyles:
+	case "", "transparent":
 		return color.Transparent
 	default:
-		return bg
+		c, err := css.ConvertColorToRGBA(bgc)
+		if err != nil {
+			return color.Transparent
+			//panic(err)
+		}
+		return c
+
 	}
 }
 

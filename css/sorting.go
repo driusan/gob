@@ -21,7 +21,7 @@ func specificityLess(i, j StyleRule) bool {
 	}
 
 	iNumIDs := i.Selector.NumberIDs()
-	jNumIDs := i.Selector.NumberIDs()
+	jNumIDs := j.Selector.NumberIDs()
 	if iNumIDs != jNumIDs {
 		return iNumIDs > jNumIDs
 	}
@@ -46,22 +46,13 @@ func specificityLess(i, j StyleRule) bool {
 func (r byCSSPrecedence) Len() int      { return len(r) }
 func (r byCSSPrecedence) Swap(i, j int) { r[i], r[j] = r[j], r[i] }
 func (r byCSSPrecedence) Less(i, j int) bool {
-	// handle inline styles first.
-	if r[i].Src == InlineStyleSrc {
+	switch r[i].Src {
+	case InlineStyleSrc:
 		if r[j].Src != InlineStyleSrc {
 			return true
 		}
 		return specificityLess(r[i], r[j])
-
-	}
-	if r[j].Src == InlineStyleSrc {
-		if r[i].Src != InlineStyleSrc {
-			return false
-		}
-		return specificityLess(r[i], r[j])
-
-	}
-	if r[i].Src == UserAgentSrc {
+	case UserAgentSrc:
 		// This is a UserAgent stylesheet.
 		// Reminder:
 		//	1. user agent declarations
@@ -84,7 +75,7 @@ func (r byCSSPrecedence) Less(i, j int) bool {
 		}
 		// they're both the same importance, so order by specificity
 		return specificityLess(r[i], r[j])
-	} else if r[i].Src == UserSrc {
+	case UserSrc:
 		// This is a User stylesheet.
 		// Reminder:
 		//	1. user agent declarations
@@ -112,7 +103,7 @@ func (r byCSSPrecedence) Less(i, j int) bool {
 		// stylesheets are never more important, so they're never
 		// "less"
 		return false
-	} else if r[i].Src == AuthorSrc {
+	case AuthorSrc:
 		// This is an Author stylesheet.
 		// Reminder:
 		//	1. user agent declarations

@@ -182,7 +182,7 @@ func ParseStylesheet(val string, src StyleSource) Stylesheet {
 					curAttribute = ""
 					spaceIfMatch = false
 
-					fmt.Printf("Selectors for block: %s\n", blockSelectors)
+					//fmt.Printf("Selectors for block: %s\n", blockSelectors)
 				}
 			case matchingAttribute:
 				switch token.Value {
@@ -285,7 +285,7 @@ func ParseStylesheet(val string, src StyleSource) Stylesheet {
 		}
 
 	}
-	fmt.Printf("Selectors for block: %s\n", blockSelectors)
+	//fmt.Printf("Selectors for block: %s\n", blockSelectors)
 	return s
 }
 

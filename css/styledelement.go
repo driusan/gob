@@ -413,7 +413,16 @@ func (e *StyledElement) expandBoxSideShorthand(attrib StyleAttribute, s StyleRul
 func (e *StyledElement) expandBackgroundShorthand(s StyleRule) {
 	values := strings.Fields(s.Value.string)
 
+	// hack to build background-color from the shorthand even
+	// though we split on whitespace and rgb(1, 2, 3) has whitespace
+	buildColour := false
 	for _, val := range values {
+		if buildColour {
+			e.rules[len(e.rules)-1].Value.string += (" " + val)
+			if strings.Index(val, ")") >= 0 {
+				buildColour = false
+			}
+		}
 		if val == "none" || IsURL(val) {
 			s.Name = "background-image"
 			s.Value.string = val
@@ -422,6 +431,9 @@ func (e *StyledElement) expandBackgroundShorthand(s StyleRule) {
 			s.Name = "background-color"
 			s.Value.string = val
 			e.rules = append(e.rules, s)
+			if string(val[0:4]) == "rgb(" {
+				buildColour = true
+			}
 		}
 		switch val {
 		case "repeat", "repeat-x", "repeat-y", "no-repeat":
@@ -655,18 +667,6 @@ func (e StyledElement) GetBackgroundImage() (string, error) {
 	}
 	realURL := bgi[strings.IndexRune(bgi, '(')+1 : strings.LastIndex(bgi, ")")]
 	return realURL, nil
-}
-func (e StyledElement) GetBackgroundColor(defaultColour color.Color) (color.Color, error) {
-	switch e.BackgroundColor.string {
-	case "inherit":
-		return defaultColour, InheritValue
-	case "transparent":
-		return color.Transparent, nil
-	case "":
-		return color.Transparent, NoStyles
-	default:
-		return ConvertColorToRGBA(e.BackgroundColor.string)
-	}
 }
 
 func (e StyledElement) GetColor(defaultColour color.Color) (color.Color, error) {
