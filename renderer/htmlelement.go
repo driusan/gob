@@ -233,6 +233,8 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 	defer func() {
 		if overlayed != nil {
 			e.OverlayedContent = image.NewRGBA(overlayed.Bounds())
+		} else {
+			e.OverlayedContent = image.NewRGBA(image.ZR)
 		}
 	}()
 	e.RenderAbort = make(chan bool)
@@ -351,7 +353,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 					dot.Y += e.GetLineHeight()
 					dot.X = lfWidth
 				case "nowrap":
-					dot.X = r.Max.X
+					fallthrough // dot.X = r.Max.X
 				case "normal":
 					fallthrough
 				default:
@@ -397,7 +399,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				c.ContentOverlay = childContent
 				_, contentbox := c.calcCSSBox(childContent)
 				c.BoxContentRectangle = contentbox
-		//cr := image.Rectangle{contentStart, contentStart.Add(contentBounds.Size())}
+				//cr := image.Rectangle{contentStart, contentStart.Add(contentBounds.Size())}
 				overlayed.GrowBounds(contentbox)
 
 				/*
@@ -447,7 +449,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				}
 
 				// draw the border, background, and CSS outer box.
-				childContent, _ := c.LayoutPass(width, image.ZR, image.ZP, leftFloatStack, rightFloatStack)
+				childContent, _ := c.LayoutPass(width, image.ZR, image.ZP, nil, nil) //leftFloatStack, rightFloatStack)
 				c.ContentOverlay = childContent
 				box, contentbox := c.calcCSSBox(childContent)
 				c.BoxContentRectangle = contentbox
@@ -579,6 +581,8 @@ func (e *RenderableDomElement) DrawPass() image.Image {
 			switch c.GetDisplayProp() {
 			case "none":
 				continue
+			default:
+				fallthrough
 			case "inline":
 				childContent := c.DrawPass()
 
@@ -592,8 +596,8 @@ func (e *RenderableDomElement) DrawPass() image.Image {
 					draw.Over,
 				)
 			case "block":
-				fallthrough
-			default:
+				/*				fallthrough
+								default: */
 				// draw the border, background, and CSS outer box.
 				childContent := c.DrawPass()
 				c.ContentOverlay = childContent
