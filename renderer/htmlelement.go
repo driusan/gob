@@ -318,7 +318,8 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 						lfHeight := leftFloatStack.NextFloatHeight()
 						rfHeight := rightFloatStack.NextFloatHeight()
 						if len(leftFloatStack) == 0 && len(rightFloatStack) == 0 {
-							panic("Not enough space to render any element and no floats to remove.")
+							dot.X = 0
+							dot.Y += e.GetLineHeight()
 						}
 
 						if lfHeight <= 0 && rfHeight <= 0 {

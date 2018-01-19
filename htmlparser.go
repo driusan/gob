@@ -157,23 +157,29 @@ func fontSizeToPx(val string, parent *renderer.RenderableDomElement) int {
 	case "0":
 		return 0
 	}
+	var psize int = DefaultFontSize
 	// handle percentages,
 	if val[len(val)-1] == '%' {
 		f, err := strconv.ParseFloat(string(val[0:len(val)-1]), 64)
-		if err == nil {
-			psize, err := parent.Styles.GetFontSize()
+		if parent != nil && err == nil {
+			psize, err = parent.Styles.GetFontSize()
 			if err != nil {
 				return DefaultFontSize
 			}
-			size := int(f * float64(psize) / 100.0)
-			return size
 		}
+
+		size := int(f * float64(psize) / 100.0)
+		return size
 		return DefaultFontSize
 	}
 
-	psize, err := parent.Styles.GetFontSize()
-	if err != nil {
-		psize = DefaultFontSize
+	if parent != nil {
+		ps, err := parent.Styles.GetFontSize()
+		if err != nil {
+			psize = DefaultFontSize
+		} else {
+			psize = ps
+		}
 	}
 	size, err := css.ConvertUnitToPx(DefaultFontSize, psize, val)
 	if err != nil {
