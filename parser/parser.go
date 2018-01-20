@@ -1,21 +1,20 @@
-package main
+package parser
 
 import (
-	//"fmt"
+	//	"fmt"
 	"github.com/driusan/Gob/css"
+	"github.com/driusan/Gob/net"
 	"github.com/driusan/Gob/renderer"
 	"golang.org/x/net/html"
-	"image/color"
 	"io"
 	"io/ioutil"
 	"net/url"
 	"strconv"
-	"strings"
 )
 
-func loadHTML(r io.Reader, urlContext *url.URL) *Page {
+func LoadPage(r io.Reader, loader net.URLReader, urlContext *url.URL) Page {
 	parsedhtml, _ := html.Parse(r)
-	styles := css.ExtractStyles(parsedhtml, urlContext)
+	styles := css.ExtractStyles(parsedhtml, loader, urlContext)
 
 	var body *html.Node
 	var root *html.Node
@@ -43,7 +42,7 @@ func loadHTML(r io.Reader, urlContext *url.URL) *Page {
 
 	styles2 := css.ParseStylesheet(styles, css.AuthorSrc)
 
-	renderable, _ := renderer.ConvertNodeToRenderableElement(body)
+	renderable, _ := renderer.ConvertNodeToRenderableElement(body, loader)
 
 	sheet, _ := ioutil.ReadFile("useragent.css")
 	userAgentStyles := css.ParseStylesheet(string(sheet), css.UserAgentSrc)
@@ -96,17 +95,9 @@ func loadHTML(r io.Reader, urlContext *url.URL) *Page {
 		default:
 			el.Styles.SetFontSize(fontSizeToPx(strVal, el.Parent))
 		}
-
-		if el.Type == html.ElementNode && strings.ToLower(el.Data) == "body" {
-			background = el.GetBackgroundColor()
-			//fmt.Print("Background color of body: %s\n", background)
-			if background == color.Transparent {
-				background = color.RGBA{0xE0, 0xE0, 0xE0, 0xFF}
-			}
-		}
 	})
 
-	return &Page{
+	return Page{
 		Content: renderable,
 		URL:     nil,
 	}
@@ -157,27 +148,26 @@ func fontSizeToPx(val string, parent *renderer.RenderableDomElement) int {
 	case "0":
 		return 0
 	}
-	var psize int = DefaultFontSize
 	// handle percentages,
 	if val[len(val)-1] == '%' {
 		f, err := strconv.ParseFloat(string(val[0:len(val)-1]), 64)
-		if parent != nil && err == nil {
-			psize, err = parent.Styles.GetFontSize()
-			if err != nil {
-				return DefaultFontSize
+		if err == nil {
+			var psize int = DefaultFontSize
+			if parent != nil {
+				if psize, err = parent.Styles.GetFontSize(); err != nil {
+					psize = DefaultFontSize
+				}
 			}
-		}
 
-		size := int(f * float64(psize) / 100.0)
-		return size
+			size := int(f * float64(psize) / 100.0)
+			return size
+		}
 		return DefaultFontSize
 	}
 
+	var psize int = DefaultFontSize
 	if parent != nil {
-		ps, err := parent.Styles.GetFontSize()
-		if err != nil {
-			psize = DefaultFontSize
-		} else {
+		if ps, err := parent.Styles.GetFontSize(); err == nil {
 			psize = ps
 		}
 	}

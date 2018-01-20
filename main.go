@@ -3,8 +3,10 @@ package main
 import (
 	"fmt"
 	"github.com/driusan/Gob/css"
+	//	"github.com/driusan/Gob/renderer"
 	"github.com/driusan/Gob/net"
-	"github.com/driusan/Gob/renderer"
+	"github.com/driusan/Gob/parser"
+
 	"golang.org/x/exp/shiny/driver"
 	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/mobile/event/key"
@@ -14,6 +16,7 @@ import (
 	"golang.org/x/mobile/event/size"
 	"golang.org/x/mobile/event/touch"
 	"golang.org/x/net/html"
+
 	"image"
 	"image/color"
 	"image/draw"
@@ -38,12 +41,8 @@ type Viewport struct {
 	// The location of the image to be displayed into the viewpart.
 	Cursor image.Point
 }
-type Page struct {
-	Content *renderer.RenderableDomElement
-	URL     *url.URL
-}
 
-func paintWindow(s screen.Screen, w screen.Window, v *Viewport, page *Page) {
+func paintWindow(s screen.Screen, w screen.Window, v *Viewport, page parser.Page) {
 	viewport := v.Size.Bounds()
 
 	if v.Content != nil {
@@ -81,7 +80,7 @@ func main() {
 	}
 
 	page, err := loadPage(filename)
-	if err != nil || page == nil {
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %s\n", err.Error())
 		return
 	}
@@ -181,7 +180,7 @@ func main() {
 								if el.Type == html.ElementNode && el.Data == "a" {
 									p, err := loadNewPage(page.URL, el.GetAttribute("href"))
 									page = p
-									if err == nil && p != nil {
+									if err == nil {
 										renderNewPageIntoViewport(s, w, &v, p)
 									}
 								}
@@ -199,23 +198,23 @@ func main() {
 		}
 	})
 }
-func loadNewPage(context *url.URL, path string) (*Page, error) {
+func loadNewPage(context *url.URL, path string) (parser.Page, error) {
 	u, err := url.Parse(path)
 	if err != nil {
-		return nil, err
+		return parser.Page{}, err
 	}
 	newURL := context.ResolveReference(u)
-	r, err := net.GetURLReader(newURL)
+	loader := net.DefaultReader{}
+	r, err := loader.GetURL(newURL)
 	if err != nil {
-		return nil, err
+		return parser.Page{}, err
 	}
 	defer r.Close()
-	p := loadHTML(r, newURL)
-	p.URL = newURL
+	p := parser.LoadPage(r, loader, newURL)
 	return p, nil
 }
 
-func renderNewPageIntoViewport(s screen.Screen, w screen.Window, v *Viewport, page *Page) {
+func renderNewPageIntoViewport(s screen.Screen, w screen.Window, v *Viewport, page parser.Page) {
 	windowSize := v.Size.Size()
 
 	page.Content.FirstPageOnly = true

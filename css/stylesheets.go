@@ -94,7 +94,7 @@ func ParseStylesheet(val string, src StyleSource) Stylesheet {
 		if token.Type == scanner.TokenEOF { //|| token.Type == scanner.TokenError {
 			break
 		}
-		fmt.Printf("Token: %v\n", token)
+		//fmt.Printf("Token: %v\n", token)
 		switch token.Type {
 		// Different kinds of comments
 		case scanner.TokenCDO, scanner.TokenCDC:

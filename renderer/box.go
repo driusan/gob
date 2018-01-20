@@ -3,7 +3,7 @@ package renderer
 import (
 	//	"fmt"
 	"github.com/driusan/Gob/css"
-	"github.com/driusan/Gob/net"
+	//"github.com/driusan/Gob/net"
 	"image"
 	"image/color"
 	// the standard draw package doesn't have Copy, which we need for background Repeat.
@@ -640,7 +640,7 @@ func (e *RenderableDomElement) GetBackgroundImage() image.Image {
 		return nil
 	}
 	newURL := e.PageLocation.ResolveReference(u)
-	r, err := net.GetURLReader(newURL)
+	r, err := e.resolver.GetURL(newURL)
 	if err != nil {
 		return nil
 	}

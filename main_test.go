@@ -1,6 +1,8 @@
 package main
 
 import (
+	"github.com/driusan/Gob/net"
+	"github.com/driusan/Gob/parser"
 	"image"
 	"strings"
 	"testing"
@@ -82,22 +84,25 @@ a:hover {
 `
 
 func BenchmarkParseAndRender(b *testing.B) {
+	loader := net.DefaultReader{}
 	for i := 0; i < b.N; i++ {
 		f := strings.NewReader(content)
-		parsedhtml := loadHTML(f, nil)
+		parsedhtml := parser.LoadPage(f, loader, nil)
 		parsedhtml.Content.Render(1024)
 	}
 }
 
 func BenchmarkParseOnly(b *testing.B) {
+	loader := net.DefaultReader{}
 	for i := 0; i < b.N; i++ {
 		f := strings.NewReader(content)
-		loadHTML(f, nil)
+		parser.LoadPage(f, loader, nil)
 	}
 }
 func BenchmarkRenderOnly(b *testing.B) {
+	loader := net.DefaultReader{}
 	f := strings.NewReader(content)
-	parsedhtml := loadHTML(f, nil)
+	parsedhtml := parser.LoadPage(f, loader, nil)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		parsedhtml.Content.Render(1024)
@@ -105,16 +110,18 @@ func BenchmarkRenderOnly(b *testing.B) {
 }
 
 func BenchmarkRenderLayoutOnly(b *testing.B) {
+	loader := net.DefaultReader{}
 	f := strings.NewReader(content)
-	parsedhtml := loadHTML(f, nil)
+	parsedhtml := parser.LoadPage(f, loader, nil)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		parsedhtml.Content.LayoutPass(1024, image.ZR, image.Point{0, 0}, nil, nil)
 	}
 }
 func BenchmarkRenderDrawOnly(b *testing.B) {
+	loader := net.DefaultReader{}
 	f := strings.NewReader(content)
-	parsedhtml := loadHTML(f, nil)
+	parsedhtml := parser.LoadPage(f, loader, nil)
 	parsedhtml.Content.LayoutPass(1024, image.ZR, image.Point{0, 0}, nil, nil)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

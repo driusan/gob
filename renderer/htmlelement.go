@@ -63,6 +63,19 @@ type RenderableDomElement struct {
 	containerHeight int
 
 	lineBoxes []lineBox
+
+	resolver net.URLReader
+}
+
+func (e RenderableDomElement) String() string {
+	var ret string
+	if e.Element != nil {
+		ret += fmt.Sprintf("%v", e.Element)
+	}
+	if e.Styles != nil {
+		ret += fmt.Sprintf("%v", e.Styles)
+	}
+	return ret
 }
 
 type lineBox struct {
@@ -257,14 +270,14 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				switch attr.Key {
 				case "src":
 					// Seeing this print way too many times.. something's wrong.
-					//fmt.Printf("Should load: %s\n", attr.Val)
+					fmt.Printf("Should load: %s\n", attr.Val)
 					u, err := url.Parse(attr.Val)
 					if err != nil {
 						loadedImage = true
 						break
 					}
 					newURL := e.PageLocation.ResolveReference(u)
-					r, err := net.GetURLReader(newURL)
+					r, err := e.resolver.GetURL(newURL)
 					if err != nil {
 						panic(err)
 					}
@@ -320,6 +333,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 						if len(leftFloatStack) == 0 && len(rightFloatStack) == 0 {
 							dot.X = 0
 							dot.Y += e.GetLineHeight()
+							//panic("Not enough space to render any element and no floats to remove.")
 						}
 
 						if lfHeight <= 0 && rfHeight <= 0 {

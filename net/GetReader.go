@@ -33,7 +33,13 @@ func ParseURL(urlS string) (*url.URL, error) {
 	return url.Parse(urlS)
 }
 
-func GetURLReader(u *url.URL) (io.ReadCloser, error) {
+type URLReader interface {
+	GetURL(u *url.URL) (io.ReadCloser, error)
+}
+
+type DefaultReader struct{}
+
+func (d DefaultReader) GetURL(u *url.URL) (io.ReadCloser, error) {
 	switch u.Scheme {
 	case "file":
 		if _, err := os.Stat(u.Path); err != nil {

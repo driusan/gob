@@ -10,7 +10,7 @@ import (
 // ExtractStyles takes an html Node as input, and extracts the unparsed text
 // from any <style> elements in the HTML, returning the string of the style
 // body.
-func ExtractStyles(n *html.Node, context *url.URL) string {
+func ExtractStyles(n *html.Node, loader net.URLReader, context *url.URL) string {
 	var style string
 	if n.Type == html.ElementNode && n.Data == "link" {
 		var href, rel string
@@ -30,7 +30,7 @@ func ExtractStyles(n *html.Node, context *url.URL) string {
 			return ""
 		}
 		newAbsoluteURL := context.ResolveReference(newUrl)
-		r, err := net.GetURLReader(newAbsoluteURL)
+		r, err := loader.GetURL(newAbsoluteURL)
 		if err != nil {
 			return ""
 		}
@@ -51,7 +51,7 @@ func ExtractStyles(n *html.Node, context *url.URL) string {
 		}
 	}
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		style += ExtractStyles(c, context)
+		style += ExtractStyles(c, loader, context)
 	}
 
 	return style
