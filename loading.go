@@ -19,5 +19,6 @@ func loadPage(filename string) (parser.Page, error) {
 	defer r.Close()
 	p := parser.LoadPage(r, loader, u)
 	p.URL = u
+	background = p.Background
 	return p, nil
 }

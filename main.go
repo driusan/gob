@@ -211,6 +211,7 @@ func loadNewPage(context *url.URL, path string) (parser.Page, error) {
 	}
 	defer r.Close()
 	p := parser.LoadPage(r, loader, newURL)
+	background = p.Background
 	return p, nil
 }
 

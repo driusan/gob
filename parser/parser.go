@@ -6,10 +6,12 @@ import (
 	"github.com/driusan/Gob/net"
 	"github.com/driusan/Gob/renderer"
 	"golang.org/x/net/html"
+	"image/color"
 	"io"
 	"io/ioutil"
 	"net/url"
 	"strconv"
+	"strings"
 )
 
 func LoadPage(r io.Reader, loader net.URLReader, urlContext *url.URL) Page {
@@ -46,6 +48,11 @@ func LoadPage(r io.Reader, loader net.URLReader, urlContext *url.URL) Page {
 
 	sheet, _ := ioutil.ReadFile("useragent.css")
 	userAgentStyles := css.ParseStylesheet(string(sheet), css.UserAgentSrc)
+
+	p := Page{
+		Content: renderable,
+		URL:     nil,
+	}
 
 	renderable.Walk(func(el *renderer.RenderableDomElement) {
 		el.PageLocation = urlContext
@@ -95,13 +102,16 @@ func LoadPage(r io.Reader, loader net.URLReader, urlContext *url.URL) Page {
 		default:
 			el.Styles.SetFontSize(fontSizeToPx(strVal, el.Parent))
 		}
+
+		if el.Type == html.ElementNode && strings.ToLower(el.Data) == "body" {
+			background := el.GetBackgroundColor()
+			if background == color.Transparent {
+				background = color.RGBA{0xE0, 0xE0, 0xE0, 0xFF}
+			}
+			p.Background = background
+		}
 	})
-
-	return Page{
-		Content: renderable,
-		URL:     nil,
-	}
-
+	return p
 }
 
 func fontSizeToPx(val string, parent *renderer.RenderableDomElement) int {
