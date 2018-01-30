@@ -19,7 +19,7 @@ var PixelsPerPt float64
 
 func init() {
 	// Assume 96 DPI unless someone tells us otherwise at this resolution.
-	PixelsPerPt = (96.0 / 12.0)
+	PixelsPerPt = (96.0 / 72.0)
 }
 func ConvertUnitToPx(fontsize int, percentbasis int, cssString string) (int, error) {
 	if len(cssString) < 2 {
