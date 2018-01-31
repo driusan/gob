@@ -161,6 +161,10 @@ func (e RenderableDomElement) GetDisplayProp() string {
 				"table-footer-group", "table-row", "table-cell", "table-caption",
 				"inline-block":
 				return "block"
+			case "list-item":
+				// FIXME: This should generate a principle box and a marker box,
+				// but for now just pretending it's a block simplifies things
+				return "block"
 			default:
 				return cssVal
 
