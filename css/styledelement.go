@@ -1,7 +1,7 @@
 package css
 
 import (
-	//"fmt"
+	"fmt"
 	"github.com/driusan/fonts"
 	"github.com/golang/freetype/truetype"
 	"golang.org/x/image/font"
@@ -179,6 +179,9 @@ type StyledElement struct {
 	fontSize int
 }
 
+func (e StyledElement) String() string {
+	return fmt.Sprintf("%v", e.rules)
+}
 func (e *StyledElement) SetFontSize(size int) {
 	e.fontSize = size
 }

@@ -12,7 +12,7 @@ func loadPage(filename string) (parser.Page, error) {
 	}
 
 	loader := net.DefaultReader{}
-	r, err := loader.GetURL(u)
+	r, _, err := loader.GetURL(u)
 	if err != nil {
 		return parser.Page{}, err
 	}

@@ -14,6 +14,11 @@ type StyleRule struct {
 	Value    StyleValue
 	Src      StyleSource
 }
+
+func (sr StyleRule) String() string {
+	return fmt.Sprintf("(%s { %s: %s (%s)})", sr.Selector, sr.Name, sr.Value, sr.Src)
+}
+
 type Stylesheet []StyleRule
 
 type StyleAttribute string
@@ -78,9 +83,9 @@ func appendStyles(s []StyleRule, selectors []CSSSelector, attr StyleAttribute, v
 	}
 	return s, nil
 }
+
 func ParseStylesheet(val string, src StyleSource) Stylesheet {
 	s := make([]StyleRule, 0)
-	//currentRule := StyleRule{Src: src}
 
 	var blockSelectors []CSSSelector
 	var curSelector CSSSelector

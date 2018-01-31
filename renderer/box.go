@@ -640,8 +640,8 @@ func (e *RenderableDomElement) GetBackgroundImage() image.Image {
 		return nil
 	}
 	newURL := e.PageLocation.ResolveReference(u)
-	r, err := e.resolver.GetURL(newURL)
-	if err != nil {
+	r, resp, err := e.resolver.GetURL(newURL)
+	if err != nil || resp < 200 || resp >= 300 {
 		return nil
 	}
 	content, _, err := image.Decode(r)

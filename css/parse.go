@@ -30,8 +30,14 @@ func ExtractStyles(n *html.Node, loader net.URLReader, context *url.URL) string 
 			return ""
 		}
 		newAbsoluteURL := context.ResolveReference(newUrl)
-		r, err := loader.GetURL(newAbsoluteURL)
+		r, resp, err := loader.GetURL(newAbsoluteURL)
 		if err != nil {
+			return ""
+		}
+
+		// Only parse the stylesheet if it's found, otherwise we extract
+		// styles from 404 error pages
+		if resp < 200 || resp >= 300 {
 			return ""
 		}
 		defer r.Close()

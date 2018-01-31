@@ -9,7 +9,6 @@ import (
 	"golang.org/x/image/math/fixed"
 	"golang.org/x/net/html"
 	"image"
-	"image/color"
 	"image/draw"
 	_ "image/gif"
 	_ "image/jpeg"
@@ -115,9 +114,6 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 	fontFace := e.GetFontFace(fSize)
 	var dot int
 	clr := e.GetColor()
-	if clr == nil {
-		clr = color.RGBA{0xff, 0xff, 0xff, 0xff}
-	}
 	fntDrawer := font.Drawer{
 		Dst:  nil,
 		Src:  &image.Uniform{clr},
@@ -277,9 +273,12 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 						break
 					}
 					newURL := e.PageLocation.ResolveReference(u)
-					r, err := e.resolver.GetURL(newURL)
+					r, code, err := e.resolver.GetURL(newURL)
 					if err != nil {
 						panic(err)
+					}
+					if code <= 200 || code >= 300 {
+						continue
 					}
 					content, format, err := image.Decode(r)
 					if err == nil {

@@ -3,9 +3,10 @@ package main
 import (
 	"fmt"
 	"github.com/driusan/Gob/css"
-	//	"github.com/driusan/Gob/renderer"
+	"github.com/driusan/Gob/dom"
 	"github.com/driusan/Gob/net"
 	"github.com/driusan/Gob/parser"
+	"github.com/driusan/Gob/renderer"
 
 	"golang.org/x/exp/shiny/driver"
 	"golang.org/x/exp/shiny/screen"
@@ -29,6 +30,34 @@ var (
 	background = color.Color(color.RGBA{0xE0, 0xE0, 0xE0, 0xFF})
 	//	background = color.RGBA{0xFF, 0xFF, 0xFF, 0xFF}
 )
+
+// for debugging
+var hover *renderer.RenderableDomElement
+
+func debugelement(el *renderer.RenderableDomElement) {
+	cur := el.Element
+	name := ""
+	for {
+		curname := cur.Data
+		if cl := cur.GetAttribute("class"); cl != "" {
+			curname += "." + cl
+		}
+		if id := cur.GetAttribute("id"); id != "" {
+			curname += "#" + id
+		}
+		if name == "" {
+			name = curname
+		} else {
+			name = curname + " " + name
+		}
+		if cur.Parent == nil {
+			break
+		}
+		cur = (*dom.Element)(cur.Parent)
+	}
+	fmt.Printf("Hovering over: %v\n", name)
+	fmt.Printf("Styles applied: %v\n", el.Styles)
+}
 
 type Viewport struct {
 	// The size of the viewport
@@ -141,6 +170,10 @@ func main() {
 						}
 						paintWindow(s, w, &v, page)
 					}
+				case key.CodeP:
+					if e.Direction == key.DirPress {
+						debugelement(hover)
+					}
 				default:
 					fmt.Printf("Unknown key: %s", e.Code)
 				}
@@ -186,7 +219,11 @@ func main() {
 								}
 							default:
 								if el.Type == html.ElementNode && el.Data == "a" {
+
 									//fmt.Printf("Hovering over link %s\n", el.GetAttribute("href"))
+								}
+								if el.Type == html.ElementNode {
+									hover = el
 								}
 							}
 						}
@@ -205,7 +242,7 @@ func loadNewPage(context *url.URL, path string) (parser.Page, error) {
 	}
 	newURL := context.ResolveReference(u)
 	loader := net.DefaultReader{}
-	r, err := loader.GetURL(newURL)
+	r, _, err := loader.GetURL(newURL)
 	if err != nil {
 		return parser.Page{}, err
 	}

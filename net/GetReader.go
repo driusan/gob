@@ -34,22 +34,23 @@ func ParseURL(urlS string) (*url.URL, error) {
 }
 
 type URLReader interface {
-	GetURL(u *url.URL) (io.ReadCloser, error)
+	GetURL(u *url.URL) (body io.ReadCloser, statuscode int, err error)
 }
 
 type DefaultReader struct{}
 
-func (d DefaultReader) GetURL(u *url.URL) (io.ReadCloser, error) {
+func (d DefaultReader) GetURL(u *url.URL) (body io.ReadCloser, statuscode int, err error) {
 	switch u.Scheme {
 	case "file":
 		if _, err := os.Stat(u.Path); err != nil {
-			return nil, err
+			return nil, 404, err
 		}
-		return os.Open(u.Path)
+		f, err := os.Open(u.Path)
+		return f, 200, err
 	default:
 		if cached := getCacheReader(u); cached != nil {
 			//fmt.Printf("Using cache for %s\n", u)
-			return cached, nil
+			return cached, 200, nil
 		}
 
 		req, _ := http.NewRequest("GET", u.String(), nil)
@@ -57,9 +58,15 @@ func (d DefaultReader) GetURL(u *url.URL) (io.ReadCloser, error) {
 		resp, err := client.Do(req)
 		//resp, err := http.Get(u.String())
 		if err != nil {
-			return nil, err
+			return nil, 400, err
 		}
-		return GetCacheWriter(resp.Body, "/home/driusan/.gob/cache/", u), nil
+		if resp.StatusCode == 200 {
+			// Only cache 200 response codes, because the filesystem doesn't store
+			// information about the response code in the cache..
+			cw := GetCacheWriter(resp.Body, "/home/driusan/.gob/cache/", u)
+			return cw, 200, nil
+		}
+		return resp.Body, resp.StatusCode, nil
 	}
 }
 
