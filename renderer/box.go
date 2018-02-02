@@ -65,7 +65,7 @@ func (b *outerBoxDrawer) Bounds() image.Rectangle {
 		Min: image.Point{X: 0, Y: 0},
 		Max: image.Point{
 			X: b.contentSize.X + int(b.Border.Left.Width+b.Border.Right.Width) + int(b.Padding.Left.Width+b.Padding.Right.Width) + int(b.Margin.Left.Width+b.Margin.Right.Width),
-			Y: b.contentSize.Y + int(b.Border.Top.Width+b.Border.Bottom.Width) + int(b.Padding.Top.Width+b.Padding.Bottom.Width) + int(b.Margin.Left.Width+b.Margin.Right.Width),
+			Y: b.contentSize.Y + int(b.Border.Top.Width+b.Border.Bottom.Width) + int(b.Padding.Top.Width+b.Padding.Bottom.Width) + int(b.Margin.Top.Width+b.Margin.Bottom.Width),
 		},
 	}
 }
@@ -657,7 +657,7 @@ func (e *RenderableDomElement) GetBackgroundImage() image.Image {
 // image which should be used to overlay content.
 // The returned image does *not* have the content overlayed, it only
 // has the margin/background/borders drawn on it.
-func (e *RenderableDomElement) calcCSSBox(content image.Image) (image.Image, image.Rectangle) {
+func (e *RenderableDomElement) calcCSSBox(content image.Image, collapsablemargin int) (image.Image, image.Rectangle) {
 	// calculate the size of the box.
 	size := content.Bounds().Size()
 	if width := e.GetWidth(); width >= 0 {
@@ -782,9 +782,19 @@ func (e *RenderableDomElement) calcCSSBox(content image.Image) (image.Image, ima
 		}
 		bgi = bgCanvas
 	}
+	var topmargin int
+	if collapsablemargin == 0 {
+		topmargin = e.GetMarginTopSize()
+	} else {
+		if ts := e.GetMarginTopSize(); ts < collapsablemargin {
+			topmargin = collapsablemargin
+		} else {
+			topmargin = ts
+		}
+	}
 	box := &outerBoxDrawer{
 		Margin: BoxMargins{
-			Top:    BoxMargin{Width: e.GetMarginTopSize()},
+			Top:    BoxMargin{Width: topmargin},
 			Left:   BoxMargin{Width: e.GetMarginLeftSize()},
 			Right:  BoxMargin{Width: e.GetMarginRightSize()},
 			Bottom: BoxMargin{Width: e.GetMarginBottomSize()},

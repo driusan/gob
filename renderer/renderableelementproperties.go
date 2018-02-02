@@ -20,9 +20,13 @@ func stringSize(fntDrawer font.Drawer, textContent string) (int, error) {
 	fSize := getFontHeight(fntDrawer.Face)
 	//firstRune, _ := utf8.DecodeRuneInString(textContent)
 
-	for _, word := range words {
+	for i, word := range words {
 		wordSizeInPx := fntDrawer.MeasureString(word).Ceil()
 		size += wordSizeInPx
+
+		if i == len(words)-1 {
+			break
+		}
 
 		// Add a three per em space between words, an em-quad after a period,
 		// and an en-quad after other punctuation

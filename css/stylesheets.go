@@ -96,7 +96,7 @@ func ParseStylesheet(val string, src StyleSource) Stylesheet {
 	scn := scanner.New(val)
 	for {
 		token := scn.Next()
-		if token.Type == scanner.TokenEOF { //|| token.Type == scanner.TokenError {
+		if token.Type == scanner.TokenEOF {
 			break
 		}
 		//fmt.Printf("Token: %v\n", token)
@@ -108,10 +108,13 @@ func ParseStylesheet(val string, src StyleSource) Stylesheet {
 			//fmt.Printf("Comment: %v\n")
 			continue
 		case scanner.TokenS:
-			if context == matchingSelector {
+			switch context {
+			case matchingSelector:
 				// if we get another Ident, it's an E F type selector.
 				// if not, the , will set it back to matching
 				context = appendingSelector
+				spaceIfMatch = true
+			case matchingValue:
 				spaceIfMatch = true
 			}
 			// whitespace tokens. Ignore them.

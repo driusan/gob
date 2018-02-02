@@ -352,6 +352,7 @@ func (e *StyledElement) expandBoxBorderShorthand(att StyleAttribute, s StyleRule
 		e.rules = append(e.rules, s)
 	}
 }
+
 func (e *StyledElement) expandBoxSideShorthand(attrib StyleAttribute, s StyleRule) {
 	values := strings.Fields(s.Value.string)
 	switch len(values) {
@@ -413,6 +414,7 @@ func (e *StyledElement) expandBoxSideShorthand(attrib StyleAttribute, s StyleRul
 		e.rules = append(e.rules, s)
 	}
 }
+
 func (e *StyledElement) expandBackgroundShorthand(s StyleRule) {
 	values := strings.Fields(s.Value.string)
 

@@ -161,26 +161,28 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 	fntDrawer.Dot = fixed.P(0, fontFace.Metrics().Ascent.Floor())
 	fntDrawer.Dst = img
 
-	if decoration := e.GetTextDecoration(); decoration != "" && decoration != "none" && decoration != "blink" {
-		if strings.Contains(decoration, "underline") {
-			y := fntDrawer.Dot.Y.Floor()
-			for px := 0; px < ssize; px++ {
-				img.Set(px, y, clr)
+	defer func() {
+		if decoration := e.GetTextDecoration(); decoration != "" && decoration != "none" && decoration != "blink" {
+			if strings.Contains(decoration, "underline") {
+				y := fntDrawer.Dot.Y.Floor()
+				for px := 0; px < ssize; px++ {
+					img.Set(px, y, clr)
+				}
+			}
+			if strings.Contains(decoration, "overline") {
+				y := fntDrawer.Dot.Y.Floor() - fontFace.Metrics().Ascent.Floor()
+				for px := 0; px < ssize; px++ {
+					img.Set(px, y, clr)
+				}
+			}
+			if strings.Contains(decoration, "line-through") {
+				y := fntDrawer.Dot.Y.Floor() - (fontFace.Metrics().Ascent.Floor() / 2)
+				for px := 0; px < ssize; px++ {
+					img.Set(px, y, clr)
+				}
 			}
 		}
-		if strings.Contains(decoration, "overline") {
-			y := fntDrawer.Dot.Y.Floor() - fontFace.Metrics().Ascent.Floor()
-			for px := 0; px < ssize; px++ {
-				img.Set(px, y, clr)
-			}
-		}
-		if strings.Contains(decoration, "line-through") {
-			y := fntDrawer.Dot.Y.Floor() - (fontFace.Metrics().Ascent.Floor() / 2)
-			for px := 0; px < ssize; px++ {
-				img.Set(px, y, clr)
-			}
-		}
-	}
+	}()
 
 	if whitespace == "pre" {
 		fntDrawer.DrawString(lines[0])
@@ -216,6 +218,10 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 			dot = (int(fntDrawer.Dot.X) >> 6) + fSize
 		default:
 			dot = (int(fntDrawer.Dot.X) >> 6) + (fSize / 3)
+		}
+		ssize = int(fntDrawer.Dot.X) >> 6
+		if i == len(words)-1 {
+			break
 		}
 		fntDrawer.Dot.X = fixed.Int26_6(dot << 6)
 	}
@@ -328,6 +334,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 
 	firstLine := true
 	imageMap := NewImageMap()
+	collapsablemargin := 0
 	for c := e.FirstChild; c != nil; c = c.NextSibling {
 		c.ViewportHeight = e.ViewportHeight
 		if dot.X < leftFloatStack.Width() {
@@ -442,7 +449,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				}
 				childContent, newDot := c.LayoutPass(width, image.ZR, dot, leftFloatStack, rightFloatStack, nextline)
 				c.ContentOverlay = childContent
-				_, contentbox := c.calcCSSBox(childContent)
+				_, contentbox := c.calcCSSBox(childContent, 0)
 				c.BoxContentRectangle = contentbox
 				//cr := image.Rectangle{contentStart, contentStart.Add(contentBounds.Size())}
 				overlayed.GrowBounds(contentbox)
@@ -482,9 +489,26 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				// draw the border, background, and CSS outer box.
 				var lh int
 				cdot := image.Point{}
+
+				// Collapse margins before doing layout
+				if display != "inline-block" {
+					if collapsablemargin != 0 {
+						fmt.Println("Margin was", collapsablemargin)
+						tm := c.GetMarginTopSize()
+						if tm > collapsablemargin {
+							collapsablemargin = tm
+						}
+						fmt.Printf("Collapsing margin to %v", collapsablemargin)
+						dot.Y -= collapsablemargin
+					} else {
+						collapsablemargin = c.GetMarginBottomSize()
+					}
+				} else {
+					collapsablemargin = 0
+				}
 				childContent, _ := c.LayoutPass(width, image.ZR, &cdot, nil, nil, &lh)
 				c.ContentOverlay = childContent
-				box, contentbox := c.calcCSSBox(childContent)
+				box, contentbox := c.calcCSSBox(childContent, collapsablemargin)
 				c.BoxContentRectangle = contentbox
 				sr := box.Bounds()
 

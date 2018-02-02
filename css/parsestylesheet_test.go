@@ -32,6 +32,13 @@ func TestParseStylesheet(t *testing.T) {
 				StyleRule{Selector: "a", Name: "display", Value: StyleValue{"inline", false}},
 			},
 		},
+		{
+			"p { margin: 1.12em 0; }",
+			Stylesheet{
+				// This gets expanded from the shorthand when applying to an element
+				StyleRule{Selector: "p", Name: "margin", Value: StyleValue{"1.12em 0", false}},
+			},
+		},
 	}
 	for i, tc := range tests {
 		style := ParseStylesheet(tc.Stylesheet, 0)
