@@ -101,7 +101,7 @@ func (e *RenderableDomElement) Walk(callback func(*RenderableDomElement)) {
 	}
 }
 
-func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent string) (img *image.RGBA, unconsumed string) {
+func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent string, force bool) (img *image.RGBA, consumed, unconsumed string) {
 	switch e.GetTextTransform() {
 	case "capitalize":
 		textContent = strings.Title(textContent)
@@ -192,13 +192,15 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 	for i, word := range words {
 		wordSizeInPx := fntDrawer.MeasureString(word).Ceil()
 		if dot+wordSizeInPx > remainingWidth && whitespace != "nowrap" {
-			if i == 0 {
+			if i == 0 && force {
 				// make sure at least one word gets consumed to avoid an infinite loop.
 				// this isn't ideal, since some words will disappear, but if we reach this
 				// point we're already in a pretty bad state..
 				unconsumed = strings.Join(words[i+1:], " ")
+				consumed = words[0]
 			} else {
 				unconsumed = strings.Join(words[i:], " ")
+				consumed = strings.Join(words[:i], " ")
 			}
 			return
 		}
@@ -217,12 +219,14 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 		fntDrawer.Dot.X = fixed.Int26_6(dot << 6)
 	}
 	unconsumed = ""
+	consumed = textContent
 	return
 }
 
 func (e *RenderableDomElement) Render(containerWidth int) image.Image {
 	leftFloatStack, rightFloatStack := make(FloatStack, 0), make(FloatStack, 0)
-	e.LayoutPass(containerWidth, image.ZR, image.Point{0, 0}, leftFloatStack, rightFloatStack)
+	var lh int
+	e.LayoutPass(containerWidth, image.ZR, image.Point{0, 0}, leftFloatStack, rightFloatStack, &lh)
 	return e.DrawPass()
 }
 
@@ -237,7 +241,7 @@ func (e *RenderableDomElement) Render(containerWidth int) image.Image {
 // to draw at.), and it returns both an image, and the final location of dot after drawing the element. This is
 // required because inline elements might render multiple line blocks, and the whole inline isn't necessarily
 // square, so you can't just take the bounds of the rendered image.
-func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle, dot image.Point, leftFloatStack, rightFloatStack FloatStack) (image.Image, image.Point) {
+func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle, dot image.Point, leftFloatStack, rightFloatStack FloatStack, nextline *int) (image.Image, image.Point) {
 	var overlayed *DynamicMemoryDrawer
 	defer func() {
 		if overlayed != nil {
@@ -253,6 +257,9 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 	e.containerWidth = containerWidth
 
 	height := e.GetMinHeight()
+	if lh := e.GetLineHeight(); lh > *nextline {
+		*nextline = lh
+	}
 
 	// special cases
 	if e.Type == html.ElementNode {
@@ -331,7 +338,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 						rfHeight := rightFloatStack.NextFloatHeight()
 						if len(leftFloatStack) == 0 && len(rightFloatStack) == 0 {
 							dot.X = 0
-							dot.Y += e.GetLineHeight()
+							dot.Y += *nextline
 							//panic("Not enough space to render any element and no floats to remove.")
 						}
 
@@ -355,7 +362,10 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 						rfWidth = rightFloatStack.Width()
 					}
 				}
-				childImage, rt := c.renderLineBox(width-dot.X-rfWidth, remainingTextContent)
+				childImage, consumed, rt := c.renderLineBox(width-dot.X-rfWidth, remainingTextContent, false)
+				if consumed == "" && dot.X == 0 {
+					childImage, consumed, rt = c.renderLineBox(width-dot.X-rfWidth, remainingTextContent, true)
+				}
 				remainingTextContent = rt
 				sr := childImage.Bounds()
 				r := image.Rectangle{dot, dot.Add(sr.Size())}
@@ -364,7 +374,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				c.lineBoxes = append(c.lineBoxes, lineBox{childImage, dot})
 				switch e.GetWhiteSpace() {
 				case "pre":
-					dot.Y += e.GetLineHeight()
+					dot.Y += *nextline
 					dot.X = lfWidth
 				case "nowrap":
 					fallthrough // dot.X = r.Max.X
@@ -373,7 +383,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				default:
 					if r.Max.X >= width-rfWidth {
 						// there's no space left on this line, so advance dot to the next line.
-						dot.Y += e.GetLineHeight()
+						dot.Y += *nextline
 						// clear the floats that have been passed, and then move dot to the edge
 						// of the left float.
 						leftFloatStack = leftFloatStack.ClearFloats(dot)
@@ -394,7 +404,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 		case html.ElementNode:
 			if c.Data == "br" {
 				dot.X = 0
-				dot.Y += c.GetLineHeight()
+				dot.Y += *nextline
 				continue
 			}
 			switch display := c.GetDisplayProp(); display {
@@ -409,27 +419,13 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 					dot.X += c.GetTextIndent(width)
 					firstLine = false
 				}
-				childContent, newDot := c.LayoutPass(width, image.ZR, dot, leftFloatStack, rightFloatStack)
+				childContent, newDot := c.LayoutPass(width, image.ZR, dot, leftFloatStack, rightFloatStack, nextline)
 				c.ContentOverlay = childContent
 				_, contentbox := c.calcCSSBox(childContent)
 				c.BoxContentRectangle = contentbox
 				//cr := image.Rectangle{contentStart, contentStart.Add(contentBounds.Size())}
 				overlayed.GrowBounds(contentbox)
 
-				/*
-					if layoutPass == false {
-						c.ContentOverlay = childContent
-						bounds := childContent.Bounds()
-						draw.Draw(
-							dst,
-							image.Rectangle{image.ZP, bounds.Max},
-							c.ContentOverlay,
-							bounds.Min,
-							draw.Over,
-						)
-
-					}
-				*/
 				// Populate this image map. This is an inline, so we actually only care
 				// about the line boxes that were generated by the children.
 				childImageMap := c.ImageMap
@@ -463,7 +459,8 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				}
 
 				// draw the border, background, and CSS outer box.
-				childContent, _ := c.LayoutPass(width, image.ZR, image.ZP, nil, nil) //leftFloatStack, rightFloatStack)
+				var lh int
+				childContent, _ := c.LayoutPass(width, image.ZR, image.ZP, nil, nil, &lh)
 				c.ContentOverlay = childContent
 				box, contentbox := c.calcCSSBox(childContent)
 				c.BoxContentRectangle = contentbox
