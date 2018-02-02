@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/driusan/Gob/css"
 	"github.com/driusan/Gob/dom"
+	"unicode"
 	"github.com/driusan/Gob/net"
 	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
@@ -155,16 +156,24 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 		}
 	}
 	lineheight := e.GetLineHeight()
+	start := 0
+	if unicode.IsSpace(rune(textContent[0])) {
+			start = (fSize / 3)
+			ssize += start
+	}
+	if unicode.IsSpace(rune(textContent[len(textContent)-1])) {
+			ssize += (fSize / 3)
+	}
 	img = image.NewRGBA(image.Rectangle{image.ZP, image.Point{ssize, lineheight}})
 
 	//BUG(driusan): This math is wrong
-	fntDrawer.Dot = fixed.P(0, fontFace.Metrics().Ascent.Floor())
+	fntDrawer.Dot = fixed.P(start, fontFace.Metrics().Ascent.Floor())
 	fntDrawer.Dst = img
 
 	defer func() {
 		if decoration := e.GetTextDecoration(); decoration != "" && decoration != "none" && decoration != "blink" {
 			if strings.Contains(decoration, "underline") {
-				y := fntDrawer.Dot.Y.Floor()
+				y := fntDrawer.Dot.Y.Floor() + 1
 				for px := 0; px < ssize; px++ {
 					img.Set(px, y, clr)
 				}
@@ -344,6 +353,9 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 		switch c.Type {
 
 		case html.TextNode:
+			if strings.TrimSpace(c.Data) == "" {
+				continue
+			}
 			// text nodes are inline elements that didn't match
 			// anything when adding styles, but that's okay,
 			// because their style should be identical to their
@@ -360,7 +372,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				firstLine = false
 			}
 
-			remainingTextContent := strings.TrimSpace(c.Data)
+			remainingTextContent := c.Data
 			whitespace := e.GetWhiteSpace()
 			for remainingTextContent != "" {
 				if whitespace == "normal" {
