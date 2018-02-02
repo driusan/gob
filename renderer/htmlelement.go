@@ -63,7 +63,8 @@ type RenderableDomElement struct {
 
 	lineBoxes []lineBox
 
-	resolver net.URLReader
+	resolver   net.URLReader
+	layoutDone bool
 }
 
 func (e RenderableDomElement) String() string {
@@ -226,8 +227,27 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 func (e *RenderableDomElement) Render(containerWidth int) image.Image {
 	leftFloatStack, rightFloatStack := make(FloatStack, 0), make(FloatStack, 0)
 	var lh int
-	e.LayoutPass(containerWidth, image.ZR, image.Point{0, 0}, leftFloatStack, rightFloatStack, &lh)
+	e.LayoutPass(containerWidth, image.ZR, &image.Point{0, 0}, leftFloatStack, rightFloatStack, &lh)
 	return e.DrawPass()
+}
+
+func (e *RenderableDomElement) InvalidateLayout() {
+	if e == nil {
+		return
+	}
+	e.layoutDone = false
+	e.OverlayedContent = nil
+	e.CSSOuterBox = nil
+	e.ContentOverlay = nil
+
+	e.lineBoxes = nil
+
+	if e.FirstChild != nil {
+		e.FirstChild.InvalidateLayout()
+	}
+	for sib := e.NextSibling; sib != nil; sib = sib.NextSibling {
+		sib.InvalidateLayout()
+	}
 }
 
 // realRender either calculates the size of elements, or draws them, depending on if it's a layoutPass
@@ -241,14 +261,18 @@ func (e *RenderableDomElement) Render(containerWidth int) image.Image {
 // to draw at.), and it returns both an image, and the final location of dot after drawing the element. This is
 // required because inline elements might render multiple line blocks, and the whole inline isn't necessarily
 // square, so you can't just take the bounds of the rendered image.
-func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle, dot image.Point, leftFloatStack, rightFloatStack FloatStack, nextline *int) (image.Image, image.Point) {
+func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle, dot *image.Point, leftFloatStack, rightFloatStack FloatStack, nextline *int) (image.Image, image.Point) {
 	var overlayed *DynamicMemoryDrawer
+	if e.layoutDone {
+		return e.OverlayedContent, image.Point{}
+	}
 	defer func() {
 		if overlayed != nil {
 			e.OverlayedContent = image.NewRGBA(overlayed.Bounds())
 		} else {
 			e.OverlayedContent = image.NewRGBA(image.ZR)
 		}
+		e.layoutDone = true
 	}()
 	e.RenderAbort = make(chan bool)
 
@@ -268,7 +292,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 			var loadedImage bool
 			for _, attr := range e.Attr {
 				if loadedImage {
-					return e.ContentOverlay, dot
+					return e.ContentOverlay, *dot
 				}
 				switch attr.Key {
 				case "src":
@@ -339,22 +363,19 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 						if len(leftFloatStack) == 0 && len(rightFloatStack) == 0 {
 							dot.X = 0
 							dot.Y += *nextline
-							//panic("Not enough space to render any element and no floats to remove.")
 						}
 
 						if lfHeight <= 0 && rfHeight <= 0 {
 							remainingTextContent = ""
 							continue
-
-							//panic("Floats don't have any height to clear")
 						}
 						if lfHeight > 0 && lfHeight < rfHeight {
 							dot.Y += lfHeight + 1
-							leftFloatStack = leftFloatStack.ClearFloats(dot)
+							leftFloatStack = leftFloatStack.ClearFloats(*dot)
 							dot.X = leftFloatStack.Width()
 						} else if rfHeight > 0 {
 							dot.Y += rfHeight + 1
-							rightFloatStack = rightFloatStack.ClearFloats(dot)
+							rightFloatStack = rightFloatStack.ClearFloats(*dot)
 						} else {
 							panic("Clearing floats didn't make any space.")
 						}
@@ -368,10 +389,10 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				}
 				remainingTextContent = rt
 				sr := childImage.Bounds()
-				r := image.Rectangle{dot, dot.Add(sr.Size())}
+				r := image.Rectangle{*dot, dot.Add(sr.Size())}
 				overlayed.GrowBounds(r)
 
-				c.lineBoxes = append(c.lineBoxes, lineBox{childImage, dot})
+				c.lineBoxes = append(c.lineBoxes, lineBox{childImage, *dot})
 				switch e.GetWhiteSpace() {
 				case "pre":
 					dot.Y += *nextline
@@ -386,8 +407,8 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 						dot.Y += *nextline
 						// clear the floats that have been passed, and then move dot to the edge
 						// of the left float.
-						leftFloatStack = leftFloatStack.ClearFloats(dot)
-						rightFloatStack = rightFloatStack.ClearFloats(dot)
+						leftFloatStack = leftFloatStack.ClearFloats(*dot)
+						rightFloatStack = rightFloatStack.ClearFloats(*dot)
 						lfWidth = leftFloatStack.Width()
 						rfWidth = rightFloatStack.Width()
 
@@ -460,13 +481,14 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 
 				// draw the border, background, and CSS outer box.
 				var lh int
-				childContent, _ := c.LayoutPass(width, image.ZR, image.ZP, nil, nil, &lh)
+				cdot := image.Point{}
+				childContent, _ := c.LayoutPass(width, image.ZR, &cdot, nil, nil, &lh)
 				c.ContentOverlay = childContent
 				box, contentbox := c.calcCSSBox(childContent)
 				c.BoxContentRectangle = contentbox
 				sr := box.Bounds()
 
-				r := image.Rectangle{dot, dot.Add(sr.Size())}
+				r := image.Rectangle{*dot, dot.Add(sr.Size())}
 
 				switch float {
 				case "right":
@@ -506,7 +528,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				// add the grandchildren
 				for _, area := range childImageMap {
 					// translate the coordinate systems from the child's to this one
-					newArea := area.Area.Add(dot).Add(contentbox.Min)
+					newArea := area.Area.Add(*dot).Add(contentbox.Min)
 					imageMap.Add(area.Content, newArea)
 				}
 
@@ -538,12 +560,12 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 
 		}
 		if float == "none" {
-			leftFloatStack = leftFloatStack.ClearFloats(dot)
-			rightFloatStack = rightFloatStack.ClearFloats(dot)
+			leftFloatStack = leftFloatStack.ClearFloats(*dot)
+			rightFloatStack = rightFloatStack.ClearFloats(*dot)
 		}
 	}
 	e.ImageMap = imageMap
-	return overlayed, dot
+	return overlayed, *dot
 }
 
 // realRender either calculates the size of elements, or draws them, depending on if it's a layoutPass

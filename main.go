@@ -184,6 +184,7 @@ func main() {
 				if e.PixelsPerPt != 0 {
 					css.PixelsPerPt = float64(e.PixelsPerPt)
 				}
+				page.Content.InvalidateLayout()
 				renderNewPageIntoViewport(s, w, &v, page)
 			case touch.Event:
 				fmt.Printf("Touch event!")
@@ -248,6 +249,7 @@ func loadNewPage(context *url.URL, path string) (parser.Page, error) {
 	}
 	defer r.Close()
 	p := parser.LoadPage(r, loader, newURL)
+	p.Content.InvalidateLayout()
 	background = p.Background
 	return p, nil
 }
