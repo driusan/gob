@@ -129,7 +129,13 @@ func recursiveParentMatches(el *html.Node, selectorPieces []string) bool {
 	case 0:
 		return false
 	case 1:
-		return matchBasicSelector(el, selectorPieces[0])
+		if matchBasicSelector(el, selectorPieces[0]) {
+			return true
+		}
+		if el == nil {
+			return false
+		}
+		return recursiveParentMatches(el.Parent, selectorPieces)
 	default:
 		lastSelector := selectorPieces[len(selectorPieces)-1]
 		otherSelectors := selectorPieces[0 : len(selectorPieces)-1]
@@ -141,6 +147,9 @@ func recursiveParentMatches(el *html.Node, selectorPieces []string) bool {
 }
 func (s CSSSelector) Matches(el *html.Node) bool {
 	pieces := strings.Fields(string(s))
+	if len(pieces) <= 1 {
+		return matchBasicSelector(el, pieces[0])
+	}
 	return recursiveParentMatches(el, pieces)
 }
 

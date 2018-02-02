@@ -171,22 +171,18 @@ func TestCSS1ParentSelector(t *testing.T) {
 	//</div>
 	rule := StyleRule{Selector: "h1"}
 	if rule.Matches(h1) != true {
-		print("Did not match simple h1 selector\n")
-		t.Fail()
+		t.Error("Did not match simple h1 selector")
 	}
 	rule.Selector = "div h1"
 	if rule.Matches(h1) != true {
-		print("Did not match parent div selector\n")
-		t.Fail()
+		t.Error("Did not match parent div selector")
 	}
 	rule.Selector = ".header h1"
 	if rule.Matches(h1) != true {
-		print("Did not match parent div selector by class\n")
-		t.Fail()
+		t.Error("Did not match parent div selector by class")
 	}
 	rule.Selector = ".site h1"
-	if rule.Matches(h1) != false {
-		print("Simple parent selector matched higher than parent element.\n")
-		t.Fail()
+	if rule.Matches(h1) != true {
+		t.Error("Ancestor selector did not grandparent")
 	}
 }
