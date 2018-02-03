@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/driusan/Gob/css"
 	"github.com/driusan/Gob/dom"
-	"unicode"
 	"github.com/driusan/Gob/net"
 	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
@@ -17,6 +16,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"unicode"
 	//"strconv"
 )
 
@@ -158,11 +158,11 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 	lineheight := e.GetLineHeight()
 	start := 0
 	if unicode.IsSpace(rune(textContent[0])) {
-			start = (fSize / 3)
-			ssize += start
+		start = (fSize / 3)
+		ssize += start
 	}
 	if unicode.IsSpace(rune(textContent[len(textContent)-1])) {
-			ssize += (fSize / 3)
+		ssize += (fSize / 3)
 	}
 	img = image.NewRGBA(image.Rectangle{image.ZP, image.Point{ssize, lineheight}})
 
@@ -254,14 +254,13 @@ func (e *RenderableDomElement) InvalidateLayout() {
 	e.OverlayedContent = nil
 	e.CSSOuterBox = nil
 	e.ContentOverlay = nil
-
 	e.lineBoxes = nil
 
 	if e.FirstChild != nil {
 		e.FirstChild.InvalidateLayout()
 	}
-	for sib := e.NextSibling; sib != nil; sib = sib.NextSibling {
-		sib.InvalidateLayout()
+	if e.NextSibling != nil {
+		e.NextSibling.InvalidateLayout()
 	}
 }
 
@@ -307,6 +306,12 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 			var loadedImage bool
 			for _, attr := range e.Attr {
 				if loadedImage {
+					_, contentbox := e.calcCSSBox(e.ContentOverlay, 0)
+					e.BoxContentRectangle = contentbox
+					//cr := image.Rectangle{contentStart, contentStart.Add(contentBounds.Size())}
+					overlayed.GrowBounds(contentbox)
+					fmt.Println(e.ContentOverlay.Bounds())
+					fmt.Println(contentbox.Bounds())
 					return e.ContentOverlay, *dot
 				}
 				switch attr.Key {
@@ -323,16 +328,28 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 					if err != nil {
 						panic(err)
 					}
-					if code <= 200 || code >= 300 {
+					if code < 200 || code >= 300 {
+						fmt.Println("Error", code)
 						continue
 					}
 					content, format, err := image.Decode(r)
 					if err == nil {
 						e.ContentOverlay = content
+						size := content.Bounds().Size()
+						if e.Styles.Width.GetValue() == "" {
+							e.Styles.Width = css.NewPxValue(size.X)
+						}
+						if e.Styles.Height.GetValue() == "" {
+							e.Styles.Height = css.NewPxValue(size.Y)
+						}
+						width = size.X
+						height = size.Y
+						overlayed = NewDynamicMemoryDrawer(image.Rectangle{image.ZP, image.Point{width, height}})
+						fmt.Println("Loaded", attr.Val, width, height)
 					} else {
-						fmt.Fprintf(os.Stderr, "Unknown image format: %s Err: %s", format, err)
+						fmt.Fprintf(os.Stderr, "Unknown image format: %s Err: %s\n", format, err)
+						e.ContentOverlay = image.NewRGBA(image.ZR)
 					}
-
 					loadedImage = true
 				}
 			}
@@ -485,7 +502,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				}
 				dot.X = newDot.X
 				dot.Y = newDot.Y
-			case "block", "inline-block", "table", "table-inline":
+			case "block", "inline-block", "table", "table-inline", "list-item":
 				if dot.X != 0 && display != "inline-block" {
 					// This means the previous child was an inline item, and we should position dot
 					// as if there were an implicit box around it.
@@ -505,12 +522,10 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				// Collapse margins before doing layout
 				if display != "inline-block" {
 					if collapsablemargin != 0 {
-						fmt.Println("Margin was", collapsablemargin)
 						tm := c.GetMarginTopSize()
 						if tm > collapsablemargin {
 							collapsablemargin = tm
 						}
-						fmt.Printf("Collapsing margin to %v", collapsablemargin)
 						dot.Y -= collapsablemargin
 					} else {
 						collapsablemargin = c.GetMarginBottomSize()
@@ -518,7 +533,8 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				} else {
 					collapsablemargin = 0
 				}
-				childContent, _ := c.LayoutPass(width, image.ZR, &cdot, nil, nil, &lh)
+				var childContent image.Image
+				childContent, _ = c.LayoutPass(width, image.ZR, &cdot, nil, nil, &lh)
 				c.ContentOverlay = childContent
 				box, contentbox := c.calcCSSBox(childContent, collapsablemargin)
 				c.BoxContentRectangle = contentbox
@@ -534,7 +550,6 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 						Min: image.Point{rightFloatX - size.X, dot.Y},
 						Max: image.Point{rightFloatX, size.Y + dot.Y},
 					}
-					//c.BoxContentOrigin = contentorigin.Add(image.Point{rightFloatX - size.X, 0})
 				case "left":
 					size := sr.Size()
 					leftFloatX := leftFloatStack.Width()
@@ -542,7 +557,6 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 						Min: image.Point{leftFloatX, dot.Y},
 						Max: image.Point{leftFloatX + size.X, size.Y + dot.Y},
 					}
-					//c.BoxContentOrigin = contentorigin.Add(image.Point{leftFloatX, 0})
 				}
 				overlayed.GrowBounds(r)
 				c.BoxDrawRectangle = r
@@ -616,22 +630,13 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 // required because inline elements might render multiple line blocks, and the whole inline isn't necessarily
 // square, so you can't just take the bounds of the rendered image.
 func (e *RenderableDomElement) DrawPass() image.Image {
-	// special cases
 	if e.Type == html.ElementNode {
 		switch strings.ToLower(e.Data) {
 		case "img":
-			// this was retrieved and decoded in the layout pass in order to get the
-			// size. There's no need to redo it.
-			// FIXME: Removing this and going into the normal path causes a panic.
-			//        That shouldn't be the case.
 			return e.ContentOverlay
 		}
 	}
-
 	for c := e.FirstChild; c != nil; c = c.NextSibling {
-		if e.FirstPageOnly && c.BoxDrawRectangle.Min.Y > e.ViewportHeight {
-			return e.OverlayedContent
-		}
 		switch c.Type {
 
 		case html.TextNode:
@@ -664,7 +669,7 @@ func (e *RenderableDomElement) DrawPass() image.Image {
 					bounds.Min,
 					draw.Over,
 				)
-			case "block":
+			case "block", "list-item":
 				/*				fallthrough
 								default: */
 				// draw the border, background, and CSS outer box.

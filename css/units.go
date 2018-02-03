@@ -3,6 +3,7 @@ package css
 import (
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"image/color"
 	"strconv"
 	"strings"
@@ -21,6 +22,11 @@ func init() {
 	// Assume 96 DPI unless someone tells us otherwise at this resolution.
 	PixelsPerPt = (96.0 / 72.0)
 }
+
+func NewPxValue(x int) StyleValue {
+	return StyleValue{fmt.Sprintf("%dpx", x), false}
+}
+
 func ConvertUnitToPx(fontsize int, percentbasis int, cssString string) (int, error) {
 	if len(cssString) < 2 {
 		return fontsize, Invalid

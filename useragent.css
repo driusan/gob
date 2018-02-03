@@ -60,7 +60,6 @@ ul ul, ol ol    { margin-top: 0; margin-bottom: 0 }
 u, ins          { text-decoration: underline }
 br:before       { content: "\A"; white-space: pre-line }
 center          { text-align: center }
-a { text-decoration: underline; }
 :link, :visited { text-decoration: underline }
 :focus          { outline: thin dotted invert }
 
@@ -71,10 +70,7 @@ BDO[DIR="rtl"]  { direction: rtl; unicode-bidi: bidi-override }
 *[DIR="ltr"]    { direction: ltr; unicode-bidi: embed }
 *[DIR="rtl"]    { direction: rtl; unicode-bidi: embed }
 
-noscript {
-	display: block;
-}
-
-script {
-	display: none;
-}
+a { text-decoration: underline; }
+img { display: block; }
+noscript { display: block; }
+script { display: none; }

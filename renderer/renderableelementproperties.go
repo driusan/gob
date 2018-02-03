@@ -168,7 +168,7 @@ func (e RenderableDomElement) GetDisplayProp() string {
 			case "list-item":
 				// FIXME: This should generate a principle box and a marker box,
 				// but for now just pretending it's a block simplifies things
-				return "block"
+				return "list-item"
 			default:
 				return cssVal
 
