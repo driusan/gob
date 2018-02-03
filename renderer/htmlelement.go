@@ -657,7 +657,7 @@ func (e *RenderableDomElement) DrawPass() image.Image {
 				continue
 			default:
 				fallthrough
-			case "inline":
+			case "inline", "inline-block":
 				childContent := c.DrawPass()
 
 				c.ContentOverlay = childContent
@@ -669,7 +669,7 @@ func (e *RenderableDomElement) DrawPass() image.Image {
 					bounds.Min,
 					draw.Over,
 				)
-			case "list-item", "table":
+			case "list-item", "table", "table-inline":
 				// Hacks which are displayed as blocks because they're not implemented
 				fallthrough
 			case "block":

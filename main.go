@@ -108,7 +108,7 @@ func main() {
 
 	}
 
-	page, err := loadPage(filename)
+	page, err := loadNewPage(nil, filename)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %s\n", err.Error())
 		return
@@ -248,6 +248,7 @@ func loadNewPage(context *url.URL, path string) (parser.Page, error) {
 	}
 	defer r.Close()
 	p := parser.LoadPage(r, loader, newURL)
+	p.URL = newURL
 	p.Content.InvalidateLayout()
 	background = p.Background
 	return p, nil

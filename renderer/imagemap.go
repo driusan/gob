@@ -17,7 +17,7 @@ func NewImageMap() ImageMap {
 }
 
 func (imap ImageMap) At(x, y int) *RenderableDomElement {
-	var candidate *RenderableDomElement =nil
+	var candidate *RenderableDomElement = nil
 	for i := len(imap) - 1; i >= 0; i-- {
 		area := imap[i]
 		p := image.Point{x, y}

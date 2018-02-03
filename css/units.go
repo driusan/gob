@@ -286,8 +286,8 @@ func IsLength(l string) bool {
 
 func IsBorderStyle(s string) bool {
 	switch s {
-		case "none", "hidden", "dotted", "dashed", "solid", "double",
-		"groove","ridge","inset","outset":
+	case "none", "hidden", "dotted", "dashed", "solid", "double",
+		"groove", "ridge", "inset", "outset":
 		return true
 	}
 	return false

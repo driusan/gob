@@ -2,10 +2,10 @@ package css
 
 import (
 	"fmt"
-	"os"
 	"github.com/driusan/fonts"
 	"github.com/golang/freetype/truetype"
 	"golang.org/x/image/font"
+	"os"
 	//"golang.org/x/image/font/basicfont"
 	"image/color"
 	//"io/ioutil"
