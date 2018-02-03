@@ -2,10 +2,13 @@ package css
 
 import (
 	"fmt"
-	//"Gob/dom"
+	"io/ioutil"
+	"net/url"
+	"strings"
+
+	"github.com/driusan/Gob/net"
 	"github.com/gorilla/css/scanner"
 	"golang.org/x/net/html"
-	"strings"
 )
 
 type StyleRule struct {
@@ -63,10 +66,12 @@ type parsingContext uint8
 
 const (
 	matchingUnknown = parsingContext(iota)
+	startContext
 	matchingSelector
 	matchingAttribute
 	matchingValue
 	appendingSelector // The next TokenIdent should be appended to the current selector
+	atImport
 )
 
 func appendStyles(s []StyleRule, selectors []CSSSelector, attr StyleAttribute, val StyleValue, src StyleSource) ([]StyleRule, error) {
@@ -84,28 +89,27 @@ func appendStyles(s []StyleRule, selectors []CSSSelector, attr StyleAttribute, v
 	return s, nil
 }
 
-func ParseStylesheet(val string, src StyleSource) Stylesheet {
+func ParseStylesheet(val string, src StyleSource, importLoader net.URLReader, urlContext *url.URL) Stylesheet {
 	s := make([]StyleRule, 0)
 
 	var blockSelectors []CSSSelector
 	var curSelector CSSSelector
 	var curAttribute StyleAttribute
 	var curValue StyleValue
-	var context parsingContext = matchingSelector
+	var context parsingContext = startContext
 	spaceIfMatch := false
+	var importURL *url.URL
 	scn := scanner.New(val)
 	for {
 		token := scn.Next()
 		if token.Type == scanner.TokenEOF {
 			break
 		}
-		//fmt.Printf("Token: %v\n", token)
 		switch token.Type {
 		// Different kinds of comments
 		case scanner.TokenCDO, scanner.TokenCDC:
 			continue
 		case scanner.TokenComment:
-			//fmt.Printf("Comment: %v\n")
 			continue
 		case scanner.TokenS:
 			switch context {
@@ -121,7 +125,7 @@ func ParseStylesheet(val string, src StyleSource) Stylesheet {
 			continue
 		case scanner.TokenIdent:
 			switch context {
-			case matchingSelector:
+			case startContext, matchingSelector:
 				curSelector = CSSSelector(token.Value)
 				spaceIfMatch = false
 			case appendingSelector:
@@ -145,12 +149,9 @@ func ParseStylesheet(val string, src StyleSource) Stylesheet {
 					}
 				}
 			}
-			//fmt.Printf("TokenIdent: %s\n", token.Value)
-			//curSelector = CSSSelector(token.Value)
-			//matchingSelectors = true
 		case scanner.TokenChar:
 			switch context {
-			case matchingSelector, appendingSelector:
+			case startContext, matchingSelector, appendingSelector:
 				switch token.Value {
 				case ",":
 					if curSelector != "" {
@@ -240,8 +241,39 @@ func ParseStylesheet(val string, src StyleSource) Stylesheet {
 					curValue = StyleValue{}
 					context = matchingSelector
 				}
+			case atImport:
+				switch token.Value {
+				case ";":
+					// Pretend we're at the start so future
+					// import lines succeed
+					context = startContext
+					r, resp, err := importLoader.GetURL(importURL)
+					if err != nil {
+						continue
+					}
+					defer r.Close()
+					if resp < 200 || resp >= 300 {
+						continue
+					}
+					styles, err := ioutil.ReadAll(r)
+					if err != nil {
+						continue
+					}
+					news := ParseStylesheet(string(styles), src, importLoader, importURL)
+					s = append(s, news...)
+				}
 			}
-		case scanner.TokenString, scanner.TokenHash, scanner.TokenNumber:
+		case scanner.TokenString:
+			if context == atImport {
+				undecorated := token.Value[1 : len(token.Value)-1]
+				iu, err := url.Parse(undecorated)
+				if err != nil {
+					continue
+				}
+				importURL = urlContext.ResolveReference(iu)
+			}
+			fallthrough
+		case scanner.TokenHash, scanner.TokenNumber:
 			switch context {
 			case matchingSelector, appendingSelector:
 				curSelector += CSSSelector(token.Value)
@@ -255,7 +287,6 @@ func ParseStylesheet(val string, src StyleSource) Stylesheet {
 						spaceIfMatch = false
 					}
 					curValue.string += token.Value
-
 				}
 
 			}
@@ -263,7 +294,7 @@ func ParseStylesheet(val string, src StyleSource) Stylesheet {
 			scanner.TokenSuffixMatch, scanner.TokenSubstringMatch,
 			scanner.TokenDashMatch, scanner.TokenFunction:
 			switch context {
-			case matchingSelector, appendingSelector:
+			case startContext, matchingSelector, appendingSelector:
 				curSelector += CSSSelector(token.Value)
 				spaceIfMatch = false
 			case matchingValue:
@@ -275,7 +306,18 @@ func ParseStylesheet(val string, src StyleSource) Stylesheet {
 				}
 
 			}
-		case scanner.TokenDimension, scanner.TokenPercentage, scanner.TokenURI:
+		case scanner.TokenURI:
+			if context == atImport {
+				undecorated := strings.TrimSuffix(strings.TrimPrefix(token.Value, "url("), ")")
+				iu, err := url.Parse(undecorated)
+				if err != nil {
+					continue
+				}
+				importURL = urlContext.ResolveReference(iu)
+				continue
+			}
+			fallthrough
+		case scanner.TokenDimension, scanner.TokenPercentage:
 			switch context {
 			case matchingValue:
 				if curValue.string == "" {
@@ -288,12 +330,16 @@ func ParseStylesheet(val string, src StyleSource) Stylesheet {
 					curValue.string += token.Value
 				}
 			}
+		case scanner.TokenAtKeyword:
+			if token.Value == "@import" {
+				context = atImport
+			}
+		case scanner.TokenError:
+			fallthrough
 		default:
 			fmt.Printf("%s = %s: %v\n", token.Type, token.Value, token)
 		}
-
 	}
-	//fmt.Printf("Selectors for block: %s\n", blockSelectors)
 	return s
 }
 

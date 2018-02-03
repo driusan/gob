@@ -1,10 +1,11 @@
 package css
 
 import (
-	"github.com/driusan/Gob/net"
-	"golang.org/x/net/html"
 	"io/ioutil"
 	"net/url"
+
+	"github.com/driusan/Gob/net"
+	"golang.org/x/net/html"
 )
 
 // ExtractStyles takes an html Node as input, and extracts the unparsed text
@@ -59,6 +60,5 @@ func ExtractStyles(n *html.Node, loader net.URLReader, context *url.URL) string 
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
 		style += ExtractStyles(c, loader, context)
 	}
-
 	return style
 }

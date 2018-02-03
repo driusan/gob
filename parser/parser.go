@@ -42,12 +42,12 @@ func LoadPage(r io.Reader, loader net.URLReader, urlContext *url.URL) Page {
 		panic("Couldn't find body HTML element")
 	}
 
-	styles2 := css.ParseStylesheet(styles, css.AuthorSrc)
+	styles2 := css.ParseStylesheet(styles, css.AuthorSrc, loader, urlContext)
 
 	renderable, _ := renderer.ConvertNodeToRenderableElement(body, loader)
 
 	sheet, _ := ioutil.ReadFile("useragent.css")
-	userAgentStyles := css.ParseStylesheet(string(sheet), css.UserAgentSrc)
+	userAgentStyles := css.ParseStylesheet(string(sheet), css.UserAgentSrc, loader, urlContext)
 
 	p := Page{
 		Content: renderable,

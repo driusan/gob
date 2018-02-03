@@ -1,7 +1,0 @@
-the renderLineBox is getting the spacing wrong after inline children
-that don't completely fit into one line. 
-
-It's incorrectly applying the text-decoration after an incomplete all
-the way to the end of the line, instead of cutting it off at the end
-of the last word.
-
