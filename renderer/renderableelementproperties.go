@@ -180,8 +180,13 @@ func (e RenderableDomElement) GetDisplayProp() string {
 	return "inline"
 }
 
-func (e RenderableDomElement) GetTextDecoration() string {
+func (e *RenderableDomElement) GetTextDecoration() string {
 	if e.Styles == nil {
+		if e.GetDisplayProp() == "inline" {
+			if e.Parent != nil {
+				return e.Parent.GetTextDecoration()
+			}
+		}
 		return "none"
 	}
 
@@ -189,7 +194,16 @@ func (e RenderableDomElement) GetTextDecoration() string {
 	case "inherit":
 		return e.Parent.GetTextDecoration()
 	default:
-		return strings.TrimSpace(decoration)
+		trimmed := strings.TrimSpace(decoration)
+		if trimmed != "" {
+			return trimmed
+		}
+		if e.GetDisplayProp() == "inline" {
+			if e.Parent != nil {
+				return e.Parent.GetTextDecoration()
+			}
+		}
+		return "none"
 	}
 }
 func (e RenderableDomElement) GetTextTransform() string {

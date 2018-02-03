@@ -71,7 +71,7 @@ BDO[DIR="rtl"]  { direction: rtl; unicode-bidi: bidi-override }
 *[DIR="rtl"]    { direction: rtl; unicode-bidi: embed }
 
 body { margin: 8px; }
-a { text-decoration: underline; }
+a { text-decoration: underline; color: blue; }
 img { display: block; }
 noscript { display: block; }
 script, style { display: none; }
