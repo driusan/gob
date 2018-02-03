@@ -83,8 +83,9 @@ func GetCacheLocation(resource *url.URL) string {
 	if dir == "" {
 		return ""
 	}
-	return filepath.Join(dir, escapeString(resource.Path)+"?"+escapeString(resource.RawQuery))
+	return filepath.Join(dir, escapeString(resource.Path+"?"+resource.RawQuery))
 }
+
 func getCacheReader(u *url.URL) io.ReadCloser {
 	cacheLocation := GetCacheLocation(u)
 	if _, err := os.Stat(cacheLocation); !os.IsNotExist(err) {

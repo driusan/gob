@@ -1,10 +1,11 @@
 package net
 
 import (
-	//	"fmt"
+	"fmt"
 	"io"
 	"os"
-	"strings"
+	//	"strings"
+	"crypto/sha1"
 	//"os/user"
 	"net/url"
 	"path/filepath"
@@ -24,13 +25,14 @@ func (cw *CacheWriter) Close() error {
 }
 
 func escapeString(s string) string {
-	sep := string(os.PathSeparator)
+	//	sep := string(os.PathSeparator)
 	// replace os.PathSeparator (forward slash) with ASCII path separator control character
 	// (034) so that os.Create can create the filename.
 	// This needs to be done instead of creating a directory, because on a web server a portion
 	// of a URL might sometimes be a directory, and sometimes be a file depending on context,
 	// so it can't directly map to the filesystem.
-	return strings.Replace(s, sep, "\034", -1)
+	return fmt.Sprintf("%x", sha1.Sum([]byte(s)))
+	//return strings.Replace(s, sep, "\034", -1)
 }
 func GetCacheWriter(source io.ReadCloser, cachedir string, resource *url.URL) io.ReadCloser {
 	var dir string
@@ -43,7 +45,7 @@ func GetCacheWriter(source io.ReadCloser, cachedir string, resource *url.URL) io
 
 	}
 	if dir != "" {
-		filename := filepath.Join(dir, escapeString(resource.Path)+"?"+escapeString(resource.RawQuery))
+		filename := filepath.Join(dir, escapeString(resource.Path+"?"+resource.RawQuery))
 		writer, _ := os.Create(filename)
 		return &CacheWriter{
 			Tee:     io.TeeReader(source, writer),

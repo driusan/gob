@@ -220,7 +220,6 @@ func main() {
 								}
 							default:
 								if el.Type == html.ElementNode && el.Data == "a" {
-
 									//fmt.Printf("Hovering over link %s\n", el.GetAttribute("href"))
 								}
 								if el.Type == html.ElementNode {
