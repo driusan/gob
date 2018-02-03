@@ -669,9 +669,10 @@ func (e *RenderableDomElement) DrawPass() image.Image {
 					bounds.Min,
 					draw.Over,
 				)
-			case "block", "list-item":
-				/*				fallthrough
-								default: */
+			case "list-item", "table":
+				// Hacks which are displayed as blocks because they're not implemented
+				fallthrough
+			case "block":
 				// draw the border, background, and CSS outer box.
 				childContent := c.DrawPass()
 				c.ContentOverlay = childContent
