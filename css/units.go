@@ -152,10 +152,11 @@ func sHexToUint8(val byte) uint8 {
 	}
 	panic("Invalid character")
 }
+
 func ConvertColorToRGBA(cssString string) (*color.RGBA, error) {
 
 	black := &color.RGBA{0, 0, 0, 255}
-	if cssString[0:3] == "rgb" {
+	if len(cssString) > 3 && cssString[0:3] == "rgb" {
 		tuple := cssString[4 : len(cssString)-1]
 		pieces := strings.Split(tuple, ",")
 		if len(pieces) != 3 {
@@ -167,8 +168,7 @@ func ConvertColorToRGBA(cssString string) (*color.RGBA, error) {
 		bint, _ := strconv.Atoi(strings.TrimSpace(pieces[2]))
 		return &color.RGBA{uint8(rint), uint8(gint), uint8(bint), 255}, nil
 
-	}
-	if cssString[0] == '#' {
+	} else if len(cssString) > 1 && cssString[0] == '#' {
 		switch len(cssString) {
 		case 7:
 			// #RRGGBB
@@ -279,6 +279,15 @@ func IsLength(l string) bool {
 	case "in", "cm", "mm", "pt", "pc", "px":
 		return true
 	case "em", "ex":
+		return true
+	}
+	return false
+}
+
+func IsBorderStyle(s string) bool {
+	switch s {
+		case "none", "hidden", "dotted", "dashed", "solid", "double",
+		"groove","ridge","inset","outset":
 		return true
 	}
 	return false

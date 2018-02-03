@@ -70,7 +70,8 @@ BDO[DIR="rtl"]  { direction: rtl; unicode-bidi: bidi-override }
 *[DIR="ltr"]    { direction: ltr; unicode-bidi: embed }
 *[DIR="rtl"]    { direction: rtl; unicode-bidi: embed }
 
+body { margin: 8px; }
 a { text-decoration: underline; }
 img { display: block; }
 noscript { display: block; }
-script { display: none; }
+script, style { display: none; }

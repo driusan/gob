@@ -2,6 +2,7 @@ package css
 
 import (
 	"fmt"
+	"os"
 	"github.com/driusan/fonts"
 	"github.com/golang/freetype/truetype"
 	"golang.org/x/image/font"
@@ -353,6 +354,23 @@ func (e *StyledElement) expandBoxBorderShorthand(att StyleAttribute, s StyleRule
 	}
 }
 
+func (e *StyledElement) expandBorderShorthand(attrib StyleAttribute, s StyleRule) {
+	values := strings.Fields(s.Value.string)
+	for _, v := range values {
+		if IsLength(v) {
+			s.Value.string = v
+			e.expandBoxBorderShorthand("width", s)
+		} else if IsBorderStyle(v) {
+			s.Value.string = v
+			e.expandBoxBorderShorthand("style", s)
+		} else if IsColor(v) {
+			s.Value.string = v
+			e.expandBoxBorderShorthand("color", s)
+		} else {
+			fmt.Fprintln(os.Stderr, "Didn't know what to do with border property", v)
+		}
+	}
+}
 func (e *StyledElement) expandBoxSideShorthand(attrib StyleAttribute, s StyleRule) {
 	values := strings.Fields(s.Value.string)
 	switch len(values) {
@@ -465,6 +483,8 @@ func (e *StyledElement) expandBackgroundShorthand(s StyleRule) {
 
 func (e *StyledElement) AddStyle(s StyleRule) {
 	switch s.Name {
+	case "border":
+		e.expandBorderShorthand(s.Name, s)
 	case "padding", "margin":
 		e.expandBoxSideShorthand(s.Name, s)
 	case "background":

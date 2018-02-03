@@ -56,7 +56,7 @@ func matchIDAndClassSelector(el *html.Node, s string) bool {
 		matchedId := false
 		for _, attrib := range el.Attr {
 			if attrib.Key == "id" {
-				if attrib.Val == idSelector {
+				if strings.ToLower(attrib.Val) == strings.ToLower(idSelector) {
 					matchedId = true
 				} else {
 					matchedId = false
@@ -74,7 +74,7 @@ func matchIDAndClassSelector(el *html.Node, s string) bool {
 			if attrib.Key == "class" {
 				classes := strings.Fields(attrib.Val)
 				for _, class := range classes {
-					if classSelector == class {
+					if strings.ToLower(classSelector) == strings.ToLower(class) {
 						matchedClass = true
 					}
 				}
