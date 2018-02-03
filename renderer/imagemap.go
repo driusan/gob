@@ -17,14 +17,20 @@ func NewImageMap() ImageMap {
 }
 
 func (imap ImageMap) At(x, y int) *RenderableDomElement {
+	var candidate *RenderableDomElement =nil
 	for i := len(imap) - 1; i >= 0; i-- {
 		area := imap[i]
 		p := image.Point{x, y}
 		if p.In(area.Area) {
-			return area.Content
+			if candidate == nil {
+				candidate = area.Content
+			} else if area.Content.GetFloat() != "none" {
+				candidate = area.Content
+				return candidate.ImageMap.At(x-candidate.BoxDrawRectangle.Min.X, y-candidate.BoxDrawRectangle.Min.Y)
+			}
 		}
 	}
-	return nil
+	return candidate
 }
 
 func (imap *ImageMap) Add(el *RenderableDomElement, location image.Rectangle) {
