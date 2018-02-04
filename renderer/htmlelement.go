@@ -103,7 +103,7 @@ func (e *RenderableDomElement) Walk(callback func(*RenderableDomElement)) {
 	}
 }
 
-func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent string, force bool) (img *image.RGBA, consumed, unconsumed string) {
+func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent string, force bool, inlinesibling bool) (img *image.RGBA, consumed, unconsumed string) {
 	switch e.GetTextTransform() {
 	case "capitalize":
 		textContent = strings.Title(textContent)
@@ -150,7 +150,7 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 		fallthrough
 	default:
 		words = strings.Fields(textContent)
-		ssize, _ = stringSize(fntDrawer, textContent)
+		ssize, _ = stringSize(fntDrawer, strings.TrimSpace(textContent))
 		if ssize > remainingWidth {
 			ssize = remainingWidth
 		}
@@ -166,7 +166,6 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 	}
 	img = image.NewRGBA(image.Rectangle{image.ZP, image.Point{ssize, lineheight}})
 
-	//BUG(driusan): This math is wrong
 	fntDrawer.Dot = fixed.P(start, fontFace.Metrics().Ascent.Floor())
 	fntDrawer.Dst = img
 
@@ -218,6 +217,12 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 		}
 		fntDrawer.DrawString(word)
 
+		if i == len(words)-1 {
+			if !inlinesibling {
+				ssize = int(fntDrawer.Dot.X) >> 6
+			}
+			break
+		}
 		// Add a three per em space between words, an em-quad after a period,
 		// and an en-quad after other punctuation
 		switch word[len(word)-1] {
@@ -228,9 +233,8 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 		default:
 			dot = (int(fntDrawer.Dot.X) >> 6) + (fSize / 3)
 		}
-		ssize = int(fntDrawer.Dot.X) >> 6
-		if i == len(words)-1 {
-			break
+		if !inlinesibling {
+			ssize = int(fntDrawer.Dot.X) >> 6
 		}
 		fntDrawer.Dot.X = fixed.Int26_6(dot << 6)
 	}
@@ -419,9 +423,9 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 						rfWidth = rightFloatStack.Width()
 					}
 				}
-				childImage, consumed, rt := c.renderLineBox(width-dot.X-rfWidth, remainingTextContent, false)
+				childImage, consumed, rt := c.renderLineBox(width-dot.X-rfWidth, remainingTextContent, false, c.NextSibling != nil && c.NextSibling.GetDisplayProp() == "inline")
 				if consumed == "" && dot.X == 0 {
-					childImage, consumed, rt = c.renderLineBox(width-dot.X-rfWidth, remainingTextContent, true)
+					childImage, consumed, rt = c.renderLineBox(width-dot.X-rfWidth, remainingTextContent, true, c.NextSibling != nil && c.NextSibling.GetDisplayProp() == "inline")
 				}
 				remainingTextContent = rt
 				sr := childImage.Bounds()
