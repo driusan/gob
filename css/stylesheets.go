@@ -191,7 +191,6 @@ func ParseStylesheet(val string, src StyleSource, importLoader net.URLReader, ur
 					curAttribute = ""
 					spaceIfMatch = false
 
-					//fmt.Printf("Selectors for block: %s\n", blockSelectors)
 				}
 			case matchingAttribute:
 				switch token.Value {
@@ -331,7 +330,7 @@ func ParseStylesheet(val string, src StyleSource, importLoader net.URLReader, ur
 				}
 			}
 		case scanner.TokenAtKeyword:
-			if token.Value == "@import" {
+			if token.Value == "@import" && context == startContext {
 				context = atImport
 			}
 		case scanner.TokenError:

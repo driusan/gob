@@ -42,8 +42,6 @@ func LoadPage(r io.Reader, loader net.URLReader, urlContext *url.URL) Page {
 		panic("Couldn't find body HTML element")
 	}
 
-	styles2 := css.ParseStylesheet(styles, css.AuthorSrc, loader, urlContext)
-
 	renderable, _ := renderer.ConvertNodeToRenderableElement(body, loader)
 
 	sheet, _ := ioutil.ReadFile("useragent.css")
@@ -62,7 +60,7 @@ func LoadPage(r io.Reader, loader net.URLReader, urlContext *url.URL) Page {
 			}
 		}
 
-		for _, rule := range styles2 {
+		for _, rule := range styles {
 			if rule.Matches((*html.Node)(el.Element)) {
 				el.Styles.AddStyle(rule)
 			}
