@@ -11,7 +11,7 @@ import (
 // ExtractStyles takes an html Node as input, and extracts the unparsed text
 // from any <style> elements in the HTML, returning the string of the style
 // body.
-func ExtractStyles(n *html.Node, loader net.URLReader, context *url.URL) Stylesheet {
+func ExtractStyles(n *html.Node, loader net.URLReader, context *url.URL, orderNo uint) (styles Stylesheet, nextOrderNo uint) {
 	if n.Type == html.ElementNode && n.Data == "link" {
 		var href, rel string
 		for _, attr := range n.Attr {
@@ -23,29 +23,29 @@ func ExtractStyles(n *html.Node, loader net.URLReader, context *url.URL) Stylesh
 			}
 		}
 		if href == "" || rel != "stylesheet" {
-			return nil
+			return nil, orderNo
 		}
 		newUrl, err := url.Parse(href)
 		if err != nil {
-			return nil
+			return nil, orderNo
 		}
 		newAbsoluteURL := context.ResolveReference(newUrl)
 		r, resp, err := loader.GetURL(newAbsoluteURL)
 		if err != nil {
-			return nil
+			return nil, orderNo
 		}
 
 		// Only parse the stylesheet if it's found, otherwise we extract
 		// styles from 404 error pages
 		if resp < 200 || resp >= 300 {
-			return nil
+			return nil, orderNo
 		}
 		defer r.Close()
 		styles, err := ioutil.ReadAll(r)
 		if err != nil {
-			return nil
+			return nil, orderNo
 		}
-		return ParseStylesheet(string(styles), AuthorSrc, loader, newAbsoluteURL)
+		return ParseStylesheet(string(styles), AuthorSrc, loader, newAbsoluteURL, orderNo)
 	}
 
 	var styleElem string
@@ -56,9 +56,11 @@ func ExtractStyles(n *html.Node, loader net.URLReader, context *url.URL) Stylesh
 			}
 		}
 	}
-	style := ParseStylesheet(styleElem, AuthorSrc, loader, context)
+	style, orderNo := ParseStylesheet(styleElem, AuthorSrc, loader, context, orderNo)
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		style = append(style, ExtractStyles(c, loader, context)...)
+		s, nextOrderNo := ExtractStyles(c, loader, context, orderNo)
+		style = append(style, s...)
+		orderNo = nextOrderNo
 	}
-	return style
+	return style, orderNo
 }

@@ -55,100 +55,100 @@ func TestCSS1SimpleSelector(t *testing.T) {
 	sitediv := body.FirstChild.NextSibling
 
 	// test some basic type selectors
-	rule := StyleRule{Selector: "body"}
+	rule := StyleRule{Selector: CSSSelector{"body", 0}}
 	if rule.Matches(body) != true {
 		print("body did not match body element\n")
 		t.Fail()
 	}
-	rule.Selector = "h1"
+	rule.Selector.Selector = "h1"
 	if rule.Matches(body) != false {
 		print("body incorrectly matched h1 element\n")
 		t.Fail()
 	}
 
-	rule.Selector = "div"
+	rule.Selector.Selector = "div"
 	if rule.Matches(sitediv) != true {
 		print("div did not match \"div\" selector\n")
 		t.Fail()
 	}
 
 	// test variations of class selectors
-	rule.Selector = ".site"
+	rule.Selector.Selector = ".site"
 	if rule.Matches(sitediv) != true {
 		print("div did not match \".site\" class selector\n")
 		t.Fail()
 	}
-	rule.Selector = "div.site"
+	rule.Selector.Selector = "div.site"
 	if rule.Matches(sitediv) != true {
 		print("div did not match \"div.site\" class selector\n")
 		t.Fail()
 	}
-	rule.Selector = "*.site"
+	rule.Selector.Selector = "*.site"
 	if rule.Matches(sitediv) != true {
 		print("div did not match \"*.site\" class selector\n")
 		t.Fail()
 	}
 	// make sure the id isn't interpreted as a class
-	rule.Selector = ".sitediv"
+	rule.Selector.Selector = ".sitediv"
 	if rule.Matches(sitediv) != false {
 		print("div incorrectly matched id sitediv as a class\n")
 		t.Fail()
 	}
 
 	// test variations of id selectors
-	rule.Selector = "#sitediv"
+	rule.Selector.Selector = "#sitediv"
 	if rule.Matches(sitediv) != true {
 		print("div did not match \"#sitediv\" id selector\n")
 		t.Fail()
 	}
-	rule.Selector = "div#sitediv"
+	rule.Selector.Selector = "div#sitediv"
 	if rule.Matches(sitediv) != true {
 		print("div did not match \"div#sitediv\" id selector\n")
 		t.Fail()
 	}
-	rule.Selector = "h1#sitediv"
+	rule.Selector.Selector = "h1#sitediv"
 	if rule.Matches(sitediv) != false {
 		print("div with sitediv id incorrectly matched wrong element type (\"h1#sitediv\") selector\n")
 		t.Fail()
 	}
-	rule.Selector = "*#sitediv"
+	rule.Selector.Selector = "*#sitediv"
 	if rule.Matches(sitediv) != true {
 		print("div with sitediv id did not match \"*#sitediv\" selector\n")
 		t.Fail()
 	}
 
 	// test both class and id
-	rule.Selector = "#sitediv.site"
+	rule.Selector.Selector = "#sitediv.site"
 	if rule.Matches(sitediv) != true {
 		print("div with sitediv id and site class did not match \"#sitediv.site\" selector\n")
 		t.Fail()
 	}
-	rule.Selector = ".site#sitediv"
+	rule.Selector.Selector = ".site#sitediv"
 	if rule.Matches(sitediv) != true {
 		print("div with sitediv id and site class did not match \".site#sitediv\" selector\n")
 		t.Fail()
 	}
-	rule.Selector = "div#sitediv.site"
+	rule.Selector.Selector = "div#sitediv.site"
 	if rule.Matches(sitediv) != true {
 		print("div with sitediv id and site class did not match \"div#sitediv.site\" selector\n")
 		t.Fail()
 	}
-	rule.Selector = "div.site#sitediv"
+	rule.Selector.Selector = "div.site#sitediv"
 	if rule.Matches(sitediv) != true {
 		print("div with sitediv id and site class did not match \"div.site#sitediv\" selector\n")
 		t.Fail()
 	}
-	rule.Selector = "*#sitediv.site"
+	rule.Selector.Selector = "*#sitediv.site"
 	if rule.Matches(sitediv) != true {
 		print("div with sitediv id and site class did not match \"*#sitediv.site\" selector\n")
 		t.Fail()
 	}
-	rule.Selector = "*.site#sitediv"
+	rule.Selector.Selector = "*.site#sitediv"
 	if rule.Matches(sitediv) != true {
 		print("div with sitediv id and site class did not match \"*.site#sitediv\" selector\n")
 		t.Fail()
 	}
-	rule.Selector = "h1.site#sitediv"
+	rule.Selector.Selector = "h1.site#sitediv"
 	if rule.Matches(sitediv) != false {
 		print("div with sitediv id and site class incorrectly matched h1 tag \"h1.site#sitediv\" selector\n")
 		t.Fail()
@@ -176,23 +176,23 @@ func TestCSS1ParentSelector(t *testing.T) {
 	//  </div>
 	// [...]
 	//</div>
-	rule := StyleRule{Selector: "h1"}
+	rule := StyleRule{Selector: CSSSelector{"h1", 0}}
 	if rule.Matches(h1) != true {
 		t.Error("Did not match simple h1 selector")
 	}
-	rule.Selector = "div h1"
+	rule.Selector.Selector = "div h1"
 	if rule.Matches(h1) != true {
 		t.Error("Did not match parent div selector")
 	}
-	rule.Selector = ".header h1"
+	rule.Selector.Selector = ".header h1"
 	if rule.Matches(h1) != true {
 		t.Error("Did not match parent div selector by class")
 	}
-	rule.Selector = ".site h1"
+	rule.Selector.Selector = ".site h1"
 	if rule.Matches(h1) != true {
 		t.Error("Ancestor selector did not select grandparent")
 	}
-	rule.Selector = "div div h1"
+	rule.Selector.Selector = "div div h1"
 	if rule.Matches(h1) != true {
 		t.Error("Did not match multilevel selector")
 	}
@@ -202,7 +202,7 @@ func TestCSS1ParentSelector(t *testing.T) {
 	ul2 := li1.FirstChild.NextSibling
 	li2 := ul2.FirstChild.NextSibling
 
-	rule.Selector = "UL LI LI"
+	rule.Selector.Selector = "UL LI LI"
 	if rule.Matches(li2) != true {
 		t.Error("Did not match deeper multilevel selector")
 	}

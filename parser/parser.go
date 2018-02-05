@@ -16,7 +16,7 @@ import (
 
 func LoadPage(r io.Reader, loader net.URLReader, urlContext *url.URL) Page {
 	parsedhtml, _ := html.Parse(r)
-	styles := css.ExtractStyles(parsedhtml, loader, urlContext)
+	styles, cssOrder := css.ExtractStyles(parsedhtml, loader, urlContext, 0)
 
 	var body *html.Node
 	var root *html.Node
@@ -45,7 +45,7 @@ func LoadPage(r io.Reader, loader net.URLReader, urlContext *url.URL) Page {
 	renderable, _ := renderer.ConvertNodeToRenderableElement(body, loader)
 
 	sheet, _ := ioutil.ReadFile("useragent.css")
-	userAgentStyles := css.ParseStylesheet(string(sheet), css.UserAgentSrc, loader, urlContext)
+	userAgentStyles, cssOrder := css.ParseStylesheet(string(sheet), css.UserAgentSrc, loader, urlContext, cssOrder)
 
 	p := Page{
 		Content: renderable,
@@ -72,11 +72,12 @@ func LoadPage(r io.Reader, loader net.URLReader, urlContext *url.URL) Page {
 				for name, val := range vals {
 					el.Styles.AddStyle(
 						css.StyleRule{
-							Selector: "",
+							Selector: css.CSSSelector{"", cssOrder},
 							Name:     name,
 							Value:    val,
 							Src:      css.InlineStyleSrc,
 						})
+						cssOrder++
 				}
 			}
 		}

@@ -6,13 +6,17 @@ import (
 	"strings"
 )
 
-type CSSSelector string
+type CSSSelector struct {
+	Selector    string
+	OrderNumber uint
+}
 
-func parseSelectors(val string) []CSSSelector {
+func parseSelectors(val string, orderStart uint) []CSSSelector {
 	vals := strings.Split(val, ",")
 	var ret []CSSSelector
 	for _, selector := range vals {
-		ret = append(ret, CSSSelector(strings.TrimSpace(selector)))
+		ret = append(ret, CSSSelector{strings.TrimSpace(selector), orderStart})
+		orderStart++
 	}
 	return ret
 }
@@ -148,7 +152,7 @@ func recursiveParentMatches(el *html.Node, selectorPieces []string, requireMatch
 	}
 }
 func (s CSSSelector) Matches(el *html.Node) bool {
-	pieces := strings.Fields(string(s))
+	pieces := strings.Fields(s.Selector)
 	if len(pieces) <= 1 {
 		return matchBasicSelector(el, pieces[0])
 	}
@@ -156,16 +160,16 @@ func (s CSSSelector) Matches(el *html.Node) bool {
 }
 
 func (s CSSSelector) NumberIDs() int {
-	return strings.Count(string(s), "#")
+	return strings.Count(s.Selector, "#")
 }
 func (s CSSSelector) NumberAttrs() int {
-	return strings.Count(string(s), "[")
+	return strings.Count(s.Selector, "[")
 }
 func (s CSSSelector) NumberClasses() int {
-	return strings.Count(string(s), ".")
+	return strings.Count(s.Selector, ".")
 }
 func (s CSSSelector) NumberElements() int {
-	pieces := strings.Fields(string(s))
+	pieces := strings.Fields(s.Selector)
 	elems := len(pieces)
 	for _, piece := range pieces {
 		elems += strings.Count(piece, "+")
@@ -173,5 +177,5 @@ func (s CSSSelector) NumberElements() int {
 	return elems
 }
 func (s CSSSelector) NumberPseudo() int {
-	return strings.Count(string(s), ":")
+	return strings.Count(s.Selector, ":")
 }

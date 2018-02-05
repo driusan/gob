@@ -20,36 +20,36 @@ func TestParseStylesheet(t *testing.T) {
 	}{
 		{
 			"div { color: red }",
-			Stylesheet{StyleRule{Selector: "div", Name: "color", Value: StyleValue{"red", false}}},
+			Stylesheet{StyleRule{Selector: CSSSelector{"div", 0}, Name: "color", Value: StyleValue{"red", false}}},
 		},
 		{
 			"html, body { color: red }",
 			Stylesheet{
-				StyleRule{Selector: "html", Name: "color", Value: StyleValue{"red", false}},
-				StyleRule{Selector: "body", Name: "color", Value: StyleValue{"red", false}},
+				StyleRule{Selector: CSSSelector{"html", 0}, Name: "color", Value: StyleValue{"red", false}},
+				StyleRule{Selector: CSSSelector{"body", 1}, Name: "color", Value: StyleValue{"red", false}},
 			},
 		},
 		{
 			".header a { color: red }",
-			Stylesheet{StyleRule{Selector: ".header a", Name: "color", Value: StyleValue{"red", false}}},
+			Stylesheet{StyleRule{Selector: CSSSelector{".header a", 0}, Name: "color", Value: StyleValue{"red", false}}},
 		},
 		{
 			"a { color: red; display: inline; }",
 			Stylesheet{
-				StyleRule{Selector: "a", Name: "color", Value: StyleValue{"red", false}},
-				StyleRule{Selector: "a", Name: "display", Value: StyleValue{"inline", false}},
+				StyleRule{Selector: CSSSelector{"a", 0}, Name: "color", Value: StyleValue{"red", false}},
+				StyleRule{Selector: CSSSelector{"a", 1}, Name: "display", Value: StyleValue{"inline", false}},
 			},
 		},
 		{
 			"p { margin: 1.12em 0; }",
 			Stylesheet{
 				// This gets expanded from the shorthand when applying to an element
-				StyleRule{Selector: "p", Name: "margin", Value: StyleValue{"1.12em 0", false}},
+				StyleRule{Selector: CSSSelector{"p", 0}, Name: "margin", Value: StyleValue{"1.12em 0", false}},
 			},
 		},
 	}
 	for i, tc := range tests {
-		style := ParseStylesheet(tc.Stylesheet, 0, noopURLer{}, nil)
+		style, _ := ParseStylesheet(tc.Stylesheet, 0, noopURLer{}, nil, 0)
 		if !reflect.DeepEqual(style, tc.Expected) {
 			t.Errorf("Case %d: got %v want %v", i, style, tc.Expected)
 		}

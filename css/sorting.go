@@ -11,7 +11,6 @@ package css
 //	5. user important declarations (don't exist)
 // 3. Sort rules with the same importance and origin by specificity of selector: more specific selectors will override more general ones. Pseudo-elements and pseudo-classes are counted as normal elements and classes, respectively.
 // 4. Finally, sort by order specified: if two declarations have the same weight, origin, and specificity, the latter specified wins. Declarations in imported stylesheets are considered to be before any declaration in the style sheet itself
-// BUG(driusan): The final tie break is not implemented
 
 type byCSSPrecedence []StyleRule
 
@@ -41,7 +40,7 @@ func specificityLess(i, j StyleRule) bool {
 	if (iNumElements + iNumPseudo) != (jNumElements + jNumPseudo) {
 		return (iNumElements + iNumPseudo) > (jNumElements + jNumPseudo)
 	}
-	return false
+	return i.Selector.OrderNumber > j.Selector.OrderNumber
 }
 func (r byCSSPrecedence) Len() int      { return len(r) }
 func (r byCSSPrecedence) Swap(i, j int) { r[i], r[j] = r[j], r[i] }

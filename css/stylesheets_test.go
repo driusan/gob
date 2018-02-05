@@ -20,8 +20,8 @@ goodbye {
 }
 `
 
-func assertSelector(t *testing.T, sty StyleRule, expected CSSSelector) {
-	if s := sty.Selector; s != expected {
+func assertSelector(t *testing.T, sty StyleRule, expected string) {
+	if s := sty.Selector.Selector; s != expected {
 		t.Errorf("Incorrect selector for item. Got %v expected %v.", s, expected)
 	}
 }
@@ -39,7 +39,7 @@ func assertValue(t *testing.T, sty StyleRule, expected StyleValue) {
 
 // Tests basic usage of CSS parser
 func TestCSSParser(t *testing.T) {
-	sty := ParseStylesheet(basiccsscontent, AuthorSrc, noopURLer{}, nil)
+	sty, _ := ParseStylesheet(basiccsscontent, AuthorSrc, noopURLer{}, nil, 0)
 	// 4 selectors to match, 2 attributes per selector = 6 elements in the stylesheet.
 	if len(sty) != 8 {
 		t.Fatalf("Incorrect number of elements in stylesheet. Expected 8 got %v: %s", len(sty), sty)
@@ -80,7 +80,7 @@ func TestCSSParser(t *testing.T) {
 
 // Tests that when there are multiple blocks in a CSS file, it's parsed correctly
 func TestMultipleCSSBlocks(t *testing.T) {
-	sty := ParseStylesheet(multiplecsscontent, AuthorSrc, noopURLer{}, nil)
+	sty, _ := ParseStylesheet(multiplecsscontent, AuthorSrc, noopURLer{}, nil, 0)
 	if len(sty) != 2 {
 		t.Fatalf("Incorrect number of elements in stylesheet. Expected 4 got %v: %s", len(sty), sty)
 	}
@@ -104,7 +104,7 @@ func TestMultipleCSSBlocks(t *testing.T) {
 // Tests that all types of basic selectors in CSS Level 1, 2, and 3 are parsed
 // correctly.
 func TestAllBasicSelectorTypes(t *testing.T) {
-	sty := ParseStylesheet(
+	sty, _ := ParseStylesheet(
 		`*, E, E[foo], E[foo="bar"], E[foo~="bar"], E[foo^="bar"], E[foo$="bar"], /* 7 */
 E[foo*="bar"], E[foo|="bar"], E:root, E:nth-child(1), E:nth-last-child(2), /* 12 */
 E:nth-of-type(1), E:nth-last-of-type(3), /* 14 */
@@ -117,6 +117,7 @@ E > F, E + F, E ~ F /* 48 */ {display: none}`,
 		AuthorSrc,
 		noopURLer{},
 		nil,
+		0,
 	)
 
 	if len(sty) != 48 {
@@ -179,7 +180,7 @@ E > F, E + F, E ~ F /* 48 */ {display: none}`,
 
 // Tests that different types of units in values get parsed correctly.
 func TestCSSUnits(t *testing.T) {
-	sty := ParseStylesheet(`
+	sty, _ := ParseStylesheet(`
 a {
 	height: 300px;
 	width: 5%;
@@ -190,7 +191,7 @@ a {
 	abc: url("yay");
 	multi: fff f		 fff;
 	c: rgb(255, 255, 255);
-}`, AuthorSrc, noopURLer{}, nil)
+}`, AuthorSrc, noopURLer{}, nil, 0)
 	assertName(t, sty[0], "height")
 	assertName(t, sty[1], "width")
 	assertName(t, sty[2], "foo")
@@ -214,7 +215,8 @@ a {
 
 // Tests basic usage of CSS parser
 func TestMultpleSelectors(t *testing.T) {
-	sty := ParseStylesheet(`em, ul li li { color: green }`, AuthorSrc, noopURLer{}, nil)
+	sty, _ := ParseStylesheet(`em, ul li li { color: green }`, AuthorSrc, noopURLer{}, nil, 0)
 	assertSelector(t, sty[0], `em`)
+	// BUG(driusan): The final tie break is not implemente2
 	assertSelector(t, sty[1], `ul li li`)
 }

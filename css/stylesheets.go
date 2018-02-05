@@ -74,13 +74,13 @@ const (
 	atImport
 )
 
-func appendStyles(s []StyleRule, selectors []CSSSelector, attr StyleAttribute, val StyleValue, src StyleSource) ([]StyleRule, error) {
+func appendStyles(s []StyleRule, selectors []CSSSelector, attr StyleAttribute, val StyleValue, src StyleSource, order uint) ([]StyleRule, error) {
 	if attr == "" {
 		return s, nil
 	}
-	for _, sel := range selectors {
+	for i, sel := range selectors {
 		s = append(s, StyleRule{
-			Selector: CSSSelector(strings.TrimSpace(string(sel))),
+			Selector: CSSSelector{strings.TrimSpace(string(sel.Selector)), order + uint(i)},
 			Name:     attr,
 			Value:    val,
 			Src:      src,
@@ -89,7 +89,7 @@ func appendStyles(s []StyleRule, selectors []CSSSelector, attr StyleAttribute, v
 	return s, nil
 }
 
-func ParseStylesheet(val string, src StyleSource, importLoader net.URLReader, urlContext *url.URL) Stylesheet {
+func ParseStylesheet(val string, src StyleSource, importLoader net.URLReader, urlContext *url.URL, orderNo uint) (styles Stylesheet, nextOrderNoStart uint) {
 	s := make([]StyleRule, 0)
 
 	var blockSelectors []CSSSelector
@@ -115,25 +115,24 @@ func ParseStylesheet(val string, src StyleSource, importLoader net.URLReader, ur
 			switch context {
 			case matchingSelector:
 				// if we get another Ident, it's an E F type selector.
-				// if not, the , will set it back to matching
+				// if not, the "," char will set it back to matching
 				context = appendingSelector
 				spaceIfMatch = true
 			case matchingValue:
 				spaceIfMatch = true
 			}
-			// whitespace tokens. Ignore them.
 			continue
 		case scanner.TokenIdent:
 			switch context {
 			case startContext, matchingSelector:
-				curSelector = CSSSelector(token.Value)
+				curSelector = CSSSelector{token.Value, orderNo}
 				spaceIfMatch = false
 			case appendingSelector:
 				if spaceIfMatch {
-					curSelector += " "
+					curSelector.Selector += " "
 					spaceIfMatch = false
 				}
-				curSelector += CSSSelector(token.Value)
+				curSelector.Selector += token.Value
 				context = matchingSelector
 			case matchingAttribute:
 				curAttribute = StyleAttribute(token.Value)
@@ -154,36 +153,36 @@ func ParseStylesheet(val string, src StyleSource, importLoader net.URLReader, ur
 			case startContext, matchingSelector, appendingSelector:
 				switch token.Value {
 				case ",":
-					if curSelector != "" {
+					if curSelector.Selector != "" {
 						blockSelectors = append(blockSelectors, curSelector)
 					}
-					curSelector = ""
+					curSelector.Selector = ""
 					context = matchingSelector
 					spaceIfMatch = false
 				case "*":
-					curSelector += CSSSelector(token.Value)
+					curSelector.Selector += token.Value
 					context = matchingSelector
 					spaceIfMatch = false
 
 				case "=":
-					curSelector += CSSSelector(token.Value)
+					curSelector.Selector += token.Value
 					// the actual value is a TokenString, not a TokenIdent,
 					// so the context doesn't need to change to appending.
 					context = matchingSelector
 					spaceIfMatch = false
 
 				case ">", "[", "+", ":", ".", "~":
-					curSelector += CSSSelector(token.Value)
+					curSelector.Selector += token.Value
 					context = appendingSelector
 					spaceIfMatch = false
 
 				case "]", ")":
-					curSelector += CSSSelector(token.Value)
+					curSelector.Selector += token.Value
 					context = matchingSelector
 					spaceIfMatch = false
 
 				case "{":
-					if curSelector != "" {
+					if curSelector.Selector != "" {
 						blockSelectors = append(blockSelectors, curSelector)
 					}
 					context = matchingAttribute
@@ -202,14 +201,17 @@ func ParseStylesheet(val string, src StyleSource, importLoader net.URLReader, ur
 					spaceIfMatch = false
 
 					if curAttribute != "" {
-						s, _ = appendStyles(s, blockSelectors, curAttribute, curValue, src)
+						s, _ = appendStyles(s, blockSelectors, curAttribute, curValue, src, orderNo)
+						orderNo += uint(len(s))
 					}
 					// End of a block, so reset everything to the 0 value
 					// after appending the rules.
+					curSelector.Selector = ""
 					blockSelectors = nil
-					curSelector = ""
+					curSelector.OrderNumber = orderNo
 					curAttribute = ""
 					curValue = StyleValue{}
+
 					context = matchingSelector
 				}
 			case matchingValue:
@@ -221,7 +223,8 @@ func ParseStylesheet(val string, src StyleSource, importLoader net.URLReader, ur
 					curValue.string += token.Value
 				case ";":
 					if curAttribute != "" {
-						s, _ = appendStyles(s, blockSelectors, curAttribute, curValue, src)
+						s, _ = appendStyles(s, blockSelectors, curAttribute, curValue, src, orderNo)
+						orderNo += uint(len(s))
 					}
 					curAttribute = ""
 					curValue = StyleValue{}
@@ -230,12 +233,13 @@ func ParseStylesheet(val string, src StyleSource, importLoader net.URLReader, ur
 				case "}":
 
 					if curAttribute != "" {
-						s, _ = appendStyles(s, blockSelectors, curAttribute, curValue, src)
+						s, _ = appendStyles(s, blockSelectors, curAttribute, curValue, src, orderNo)
+						orderNo += uint(len(s))
 					}
 					// End of a block, so reset everything to the 0 value
 					// after appending the rules.
 					blockSelectors = nil
-					curSelector = ""
+					curSelector.Selector = ""
 					curAttribute = ""
 					curValue = StyleValue{}
 					context = matchingSelector
@@ -258,7 +262,8 @@ func ParseStylesheet(val string, src StyleSource, importLoader net.URLReader, ur
 					if err != nil {
 						continue
 					}
-					news := ParseStylesheet(string(styles), src, importLoader, importURL)
+					news, nextOrderNo := ParseStylesheet(string(styles), src, importLoader, importURL, orderNo)
+					orderNo = nextOrderNo
 					s = append(s, news...)
 				}
 			}
@@ -275,7 +280,7 @@ func ParseStylesheet(val string, src StyleSource, importLoader net.URLReader, ur
 		case scanner.TokenHash, scanner.TokenNumber:
 			switch context {
 			case matchingSelector, appendingSelector:
-				curSelector += CSSSelector(token.Value)
+				curSelector.Selector += token.Value
 				spaceIfMatch = false
 			case matchingValue:
 				if curValue.string == "" {
@@ -294,7 +299,7 @@ func ParseStylesheet(val string, src StyleSource, importLoader net.URLReader, ur
 			scanner.TokenDashMatch, scanner.TokenFunction:
 			switch context {
 			case startContext, matchingSelector, appendingSelector:
-				curSelector += CSSSelector(token.Value)
+				curSelector.Selector += token.Value
 				spaceIfMatch = false
 			case matchingValue:
 				spaceIfMatch = false
@@ -339,7 +344,7 @@ func ParseStylesheet(val string, src StyleSource, importLoader net.URLReader, ur
 			fmt.Printf("%s = %s: %v\n", token.Type, token.Value, token)
 		}
 	}
-	return s
+	return s, orderNo
 }
 
 func (r StyleRule) Matches(el *html.Node) bool {
