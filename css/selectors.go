@@ -124,7 +124,7 @@ func matchBasicSelector(el *html.Node, s string) bool {
 
 	return matchIDAndClassSelector(el, remainingData)
 }
-func recursiveParentMatches(el *html.Node, selectorPieces []string) bool {
+func recursiveParentMatches(el *html.Node, selectorPieces []string, requireMatch bool) bool {
 	switch len(selectorPieces) {
 	case 0:
 		return false
@@ -135,14 +135,16 @@ func recursiveParentMatches(el *html.Node, selectorPieces []string) bool {
 		if el == nil {
 			return false
 		}
-		return recursiveParentMatches(el.Parent, selectorPieces)
+		return recursiveParentMatches(el.Parent, selectorPieces, requireMatch)
 	default:
 		lastSelector := selectorPieces[len(selectorPieces)-1]
 		otherSelectors := selectorPieces[0 : len(selectorPieces)-1]
-		if matchBasicSelector(el, lastSelector) == false {
+		if matchBasicSelector(el, lastSelector) == true {
+			return recursiveParentMatches(el.Parent, otherSelectors, false)
+		} else if requireMatch {
 			return false
 		}
-		return recursiveParentMatches(el.Parent, otherSelectors)
+		return recursiveParentMatches(el.Parent, otherSelectors, false)
 	}
 }
 func (s CSSSelector) Matches(el *html.Node) bool {
@@ -150,7 +152,7 @@ func (s CSSSelector) Matches(el *html.Node) bool {
 	if len(pieces) <= 1 {
 		return matchBasicSelector(el, pieces[0])
 	}
-	return recursiveParentMatches(el, pieces)
+	return recursiveParentMatches(el, pieces, true)
 }
 
 func (s CSSSelector) NumberIDs() int {

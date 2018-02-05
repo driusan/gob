@@ -27,8 +27,15 @@ var content string = `<!DOCTYPE html>
 		This is a simple benchmark which <a href="/">contains</a>various inline styles</p>
 	  </p>
 
-<p>It's all HTML and CSS1</p>
+	  <p>It's all HTML and CSS1</p>
           </div>
+          <ul>
+	  	<li>Text Content
+			<ul>
+				<li>This is a regression test</li>
+			</ul>
+		</li>
+		</ul>
         </div>
 
     </body>
@@ -183,11 +190,20 @@ func TestCSS1ParentSelector(t *testing.T) {
 	}
 	rule.Selector = ".site h1"
 	if rule.Matches(h1) != true {
-		t.Error("Ancestor selector did not grandparent")
+		t.Error("Ancestor selector did not select grandparent")
 	}
 	rule.Selector = "div div h1"
 	if rule.Matches(h1) != true {
 		t.Error("Did not match multilevel selector")
 	}
 
+	ul := headerdiv.NextSibling.NextSibling.NextSibling.NextSibling
+	li1 := ul.FirstChild.NextSibling
+	ul2 := li1.FirstChild.NextSibling
+	li2 := ul2.FirstChild.NextSibling
+
+	rule.Selector = "UL LI LI"
+	if rule.Matches(li2) != true {
+		t.Error("Did not match deeper multilevel selector")
+	}
 }

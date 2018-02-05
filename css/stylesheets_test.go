@@ -211,3 +211,10 @@ a {
 	assertValue(t, sty[7], StyleValue{"fff f fff", false})
 	assertValue(t, sty[8], StyleValue{"rgb(255, 255, 255)", false})
 }
+
+// Tests basic usage of CSS parser
+func TestMultpleSelectors(t *testing.T) {
+	sty := ParseStylesheet(`em, ul li li { color: green }`, AuthorSrc, noopURLer{}, nil)
+	assertSelector(t, sty[0], `em`)
+	assertSelector(t, sty[1], `ul li li`)
+}
