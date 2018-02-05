@@ -1,9 +1,17 @@
 package css
 
 import (
+	"io"
+	"net/url"
 	"reflect"
 	"testing"
 )
+
+type noopURLer struct{}
+
+func (l noopURLer) GetURL(u *url.URL) (body io.ReadCloser, resp int, err error) {
+	return nil, 404, nil
+}
 
 func TestParseStylesheet(t *testing.T) {
 	tests := []struct {
@@ -41,7 +49,7 @@ func TestParseStylesheet(t *testing.T) {
 		},
 	}
 	for i, tc := range tests {
-		style := ParseStylesheet(tc.Stylesheet, 0)
+		style := ParseStylesheet(tc.Stylesheet, 0, noopURLer{}, nil)
 		if !reflect.DeepEqual(style, tc.Expected) {
 			t.Errorf("Case %d: got %v want %v", i, style, tc.Expected)
 		}

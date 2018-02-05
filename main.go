@@ -102,7 +102,7 @@ func main() {
 	pprof.StartCPUProfile(f)
 	defer pprof.StopCPUProfile()
 
-	filename := "test.html"
+	filename := "file:test.html"
 	if len(os.Args) > 1 {
 		filename = os.Args[1]
 
@@ -240,7 +240,12 @@ func loadNewPage(context *url.URL, path string) (parser.Page, error) {
 	if err != nil {
 		return parser.Page{}, err
 	}
-	newURL := context.ResolveReference(u)
+	var newURL *url.URL
+	if context == nil {
+		newURL = u
+	} else {
+		newURL = context.ResolveReference(u)
+	}
 	loader := net.DefaultReader{}
 	r, _, err := loader.GetURL(newURL)
 	if err != nil {

@@ -22,7 +22,7 @@ func ParseURL(urlS string) (*url.URL, error) {
 		}
 
 		// parse the path as a file:// URL
-		curUrl, urlErr := url.Parse("file://" + urlContext)
+		curUrl, urlErr := url.Parse("file:" + urlContext)
 		if urlErr != nil {
 			return nil, err
 		}
@@ -42,10 +42,10 @@ type DefaultReader struct{}
 func (d DefaultReader) GetURL(u *url.URL) (body io.ReadCloser, statuscode int, err error) {
 	switch u.Scheme {
 	case "file":
-		if _, err := os.Stat(u.Path); err != nil {
+		if _, err := os.Stat(u.Opaque); err != nil {
 			return nil, 404, err
 		}
-		f, err := os.Open(u.Path)
+		f, err := os.Open(u.Opaque)
 		return f, 200, err
 	default:
 		if cached := getCacheReader(u); cached != nil {

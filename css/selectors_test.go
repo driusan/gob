@@ -185,4 +185,9 @@ func TestCSS1ParentSelector(t *testing.T) {
 	if rule.Matches(h1) != true {
 		t.Error("Ancestor selector did not grandparent")
 	}
+	rule.Selector = "div div h1"
+	if rule.Matches(h1) != true {
+		t.Error("Did not match multilevel selector")
+	}
+
 }

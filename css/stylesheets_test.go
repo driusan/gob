@@ -39,7 +39,7 @@ func assertValue(t *testing.T, sty StyleRule, expected StyleValue) {
 
 // Tests basic usage of CSS parser
 func TestCSSParser(t *testing.T) {
-	sty := ParseStylesheet(basiccsscontent, AuthorSrc)
+	sty := ParseStylesheet(basiccsscontent, AuthorSrc, noopURLer{}, nil)
 	// 4 selectors to match, 2 attributes per selector = 6 elements in the stylesheet.
 	if len(sty) != 8 {
 		t.Fatalf("Incorrect number of elements in stylesheet. Expected 8 got %v: %s", len(sty), sty)
@@ -80,7 +80,7 @@ func TestCSSParser(t *testing.T) {
 
 // Tests that when there are multiple blocks in a CSS file, it's parsed correctly
 func TestMultipleCSSBlocks(t *testing.T) {
-	sty := ParseStylesheet(multiplecsscontent, AuthorSrc)
+	sty := ParseStylesheet(multiplecsscontent, AuthorSrc, noopURLer{}, nil)
 	if len(sty) != 2 {
 		t.Fatalf("Incorrect number of elements in stylesheet. Expected 4 got %v: %s", len(sty), sty)
 	}
@@ -104,8 +104,8 @@ func TestMultipleCSSBlocks(t *testing.T) {
 // Tests that all types of basic selectors in CSS Level 1, 2, and 3 are parsed
 // correctly.
 func TestAllBasicSelectorTypes(t *testing.T) {
-	sty := ParseStylesheet(`
-*, E, E[foo], E[foo="bar"], E[foo~="bar"], E[foo^="bar"], E[foo$="bar"], /* 7 */
+	sty := ParseStylesheet(
+		`*, E, E[foo], E[foo="bar"], E[foo~="bar"], E[foo^="bar"], E[foo$="bar"], /* 7 */
 E[foo*="bar"], E[foo|="bar"], E:root, E:nth-child(1), E:nth-last-child(2), /* 12 */
 E:nth-of-type(1), E:nth-last-of-type(3), /* 14 */
 E:first-child, E:last-child, E:first-of-type, E:last-of-type, E:only-child, /* 19 */
@@ -113,7 +113,11 @@ E:only-of-type, E:empty, E:link, E:visited, E:active, E:hover, E:focus, /* 26 */
 E:target, E:lang(fr), E:enabled, E:disabled, E:checked, E:first-line, /* 32 */
 E::first-line, E:first-letter, E::first-letter, E:before, E::before, /* 37 */
 E:after,E::after, E.warning, .warning, E#myid, #myid, E:not(F), E	 F, /* 45 */
-E > F, E + F, E ~ F /* 48 */ {display: none}`, AuthorSrc)
+E > F, E + F, E ~ F /* 48 */ {display: none}`,
+		AuthorSrc,
+		noopURLer{},
+		nil,
+	)
 
 	if len(sty) != 48 {
 		t.Fatalf("Incorrect number of elements. Expected 48 got %d", len(sty))
@@ -186,7 +190,7 @@ a {
 	abc: url("yay");
 	multi: fff f		 fff;
 	c: rgb(255, 255, 255);
-}`, AuthorSrc)
+}`, AuthorSrc, noopURLer{}, nil)
 	assertName(t, sty[0], "height")
 	assertName(t, sty[1], "width")
 	assertName(t, sty[2], "foo")
