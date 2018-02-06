@@ -77,7 +77,7 @@ func LoadPage(r io.Reader, loader net.URLReader, urlContext *url.URL) Page {
 							Value:    val,
 							Src:      css.InlineStyleSrc,
 						})
-						cssOrder++
+					cssOrder++
 				}
 			}
 		}

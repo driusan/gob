@@ -144,7 +144,7 @@ func (b *outerBoxDrawer) RGBA() *image.RGBA {
 			},
 			Max: image.Point{
 				X: bounds.Max.X - b.Margin.Right.Width,
-				Y: bounds.Max.Y - b.Border.Left.Width,
+				Y: bounds.Max.Y - b.Border.Bottom.Width,
 			},
 		},
 		&image.Uniform{b.Border.Right.Color},
