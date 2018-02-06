@@ -396,12 +396,10 @@ func (e RenderableDomElement) GetMarginLeftSize() int {
 	case "auto":
 		if e.Styles.MarginRight.GetValue() == "auto" {
 			// return calculate how much is needed to center
-
 			return (e.containerWidth - e.contentWidth - e.GetBorderLeftWidth() - e.GetBorderRightWidth() - e.GetPaddingLeft() - e.GetPaddingRight()) / 2
 		}
-		return 0
+		return (e.containerWidth - e.contentWidth - e.GetBorderLeftWidth() - e.GetBorderRightWidth() - e.GetPaddingLeft() - e.GetPaddingRight())
 	default:
-
 		fontsize := e.GetFontSize()
 		val, err := css.ConvertUnitToPx(fontsize, e.containerWidth, value)
 		if err != nil {
