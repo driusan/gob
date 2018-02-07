@@ -627,10 +627,9 @@ func (e *RenderableDomElement) GetBackgroundRepeat() string {
 }
 func (e *RenderableDomElement) GetBackgroundImage() image.Image {
 	iURL, err := e.Styles.GetBackgroundImage()
-	switch err {
-	case css.InheritValue:
+	if err == css.InheritValue {
 		return e.Parent.GetBackgroundImage()
-	case css.Invalid, css.NoStyles:
+	} else if err != nil {
 		return nil
 	}
 	u, err := url.Parse(iURL)
@@ -783,6 +782,8 @@ func (e *RenderableDomElement) calcCSSBox(content image.Image, collapsablemargin
 	var topmargin int
 	if collapsablemargin == 0 {
 		topmargin = e.GetMarginTopSize()
+	} else if tm := e.GetMarginTopSize(); tm < 0 {
+		topmargin = tm + collapsablemargin
 	} else {
 		if ts := e.GetMarginTopSize(); ts < collapsablemargin {
 			topmargin = collapsablemargin

@@ -525,7 +525,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 
 				// Collapse margins before doing layout
 				if display != "inline-block" {
-					if collapsablemargin != 0 {
+					if collapsablemargin > 0 {
 						tm := c.GetMarginTopSize()
 						if tm > collapsablemargin {
 							collapsablemargin = tm
@@ -607,6 +607,10 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 					} else {
 						dot.X = 0
 						dot.Y = r.Max.Y
+						if mb := c.GetMarginBottomSize(); mb < 0 {
+							println("Negative bottom margin")
+							dot.Y += mb
+						}
 					}
 
 				}

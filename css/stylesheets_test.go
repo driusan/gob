@@ -191,6 +191,7 @@ a {
 	abc: url("yay");
 	multi: fff f		 fff;
 	c: rgb(255, 255, 255);
+	margin-bottom: -2cm;
 }`, AuthorSrc, noopURLer{}, nil, 0)
 	assertName(t, sty[0], "height")
 	assertName(t, sty[1], "width")
@@ -201,6 +202,7 @@ a {
 	assertName(t, sty[6], "abc")
 	assertName(t, sty[7], "multi")
 	assertName(t, sty[8], "c")
+	assertName(t, sty[9], "margin-bottom")
 
 	assertValue(t, sty[0], StyleValue{"300px", false})
 	assertValue(t, sty[1], StyleValue{"5%", false})
@@ -211,6 +213,7 @@ a {
 	assertValue(t, sty[6], StyleValue{"url(\"yay\")", false})
 	assertValue(t, sty[7], StyleValue{"fff f fff", false})
 	assertValue(t, sty[8], StyleValue{"rgb(255, 255, 255)", false})
+	assertValue(t, sty[9], StyleValue{"-2cm", false})
 }
 
 // Tests basic usage of CSS parser

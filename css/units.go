@@ -11,8 +11,6 @@ import (
 
 var (
 	NoStyles       = errors.New("No styles to apply")
-	Invalid        = errors.New("Invalid CSS unit or value")
-	NotImplemented = errors.New("Support not yet implemented")
 	InheritValue   = errors.New("Value should be inherited")
 )
 
@@ -28,8 +26,11 @@ func NewPxValue(x int) StyleValue {
 }
 
 func ConvertUnitToPx(fontsize int, percentbasis int, cssString string) (int, error) {
+	if cssString == "0" {
+		return 0, nil
+	}
 	if len(cssString) < 2 {
-		return fontsize, Invalid
+		return fontsize, fmt.Errorf("Invalid CSS Unit or value: %v", cssString)
 	}
 
 	val := cssString
@@ -40,7 +41,7 @@ func ConvertUnitToPx(fontsize int, percentbasis int, cssString string) (int, err
 			size := int(f * float64(percentbasis) / 100.0)
 			return size, nil
 		}
-		return fontsize, Invalid
+		return fontsize, fmt.Errorf("Invalid CSS Unit or value: %v", cssString)
 	}
 
 	// all other units are 2 characters long
@@ -52,7 +53,7 @@ func ConvertUnitToPx(fontsize int, percentbasis int, cssString string) (int, err
 		if err == nil {
 			return int(f * float64(fontsize)), nil
 		}
-		return fontsize, Invalid
+		return fontsize, fmt.Errorf("Invalid CSS Unit or value: %v", cssString)
 	case "ex":
 		// 1ex is supposed to be the height of a lower case x, but
 		// the spec says you can use 1ex = 0.5em if calculating
@@ -62,7 +63,7 @@ func ConvertUnitToPx(fontsize int, percentbasis int, cssString string) (int, err
 		if err == nil {
 			return int(f * float64(fontsize) / 2.0), nil
 		}
-		return fontsize, Invalid
+		return fontsize, fmt.Errorf("Invalid CSS Unit or value: %v", cssString)
 	case "px":
 		// parse px as a float then cast, just in case someone
 		// used a decimal.
@@ -70,39 +71,39 @@ func ConvertUnitToPx(fontsize int, percentbasis int, cssString string) (int, err
 		if err == nil {
 			return int(f * PixelsPerPt * 0.75), nil
 		}
-		return fontsize, Invalid
+		return fontsize, fmt.Errorf("Invalid CSS Unit or value: %v", cssString)
 	case "in":
 		f, err := strconv.ParseFloat(string(val[0:len(val)-2]), 64)
 		if err == nil {
 			return int(f * PixelsPerPt * 72), nil
 		}
-		return int(fontsize), Invalid
+		return int(fontsize), fmt.Errorf("Invalid CSS Unit or value: %v", cssString)
 	case "cm":
 		f, err := strconv.ParseFloat(string(val[0:len(val)-2]), 64)
 		if err == nil {
 			return int(f * PixelsPerPt * 72.0 / 2.54), nil
 		}
-		return int(fontsize), Invalid
+		return int(fontsize), fmt.Errorf("Invalid CSS Unit or value: %v", cssString)
 	case "mm":
 		f, err := strconv.ParseFloat(string(val[0:len(val)-2]), 64)
 		if err == nil {
 			return int(f * PixelsPerPt * 72.0 / 25.4), nil
 		}
-		return int(fontsize), Invalid
+		return int(fontsize),  fmt.Errorf("Invalid CSS Unit or value: %v", cssString)
 	case "pt":
 		f, err := strconv.ParseFloat(string(val[0:len(val)-2]), 64)
 		if err == nil {
 			return int(f * PixelsPerPt), nil
 		}
-		return int(fontsize), Invalid
+		return int(fontsize),  fmt.Errorf("Invalid CSS Unit or value: %v", cssString)
 	case "pc":
 		f, err := strconv.ParseFloat(string(val[0:len(val)-2]), 64)
 		if err == nil {
 			return int(f * PixelsPerPt * 12), nil
 		}
-		return int(fontsize), Invalid
+		return int(fontsize),fmt.Errorf("Invalid CSS Unit or value: %v", cssString) 
 	}
-	return fontsize, NotImplemented
+	return fontsize,fmt.Errorf("Unimplemented CSS Unit or invalid value: %v", cssString) 
 }
 
 func hexToUint8(val string) uint8 {
@@ -160,7 +161,7 @@ func ConvertColorToRGBA(cssString string) (*color.RGBA, error) {
 		tuple := cssString[4 : len(cssString)-1]
 		pieces := strings.Split(tuple, ",")
 		if len(pieces) != 3 {
-			return black, Invalid
+			return black, fmt.Errorf("Invalid colour: %v", cssString)
 		}
 
 		rint, _ := strconv.Atoi(strings.TrimSpace(pieces[0]))
@@ -177,7 +178,7 @@ func ConvertColorToRGBA(cssString string) (*color.RGBA, error) {
 			// #RGB
 			return &color.RGBA{sHexToUint8(cssString[1]), sHexToUint8(cssString[2]), sHexToUint8(cssString[3]), 255}, nil
 		}
-		return black, Invalid
+		return black, fmt.Errorf("Invalid colour: %v", cssString)
 	}
 	switch cssString {
 	case "inherit":

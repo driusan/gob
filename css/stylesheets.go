@@ -216,6 +216,9 @@ func ParseStylesheet(val string, src StyleSource, importLoader net.URLReader, ur
 				}
 			case matchingValue:
 				switch token.Value {
+				case "-":
+					curValue.string += token.Value
+					spaceIfMatch = false
 				case ",":
 					curValue.string += token.Value
 					spaceIfMatch = true
