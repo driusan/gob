@@ -10,8 +10,8 @@ import (
 )
 
 var (
-	NoStyles       = errors.New("No styles to apply")
-	InheritValue   = errors.New("Value should be inherited")
+	NoStyles     = errors.New("No styles to apply")
+	InheritValue = errors.New("Value should be inherited")
 )
 
 var PixelsPerPt float64
@@ -89,21 +89,21 @@ func ConvertUnitToPx(fontsize int, percentbasis int, cssString string) (int, err
 		if err == nil {
 			return int(f * PixelsPerPt * 72.0 / 25.4), nil
 		}
-		return int(fontsize),  fmt.Errorf("Invalid CSS Unit or value: %v", cssString)
+		return int(fontsize), fmt.Errorf("Invalid CSS Unit or value: %v", cssString)
 	case "pt":
 		f, err := strconv.ParseFloat(string(val[0:len(val)-2]), 64)
 		if err == nil {
 			return int(f * PixelsPerPt), nil
 		}
-		return int(fontsize),  fmt.Errorf("Invalid CSS Unit or value: %v", cssString)
+		return int(fontsize), fmt.Errorf("Invalid CSS Unit or value: %v", cssString)
 	case "pc":
 		f, err := strconv.ParseFloat(string(val[0:len(val)-2]), 64)
 		if err == nil {
 			return int(f * PixelsPerPt * 12), nil
 		}
-		return int(fontsize),fmt.Errorf("Invalid CSS Unit or value: %v", cssString) 
+		return int(fontsize), fmt.Errorf("Invalid CSS Unit or value: %v", cssString)
 	}
-	return fontsize,fmt.Errorf("Unimplemented CSS Unit or invalid value: %v", cssString) 
+	return fontsize, fmt.Errorf("Unimplemented CSS Unit or invalid value: %v", cssString)
 }
 
 func hexToUint8(val string) uint8 {
