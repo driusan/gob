@@ -310,7 +310,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 			var loadedImage bool
 			for _, attr := range e.Attr {
 				if loadedImage {
-					_, contentbox := e.calcCSSBox(e.ContentOverlay, 0)
+					_, contentbox := e.calcCSSBox(e.ContentOverlay)
 					e.BoxContentRectangle = contentbox
 					//cr := image.Rectangle{contentStart, contentStart.Add(contentBounds.Size())}
 					overlayed.GrowBounds(contentbox)
@@ -364,7 +364,9 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 
 	firstLine := true
 	imageMap := NewImageMap()
-	collapsablemargin := 0
+
+	// The bottom margin of the last child, used for collapsing margins (where applicable)
+	bottommargin := 0
 	for c := e.FirstChild; c != nil; c = c.NextSibling {
 		c.ViewportHeight = e.ViewportHeight
 		if dot.X < leftFloatStack.Width() {
@@ -482,7 +484,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				}
 				childContent, newDot := c.LayoutPass(width, image.ZR, dot, leftFloatStack, rightFloatStack, nextline)
 				c.ContentOverlay = childContent
-				_, contentbox := c.calcCSSBox(childContent, 0)
+				_, contentbox := c.calcCSSBox(childContent)
 				c.BoxContentRectangle = contentbox
 				//cr := image.Rectangle{contentStart, contentStart.Add(contentBounds.Size())}
 				overlayed.GrowBounds(contentbox)
@@ -521,26 +523,42 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 
 				// draw the border, background, and CSS outer box.
 				var lh int
-				cdot := image.Point{}
 
+				cdot := image.Point{}
 				// Collapse margins before doing layout
 				if display != "inline-block" {
-					if collapsablemargin > 0 {
-						tm := c.GetMarginTopSize()
-						if tm > collapsablemargin {
-							collapsablemargin = tm
+					if tm := c.GetMarginTopSize(); tm != 0 && bottommargin != 0 && c.GetPaddingTop() == 0 && c.GetBorderTopWidth() == 0 {
+						// collapse margins
+						if tm > bottommargin {
+							// Remove the bottom margin that was already added,
+							// because this top margin is bigger
+							dot.Y -= bottommargin
+						} else {
+							// Remove the new top margin, because the previous
+							// bottom margin was bigger.
+							dot.Y -= tm
 						}
-						dot.Y -= collapsablemargin
-					} else {
-						collapsablemargin = c.GetMarginBottomSize()
+
+						// If it's the first child of a collapsed margin, also collapse the margin in the child container.
+						if c.PrevSibling == nil {
+							println("Collapsing child margins")
+							if tm > bottommargin {
+								cdot.Y -= bottommargin
+							} else {
+								cdot.Y -= tm
+							}
+						}
 					}
-				} else {
-					collapsablemargin = 0
+					if mt := c.GetMarginTopSize(); mt < 0 {
+						dot.Y += mt
+					}
 				}
+
 				var childContent image.Image
+				// collapse child margins if applicable
 				childContent, _ = c.LayoutPass(width, image.ZR, &cdot, nil, nil, &lh)
 				c.ContentOverlay = childContent
-				box, contentbox := c.calcCSSBox(childContent, collapsablemargin)
+				box, contentbox := c.calcCSSBox(childContent)
 				c.BoxContentRectangle = contentbox
 				sr := box.Bounds()
 
@@ -607,9 +625,16 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 					} else {
 						dot.X = 0
 						dot.Y = r.Max.Y
+
+						if c.GetPaddingBottom() == 0 && c.GetBorderBottomWidth() == 0 {
+							bottommargin = c.GetMarginBottomSize()
+						} else {
+							bottommargin = 0
+						}
+
 						if mb := c.GetMarginBottomSize(); mb < 0 {
-							println("Negative bottom margin")
 							dot.Y += mb
+							bottommargin = 0
 						}
 					}
 

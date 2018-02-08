@@ -1,7 +1,7 @@
 package renderer
 
 import (
-	//	"fmt"
+	"fmt"
 	"github.com/driusan/Gob/css"
 	//"github.com/driusan/Gob/net"
 	"image"
@@ -61,18 +61,39 @@ func (b *outerBoxDrawer) ColorModel() color.Model {
 	return color.RGBAModel
 }
 func (b *outerBoxDrawer) Bounds() image.Rectangle {
-	return image.Rectangle{
+	r := image.Rectangle{
 		Min: image.Point{X: 0, Y: 0},
 		Max: image.Point{
-			X: b.contentSize.X + int(b.Border.Left.Width+b.Border.Right.Width) + int(b.Padding.Left.Width+b.Padding.Right.Width) + int(b.Margin.Left.Width+b.Margin.Right.Width),
-			Y: b.contentSize.Y + int(b.Border.Top.Width+b.Border.Bottom.Width) + int(b.Padding.Top.Width+b.Padding.Bottom.Width) + int(b.Margin.Top.Width+b.Margin.Bottom.Width),
+			X: b.contentSize.X + int(b.Border.Left.Width+b.Border.Right.Width) + int(b.Padding.Left.Width+b.Padding.Right.Width),
+			Y: b.contentSize.Y + int(b.Border.Top.Width+b.Border.Bottom.Width) + int(b.Padding.Top.Width+b.Padding.Bottom.Width),
 		},
 	}
+	// The max should be b.contentSize.X + int(b.Border.Left.Width+b.Border.Right.Width) + int(b.Padding.Left.Width+b.Padding.Right.Width) + int(b.Margin.Left.Width+b.Margin.Right.Width), but we need to take
+	// care of negative margins (similar for Y). If we unconditionally add them, the image size can
+	// become negative, causing a panic when image.NewRGBA is called.
+	//
+	// Negative margins are taken care of in LayoutPass, not by the box bounds.
+	if b.Margin.Left.Width > 0 {
+		r.Max.X += b.Margin.Left.Width
+	}
+	if b.Margin.Right.Width > 0 {
+		r.Max.X += b.Margin.Right.Width
+	}
+	if b.Margin.Top.Width > 0 {
+		r.Max.Y += b.Margin.Top.Width
+	}
+	if b.Margin.Bottom.Width > 0 {
+		r.Max.Y += b.Margin.Bottom.Width
+	}
+
+	return r
 }
 
 func (b *outerBoxDrawer) RGBA() *image.RGBA {
 	bounds := b.Bounds()
-	ri := image.NewRGBA(b.Bounds())
+	size := image.Rectangle{image.ZP, image.Point{bounds.Dx(), bounds.Dy()}}
+	fmt.Println(size)
+	ri := image.NewRGBA(size)
 	/* the zero colour is transparent, this isn't necessary
 	draw.Draw(
 		ri,
@@ -80,7 +101,7 @@ func (b *outerBoxDrawer) RGBA() *image.RGBA {
 		&image.Uniform{color.Transparent},
 		image.ZP,
 		draw.Src,
-	)
+
 	*/
 
 	// draw the background first, bounded by the margins
@@ -654,7 +675,7 @@ func (e *RenderableDomElement) GetBackgroundImage() image.Image {
 // image which should be used to overlay content.
 // The returned image does *not* have the content overlayed, it only
 // has the margin/background/borders drawn on it.
-func (e *RenderableDomElement) calcCSSBox(content image.Image, collapsablemargin int) (image.Image, image.Rectangle) {
+func (e *RenderableDomElement) calcCSSBox(content image.Image) (image.Image, image.Rectangle) {
 	// calculate the size of the box.
 	size := content.Bounds().Size()
 	if width := e.GetWidth(); width >= 0 {
@@ -779,21 +800,10 @@ func (e *RenderableDomElement) calcCSSBox(content image.Image, collapsablemargin
 		}
 		bgi = bgCanvas
 	}
-	var topmargin int
-	if collapsablemargin == 0 {
-		topmargin = e.GetMarginTopSize()
-	} else if tm := e.GetMarginTopSize(); tm < 0 {
-		topmargin = tm + collapsablemargin
-	} else {
-		if ts := e.GetMarginTopSize(); ts < collapsablemargin {
-			topmargin = collapsablemargin
-		} else {
-			topmargin = ts
-		}
-	}
+
 	box := &outerBoxDrawer{
 		Margin: BoxMargins{
-			Top:    BoxMargin{Width: topmargin},
+			Top:    BoxMargin{Width: e.GetMarginTopSize()},
 			Left:   BoxMargin{Width: e.GetMarginLeftSize()},
 			Right:  BoxMargin{Width: e.GetMarginRightSize()},
 			Bottom: BoxMargin{Width: e.GetMarginBottomSize()},
