@@ -5,9 +5,13 @@ import (
 	"github.com/driusan/Gob/css"
 	"github.com/driusan/Gob/dom"
 	"github.com/driusan/Gob/net"
+
 	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
 	"golang.org/x/net/html"
+
+	"github.com/nfnt/resize"
+
 	"image"
 	"image/draw"
 	_ "image/gif"
@@ -309,11 +313,12 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 		switch strings.ToLower(e.Data) {
 		case "img":
 			var loadedImage bool
+			var iwidth, iheight int
 			for _, attr := range e.Attr {
 				switch attr.Key {
 				case "src":
 					// Seeing this print way too many times.. something's wrong.
-					fmt.Printf("Should load: %s\n", attr.Val)
+					//fmt.Printf("Should load: %s\n", attr.Val)
 					u, err := url.Parse(attr.Val)
 					if err != nil {
 						loadedImage = true
@@ -332,29 +337,36 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 					if err == nil {
 						e.ContentOverlay = content
 						size := content.Bounds().Size()
-						if e.Styles.Width.GetValue() == "" {
-							e.Styles.Width = css.NewPxValue(size.X)
-						}
-						if e.Styles.Height.GetValue() == "" {
-							e.Styles.Height = css.NewPxValue(size.Y)
-						}
-						width = size.X
-						height = size.Y
-						fmt.Println("Loaded", attr.Val, width, height)
+						iwidth = size.X
+						iheight = size.Y
+						//fmt.Println("Loaded", attr.Val, width, height)
 					} else {
 						fmt.Fprintf(os.Stderr, "Unknown image format: %s Err: %s\n", format, err)
 						e.ContentOverlay = image.NewRGBA(image.ZR)
 					}
 					loadedImage = true
 				case "width":
-					width, _ = strconv.Atoi(attr.Val)
+					iwidth, _ = strconv.Atoi(attr.Val)
+					iheight = 0
 				case "height":
-					height, _ = strconv.Atoi(attr.Val)
+					iheight, _ = strconv.Atoi(attr.Val)
+					iwidth = 0
 				}
 			}
 
-			e.Styles.Width = css.NewPxValue(width)
-			e.Styles.Height = css.NewPxValue(height)
+			if iwidth != 0 || iheight != 0 {
+				println(iwidth, iheight)
+				e.ContentOverlay = resize.Resize(uint(iwidth), uint(iheight), e.ContentOverlay, resize.NearestNeighbor)
+				sz := e.ContentOverlay.Bounds().Size()
+				iwidth = sz.X
+				iheight = sz.Y
+			}
+			if e.Styles.Width.GetValue() == "" {
+				e.Styles.Width = css.NewPxValue(iwidth)
+			}
+			if e.Styles.Height.GetValue() == "" {
+				e.Styles.Height = css.NewPxValue(iheight)
+			}
 			e.Styles.Overflow = css.NewValue("hidden")
 			overlayed = NewDynamicMemoryDrawer(image.Rectangle{image.ZP, image.Point{width, height}})
 			if loadedImage {
