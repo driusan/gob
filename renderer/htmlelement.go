@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	DefaultFontSize = 12
+	DefaultFontSize = css.DefaultFontSize
 )
 
 // A RenderableElement is something that can be rendered to

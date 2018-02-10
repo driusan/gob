@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	DefaultFontSize = 16
+	DefaultFontSize = 12
 )
 
 type fontStyle struct {
