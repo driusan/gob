@@ -364,8 +364,8 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				overlayed.GrowBounds(contentbox)
 				//fmt.Println(e.ContentOverlay.Bounds())
 				//	fmt.Println(contentbox.Bounds())
-				return e.ContentOverlay, *dot
 			}
+			return e.ContentOverlay, *dot
 		}
 	}
 
@@ -581,6 +581,31 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 						Min: image.Point{rightFloatX - size.X, dot.Y},
 						Max: image.Point{rightFloatX, size.Y + dot.Y},
 					}
+					leftFloatX := leftFloatStack.Width()
+					if r.Min.X <= leftFloatX {
+						lfHeight := leftFloatStack.NextFloatHeight()
+						rfHeight := rightFloatStack.NextFloatHeight()
+
+						if lfHeight > 0 && (lfHeight <= rfHeight || rfHeight == 0) {
+							dot.Y += lfHeight
+							leftFloatStack = leftFloatStack.ClearFloats(*dot)
+							rightFloatStack = rightFloatStack.ClearFloats(*dot)
+							dot.X = leftFloatStack.Width()
+						} else if rfHeight > 0 {
+							dot.Y += rfHeight
+							leftFloatStack = leftFloatStack.ClearFloats(*dot)
+							rightFloatStack = rightFloatStack.ClearFloats(*dot)
+							dot.X = leftFloatStack.Width()
+						} else {
+							panic("Clearing floats didn't make any space.")
+						}
+
+						rightFloatX = rightFloatStack.Width()
+						r = image.Rectangle{
+							Min: image.Point{width - rightFloatX - size.X, dot.Y},
+							Max: image.Point{width - rightFloatX, size.Y + dot.Y},
+						}
+					}
 				case "left":
 					size := sr.Size()
 					leftFloatX := leftFloatStack.Width()
@@ -592,7 +617,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 						lfHeight := leftFloatStack.NextFloatHeight()
 						rfHeight := rightFloatStack.NextFloatHeight()
 
-						if lfHeight > 0 && (lfHeight < rfHeight || rfHeight == 0) {
+						if lfHeight > 0 && (lfHeight <= rfHeight || rfHeight == 0) {
 							dot.Y += lfHeight
 							leftFloatStack = leftFloatStack.ClearFloats(*dot)
 							rightFloatStack = rightFloatStack.ClearFloats(*dot)
