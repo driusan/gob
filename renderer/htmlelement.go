@@ -411,7 +411,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 							remainingTextContent = ""
 							continue
 						}
-						if lfHeight > 0 && lfHeight < rfHeight {
+						if lfHeight > 0 && (lfHeight < rfHeight || rfHeight == 0) {
 							dot.Y += lfHeight + 1
 							leftFloatStack = leftFloatStack.ClearFloats(*dot)
 							dot.X = leftFloatStack.Width()

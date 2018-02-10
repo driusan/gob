@@ -24,17 +24,17 @@ func (f FloatStack) Width() int {
 	return width
 }
 
-// Remove any floats that are past dot from the float stack
+// Remove any floats that are past dot from the float stack and return
+// the floats that have not yet been cleared.
 func (f FloatStack) ClearFloats(dot image.Point) FloatStack {
-	var removed = f
+	var newstack = make(FloatStack, 0, len(f))
 
-	for i, child := range f {
-		if dot.Y > (child.BoxDrawRectangle.Max.Y) {
-			//if (child.BoxDrawRectangle.Max.Y) > dot.Y {
-			removed = append(f[:i], f[i+1:]...)
+	for _, child := range f {
+		if dot.Y <= (child.BoxDrawRectangle.Max.Y) {
+			newstack = append(newstack, child)
 		}
 	}
-	return removed
+	return newstack
 }
 
 func (f FloatStack) NextFloatHeight() int {
@@ -47,5 +47,5 @@ func (f FloatStack) NextFloatHeight() int {
 	if size == 0 {
 		fmt.Printf("Bounds size is 0?? %s %s %s", lastElem.CSSOuterBox.Bounds(), lastElem.Data, lastElem.GetTextContent())
 	}
-	return 0
+	return size
 }
