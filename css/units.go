@@ -24,6 +24,9 @@ func init() {
 func NewPxValue(x int) StyleValue {
 	return StyleValue{fmt.Sprintf("%dpx", x), false}
 }
+func NewValue(val string) StyleValue {
+	return StyleValue{val, false}
+}
 
 func ConvertUnitToPx(fontsize int, percentbasis int, cssString string) (int, error) {
 	if cssString == "0" {

@@ -30,7 +30,7 @@ func (f FloatStack) ClearFloats(dot image.Point) FloatStack {
 	var newstack = make(FloatStack, 0, len(f))
 
 	for _, child := range f {
-		if dot.Y <= (child.BoxDrawRectangle.Max.Y) {
+		if dot.Y < (child.BoxDrawRectangle.Max.Y) {
 			newstack = append(newstack, child)
 		}
 	}

@@ -15,6 +15,7 @@ import (
 	_ "image/png"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"unicode"
 	//"strconv"
@@ -309,15 +310,6 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 		case "img":
 			var loadedImage bool
 			for _, attr := range e.Attr {
-				if loadedImage {
-					_, contentbox := e.calcCSSBox(e.ContentOverlay)
-					e.BoxContentRectangle = contentbox
-					//cr := image.Rectangle{contentStart, contentStart.Add(contentBounds.Size())}
-					overlayed.GrowBounds(contentbox)
-					fmt.Println(e.ContentOverlay.Bounds())
-					fmt.Println(contentbox.Bounds())
-					return e.ContentOverlay, *dot
-				}
 				switch attr.Key {
 				case "src":
 					// Seeing this print way too many times.. something's wrong.
@@ -325,7 +317,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 					u, err := url.Parse(attr.Val)
 					if err != nil {
 						loadedImage = true
-						break
+						continue
 					}
 					newURL := e.PageLocation.ResolveReference(u)
 					r, code, err := e.resolver.GetURL(newURL)
@@ -348,14 +340,31 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 						}
 						width = size.X
 						height = size.Y
-						overlayed = NewDynamicMemoryDrawer(image.Rectangle{image.ZP, image.Point{width, height}})
 						fmt.Println("Loaded", attr.Val, width, height)
 					} else {
 						fmt.Fprintf(os.Stderr, "Unknown image format: %s Err: %s\n", format, err)
 						e.ContentOverlay = image.NewRGBA(image.ZR)
 					}
 					loadedImage = true
+				case "width":
+					width, _ = strconv.Atoi(attr.Val)
+				case "height":
+					height, _ = strconv.Atoi(attr.Val)
 				}
+			}
+
+			e.Styles.Width = css.NewPxValue(width)
+			e.Styles.Height = css.NewPxValue(height)
+			e.Styles.Overflow = css.NewValue("hidden")
+			overlayed = NewDynamicMemoryDrawer(image.Rectangle{image.ZP, image.Point{width, height}})
+			if loadedImage {
+				_, contentbox := e.calcCSSBox(e.ContentOverlay)
+				e.BoxContentRectangle = contentbox
+				//cr := image.Rectangle{contentStart, contentStart.Add(contentBounds.Size())}
+				overlayed.GrowBounds(contentbox)
+				//fmt.Println(e.ContentOverlay.Bounds())
+				//	fmt.Println(contentbox.Bounds())
+				return e.ContentOverlay, *dot
 			}
 		}
 	}
@@ -578,6 +587,30 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 					r = image.Rectangle{
 						Min: image.Point{leftFloatX, dot.Y},
 						Max: image.Point{leftFloatX + size.X, size.Y + dot.Y},
+					}
+					if r.Max.X >= width {
+						lfHeight := leftFloatStack.NextFloatHeight()
+						rfHeight := rightFloatStack.NextFloatHeight()
+
+						if lfHeight > 0 && (lfHeight < rfHeight || rfHeight == 0) {
+							dot.Y += lfHeight
+							leftFloatStack = leftFloatStack.ClearFloats(*dot)
+							rightFloatStack = rightFloatStack.ClearFloats(*dot)
+							dot.X = leftFloatStack.Width()
+						} else if rfHeight > 0 {
+							dot.Y += rfHeight
+							leftFloatStack = leftFloatStack.ClearFloats(*dot)
+							rightFloatStack = rightFloatStack.ClearFloats(*dot)
+							dot.X = leftFloatStack.Width()
+						} else {
+							panic("Clearing floats didn't make any space.")
+						}
+
+						leftFloatX = leftFloatStack.Width()
+						r = image.Rectangle{
+							Min: image.Point{leftFloatX, dot.Y},
+							Max: image.Point{leftFloatX + size.X, size.Y + dot.Y},
+						}
 					}
 				}
 				overlayed.GrowBounds(r)
