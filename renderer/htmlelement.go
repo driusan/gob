@@ -151,9 +151,6 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 	default:
 		words = strings.Fields(textContent)
 		ssize, _ = stringSize(fntDrawer, strings.TrimSpace(textContent))
-		if ssize > remainingWidth {
-			ssize = remainingWidth
-		}
 	}
 	lineheight := e.GetLineHeight()
 	start := 0
@@ -163,6 +160,9 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 	}
 	if unicode.IsSpace(rune(textContent[len(textContent)-1])) {
 		ssize += (fSize / 3)
+	}
+	if ssize > remainingWidth {
+		ssize = remainingWidth
 	}
 	img = image.NewRGBA(image.Rectangle{image.ZP, image.Point{ssize, lineheight}})
 
