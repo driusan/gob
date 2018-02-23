@@ -72,6 +72,7 @@ BDO[DIR="rtl"]  { direction: rtl; unicode-bidi: bidi-override }
 
 body { margin: 8px; }
 a { text-decoration: underline; color: blue; }
-img { display: block; }
 noscript { display: block; }
 script, style { display: none; }
+/* FIXME: This shouldn't be required (it should be inline), but without it some images overlap */
+img { display: block; }

@@ -314,6 +314,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 		case "img":
 			var loadedImage bool
 			var iwidth, iheight int
+			var ewidth, eheight bool
 			for _, attr := range e.Attr {
 				switch attr.Key {
 				case "src":
@@ -347,15 +348,20 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 					loadedImage = true
 				case "width":
 					iwidth, _ = strconv.Atoi(attr.Val)
-					iheight = 0
+					ewidth = true
+					if !eheight {
+						iheight = 0
+					}
 				case "height":
 					iheight, _ = strconv.Atoi(attr.Val)
-					iwidth = 0
+					eheight = true
+					if !ewidth {
+						iwidth = 0
+					}
 				}
 			}
 
 			if iwidth != 0 || iheight != 0 {
-				println(iwidth, iheight)
 				e.ContentOverlay = resize.Resize(uint(iwidth), uint(iheight), e.ContentOverlay, resize.NearestNeighbor)
 				sz := e.ContentOverlay.Bounds().Size()
 				iwidth = sz.X
