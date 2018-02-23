@@ -204,6 +204,33 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 	for i, word := range words {
 		wordSizeInPx := fntDrawer.MeasureString(word).Ceil()
 		if dot+wordSizeInPx > remainingWidth && whitespace != "nowrap" {
+			// The word doesn't fit on this line.
+			if strings.Index(word, "-") >= 0 {
+				println("Hyphen!")
+				// This isn't required, but including partial words that have a hyphen
+				// on a line is what Chrome and Firefox do, and makes it easier to
+				// compare test cases.
+				pword := strings.SplitN(word, "-", 2)
+				pword[0] = pword[0] + "-"
+				wordSizeInPx = fntDrawer.MeasureString(pword[0]).Ceil()
+				if dot+wordSizeInPx <= remainingWidth {
+					fntDrawer.DrawString(pword[0])
+					unconsumed = strings.Join(words[i+1:], " ")
+					if len(unconsumed) > 0 {
+						unconsumed = pword[1] + " " + unconsumed
+					} else {
+						unconsumed = pword[1]
+					}
+					consumed = strings.Join(words[:i], " ")
+					if len(consumed) > 0 {
+						consumed = consumed + " " + pword[0]
+					} else {
+						consumed = pword[0]
+					}
+					return
+				}
+				// falthrough to normal exit, we couldn't fit a partial word
+			}
 			if i == 0 && force {
 				// make sure at least one word gets consumed to avoid an infinite loop.
 				// this isn't ideal, since some words will disappear, but if we reach this
