@@ -93,7 +93,7 @@ func LoadPage(r io.Reader, loader net.URLReader, urlContext *url.URL) Page {
 			// nothing specified, so inherit from parent, or
 			// fall back on default if there is no parent.
 			if el.Parent == nil {
-				el.Styles.SetFontSize(renderer.DefaultFontSize)
+				el.Styles.SetFontSize(css.DefaultFontSize)
 			} else {
 				size, _ := el.Parent.Styles.GetFontSize()
 				el.Styles.SetFontSize(size)
@@ -114,7 +114,7 @@ func LoadPage(r io.Reader, loader net.URLReader, urlContext *url.URL) Page {
 }
 
 func fontSizeToPx(val string, parent *renderer.RenderableDomElement) int {
-	DefaultFontSize := renderer.DefaultFontSize
+	DefaultFontSize := css.DefaultFontSize
 	if len(val) == 0 {
 		psize, err := parent.Styles.GetFontSize()
 		if err == nil {

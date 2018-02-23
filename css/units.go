@@ -19,6 +19,7 @@ var PixelsPerPt float64
 func init() {
 	// Assume 96 DPI unless someone tells us otherwise at this resolution.
 	PixelsPerPt = (96.0 / 72.0)
+	DefaultFontSize = int(12 * PixelsPerPt)
 }
 
 func NewPxValue(x int) StyleValue {

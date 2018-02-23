@@ -25,10 +25,6 @@ import (
 	//"strconv"
 )
 
-const (
-	DefaultFontSize = css.DefaultFontSize
-)
-
 // A RenderableElement is something that can be rendered to
 // an image.
 type Renderer interface {

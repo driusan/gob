@@ -78,7 +78,7 @@ func (e *RenderableDomElement) GetFontSize() int {
 	switch err {
 	case css.NoStyles, css.InheritValue:
 		if e.Parent == nil {
-			return DefaultFontSize
+			return css.DefaultFontSize
 		}
 		return e.Parent.GetFontSize()
 	case nil:
