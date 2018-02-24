@@ -291,14 +291,16 @@ func (e *RenderableDomElement) InvalidateLayout() {
 	if e == nil {
 		return
 	}
-	e.layoutDone = false
-	e.OverlayedContent = nil
-	e.CSSOuterBox = nil
-	e.ContentOverlay = nil
-	e.lineBoxes = nil
+	if float := e.GetFloat(); float != "left" && float != "right" {
+		e.layoutDone = false
+		e.OverlayedContent = nil
+		e.CSSOuterBox = nil
+		e.ContentOverlay = nil
+		e.lineBoxes = nil
 
-	if e.FirstChild != nil {
-		e.FirstChild.InvalidateLayout()
+		if e.FirstChild != nil {
+			e.FirstChild.InvalidateLayout()
+		}
 	}
 	if e.NextSibling != nil {
 		e.NextSibling.InvalidateLayout()
@@ -340,6 +342,8 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 	if lh := e.GetLineHeight(); lh > *nextline {
 		*nextline = lh
 	}
+	onl := *nextline
+	odot := fdot
 
 	// special cases
 	if e.Type == html.ElementNode {
@@ -423,7 +427,25 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 
 	// The bottom margin of the last child, used for collapsing margins (where applicable)
 	bottommargin := 0
+	var reflowTriggerer *RenderableDomElement
+restartLayout:
+	if reflowTriggerer != nil {
+		e.InvalidateLayout()
+		*dot = odot
+		*nextline = onl
+		firstLine = true
+		bottommargin = 0
+	}
 	for c := e.FirstChild; c != nil; c = c.NextSibling {
+		if reflowTriggerer != nil {
+				if reflowTriggerer == c {
+					reflowTriggerer = nil
+					continue
+				}
+				if float := c.GetFloat(); float == "left" || float == "right" {
+					continue
+				}
+		}
 		if fdot.Y < dot.Y {
 			fdot = *dot
 		}
@@ -659,7 +681,11 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 
 				var childContent image.Image
 				// collapse child margins if applicable
-				childContent, _ = c.LayoutPass(width, image.ZR, &cdot, &lh)
+				if reflowTriggerer == nil || !(float == "left" || float == "right") {
+					childContent, _ = c.LayoutPass(width, image.ZR, &cdot, &lh)
+				} else {
+					childContent = c.ContentOverlay
+				}
 				c.ContentOverlay = childContent
 				box, contentbox := c.calcCSSBox(childContent)
 				c.BoxContentRectangle = contentbox
@@ -739,12 +765,14 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				overlayed.GrowBounds(r)
 				c.BoxDrawRectangle = r
 
-				if sr.Size().Y > 0 {
-					switch float {
-					case "left":
-						e.leftFloats = append(e.leftFloats, c)
-					case "right":
-						e.rightFloats = append(e.rightFloats, c)
+				if reflowTriggerer == nil {
+					if sr.Size().Y > 0 {
+						switch float {
+						case "left":
+							e.leftFloats = append(e.leftFloats, c)
+						case "right":
+							e.rightFloats = append(e.rightFloats, c)
+						}
 					}
 				}
 
@@ -769,6 +797,12 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				switch float {
 				case "left", "right":
 					// floated boxes don't affect dot.
+					if reflowTriggerer == nil {
+						reflowTriggerer = c
+						goto restartLayout
+					} else if reflowTriggerer == c {
+						reflowTriggerer = nil
+					}
 				case "none":
 					fallthrough
 				default:
