@@ -67,6 +67,8 @@ type RenderableDomElement struct {
 
 	resolver   net.URLReader
 	layoutDone bool
+
+	leftFloats, rightFloats FloatStack
 }
 
 func (e RenderableDomElement) String() string {
@@ -278,9 +280,10 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 }
 
 func (e *RenderableDomElement) Render(containerWidth int) image.Image {
-	leftFloatStack, rightFloatStack := make(FloatStack, 0), make(FloatStack, 0)
+	e.leftFloats = make(FloatStack, 0)
+	e.rightFloats = make(FloatStack, 0)
 	var lh int
-	e.LayoutPass(containerWidth, image.ZR, &image.Point{0, 0}, leftFloatStack, rightFloatStack, &lh)
+	e.LayoutPass(containerWidth, image.ZR, &image.Point{0, 0}, &lh)
 	return e.DrawPass()
 }
 
@@ -313,7 +316,7 @@ func (e *RenderableDomElement) InvalidateLayout() {
 // to draw at.), and it returns both an image, and the final location of dot after drawing the element. This is
 // required because inline elements might render multiple line blocks, and the whole inline isn't necessarily
 // square, so you can't just take the bounds of the rendered image.
-func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle, dot *image.Point, leftFloatStack, rightFloatStack FloatStack, nextline *int) (image.Image, image.Point) {
+func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle, dot *image.Point, nextline *int) (image.Image, image.Point) {
 	var overlayed *DynamicMemoryDrawer
 	if e.layoutDone {
 		return e.OverlayedContent, image.Point{}
@@ -370,7 +373,6 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 						size := content.Bounds().Size()
 						iwidth = size.X
 						iheight = size.Y
-						//fmt.Println("Loaded", attr.Val, width, height)
 					} else {
 						fmt.Fprintf(os.Stderr, "Unknown image format: %s Err: %s\n", format, err)
 						e.ContentOverlay = image.NewRGBA(image.ZR)
@@ -408,10 +410,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 			if loadedImage {
 				_, contentbox := e.calcCSSBox(e.ContentOverlay)
 				e.BoxContentRectangle = contentbox
-				//cr := image.Rectangle{contentStart, contentStart.Add(contentBounds.Size())}
 				overlayed.GrowBounds(contentbox)
-				//fmt.Println(e.ContentOverlay.Bounds())
-				//	fmt.Println(contentbox.Bounds())
 			}
 			return e.ContentOverlay, *dot
 		}
@@ -427,12 +426,10 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 	for c := e.FirstChild; c != nil; c = c.NextSibling {
 		if fdot.Y < dot.Y {
 			fdot = *dot
-			//leftFloatStack = leftFloatStack.ClearFloats(fdot)
-			//rightFloatStack = rightFloatStack.ClearFloats(fdot)
 		}
 		c.ViewportHeight = e.ViewportHeight
-		if dot.X < leftFloatStack.WidthAt(*dot) {
-			dot.X = leftFloatStack.WidthAt(*dot)
+		if dot.X < e.leftFloats.WidthAt(*dot) {
+			dot.X = e.leftFloats.WidthAt(*dot)
 		}
 		float := c.GetFloat()
 		switch c.Type {
@@ -447,8 +444,8 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 			// parent.
 			c.Styles = e.Styles
 
-			lfWidth := leftFloatStack.WidthAt(*dot)
-			rfWidth := rightFloatStack.WidthAt(*dot)
+			lfWidth := e.leftFloats.WidthAt(*dot)
+			rfWidth := e.rightFloats.WidthAt(*dot)
 			if dot.X < lfWidth {
 				dot.X = lfWidth
 			}
@@ -463,9 +460,9 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 			for remainingTextContent != "" {
 				if whitespace == "normal" {
 					if width-dot.X-rfWidth <= 0 {
-						lfHeight := leftFloatStack.NextFloatHeight()
-						rfHeight := rightFloatStack.NextFloatHeight()
-						if len(leftFloatStack) == 0 && len(rightFloatStack) == 0 {
+						lfHeight := e.leftFloats.NextFloatHeight()
+						rfHeight := e.rightFloats.NextFloatHeight()
+						if len(e.leftFloats) == 0 && len(e.rightFloats) == 0 {
 							dot.X = 0
 							dot.Y += *nextline
 						}
@@ -474,18 +471,18 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 							dot.Y += lfHeight + 1
 							//dot.Y += *nextline
 							//dot.Y += c.GetFontFace(c.GetFontSize()).Metrics().Ascent.Ceil()
-							//leftFloatStack = leftFloatStack.ClearFloats(*dot)
-							dot.X = leftFloatStack.WidthAt(*dot)
+							//e.leftFloats = e.leftFloats.ClearFloats(*dot)
+							dot.X = e.leftFloats.WidthAt(*dot)
 						} else if rfHeight > 0 {
 							dot.Y += rfHeight + 1
 							//dot.Y += *nextline
-							//rightFloatStack = rightFloatStack.ClearFloats(*dot)
+							//e.rightFloats = e.rightFloats.ClearFloats(*dot)
 						} else {
 							panic("Clearing floats didn't make any space.")
 						}
 
-						lfWidth = leftFloatStack.WidthAt(*dot)
-						rfWidth = rightFloatStack.WidthAt(*dot)
+						lfWidth = e.leftFloats.WidthAt(*dot)
+						rfWidth = e.rightFloats.WidthAt(*dot)
 
 					}
 				}
@@ -504,32 +501,32 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				// not the corner to draw at, so WidthAt can be a little unreliable.
 				// Check if the new rectangle overlaps with any floats, and if it does then
 				// increase according to the box it's overlapping and try again.
-				for _, float := range leftFloatStack {
+				for _, float := range e.leftFloats {
 					if r.Overlaps(float.BoxDrawRectangle) {
 						if dot.Y <= float.BoxDrawRectangle.Min.Y {
 							dot.Y = float.BoxDrawRectangle.Min.Y + 1
 						} else {
 							dot.Y = float.BoxDrawRectangle.Max.Y + 1
 						}
-						dot.X = leftFloatStack.WidthAt(*dot)
+						dot.X = e.leftFloats.WidthAt(*dot)
 
-						lfWidth = leftFloatStack.WidthAt(*dot)
-						rfWidth = rightFloatStack.WidthAt(*dot)
+						lfWidth = e.leftFloats.WidthAt(*dot)
+						rfWidth = e.rightFloats.WidthAt(*dot)
 						continue textdraw
 					}
 				}
 				// same for right floats
-				for _, float := range rightFloatStack {
+				for _, float := range e.rightFloats {
 					if r.Overlaps(float.BoxDrawRectangle) {
 						if dot.Y <= float.BoxDrawRectangle.Min.Y {
 							dot.Y = float.BoxDrawRectangle.Min.Y + 1
 						} else {
 							dot.Y = float.BoxDrawRectangle.Max.Y + 1
 						}
-						dot.X = leftFloatStack.WidthAt(*dot)
+						dot.X = e.leftFloats.WidthAt(*dot)
 
-						lfWidth = leftFloatStack.WidthAt(*dot)
-						rfWidth = rightFloatStack.WidthAt(*dot)
+						lfWidth = e.leftFloats.WidthAt(*dot)
+						rfWidth = e.rightFloats.WidthAt(*dot)
 						continue textdraw
 					}
 				}
@@ -553,10 +550,10 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 						dot.Y += *nextline
 						// clear the floats that have been passed, and then move dot to the edge
 						// of the left float.
-						//leftFloatStack = leftFloatStack.ClearFloats(*dot)
-						//rightFloatStack = rightFloatStack.ClearFloats(*dot)
-						lfWidth = leftFloatStack.WidthAt(*dot)
-						rfWidth = rightFloatStack.WidthAt(*dot)
+						//e.leftFloats = e.leftFloats.ClearFloats(*dot)
+						//e.rightFloats = e.rightFloats.ClearFloats(*dot)
+						lfWidth = e.leftFloats.WidthAt(*dot)
+						rfWidth = e.rightFloats.WidthAt(*dot)
 
 						dot.X = lfWidth
 					} else {
@@ -586,7 +583,9 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 					dot.X += c.GetTextIndent(width)
 					firstLine = false
 				}
-				childContent, newDot := c.LayoutPass(width, image.ZR, &image.Point{dot.X, dot.Y}, leftFloatStack, rightFloatStack, nextline)
+				c.leftFloats = e.leftFloats
+				c.rightFloats = e.rightFloats
+				childContent, newDot := c.LayoutPass(width, image.ZR, &image.Point{dot.X, dot.Y}, nextline)
 				c.ContentOverlay = childContent
 				_, contentbox := c.calcCSSBox(childContent)
 				c.BoxContentRectangle = contentbox
@@ -660,7 +659,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 
 				var childContent image.Image
 				// collapse child margins if applicable
-				childContent, _ = c.LayoutPass(width, image.ZR, &cdot, nil, nil, &lh)
+				childContent, _ = c.LayoutPass(width, image.ZR, &cdot, &lh)
 				c.ContentOverlay = childContent
 				box, contentbox := c.calcCSSBox(childContent)
 				c.BoxContentRectangle = contentbox
@@ -675,8 +674,8 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 						fdot.X = dot.X
 					}
 					size := sr.Size()
-					rightFloat := rightFloatStack.ClearFloats(fdot)
-					leftFloat := leftFloatStack.ClearFloats(fdot)
+					rightFloat := e.rightFloats.ClearFloats(fdot)
+					leftFloat := e.leftFloats.ClearFloats(fdot)
 					rightFloatX := width - rightFloat.WidthAt(fdot)
 					r = image.Rectangle{
 						Min: image.Point{rightFloatX - size.X, fdot.Y},
@@ -710,29 +709,27 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 						fdot.X = dot.X
 					}
 					size := sr.Size()
-					//rightFloat := rightFloatStack//.ClearFloats(fdot)
-					//leftFloat := leftFloatStack//.ClearFloats(fdot)
-					leftFloatX := leftFloatStack.WidthAt(fdot)
+					leftFloatX := e.leftFloats.WidthAt(fdot)
 					fdot.X = leftFloatX
 					r = image.Rectangle{
 						Min: image.Point{leftFloatX, fdot.Y},
 						Max: image.Point{leftFloatX + size.X, size.Y + fdot.Y},
 					}
 					if r.Max.X >= width {
-						lfHeight := leftFloatStack.ClearFloats(fdot).NextFloatHeight()
-						rfHeight := rightFloatStack.ClearFloats(fdot).NextFloatHeight()
+						lfHeight := e.leftFloats.ClearFloats(fdot).NextFloatHeight()
+						rfHeight := e.rightFloats.ClearFloats(fdot).NextFloatHeight()
 
 						if lfHeight > 0 && (lfHeight <= rfHeight || rfHeight == 0) {
 							fdot.Y += lfHeight
-							fdot.X = leftFloatStack.WidthAt(fdot)
+							fdot.X = e.leftFloats.WidthAt(fdot)
 						} else if rfHeight > 0 {
 							fdot.Y += rfHeight
-							fdot.X = leftFloatStack.WidthAt(fdot)
+							fdot.X = e.leftFloats.WidthAt(fdot)
 						} else {
 							panic("Clearing floats didn't make any space.")
 						}
 
-						leftFloatX = leftFloatStack.ClearFloats(fdot).WidthAt(fdot)
+						leftFloatX = e.leftFloats.ClearFloats(fdot).WidthAt(fdot)
 						r = image.Rectangle{
 							Min: image.Point{leftFloatX, fdot.Y},
 							Max: image.Point{leftFloatX + size.X, size.Y + fdot.Y},
@@ -745,9 +742,9 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				if sr.Size().Y > 0 {
 					switch float {
 					case "left":
-						leftFloatStack = append(leftFloatStack, c)
+						e.leftFloats = append(e.leftFloats, c)
 					case "right":
-						rightFloatStack = append(rightFloatStack, c)
+						e.rightFloats = append(e.rightFloats, c)
 					}
 				}
 
@@ -800,10 +797,6 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				}
 			}
 
-		}
-		if float == "none" {
-			//leftFloatStack = leftFloatStack.ClearFloats(*dot)
-			//rightFloatStack = rightFloatStack.ClearFloats(*dot)
 		}
 	}
 	e.ImageMap = imageMap
