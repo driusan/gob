@@ -1,7 +1,7 @@
 package renderer
 
 import (
-	"fmt"
+	//	"fmt"
 	"github.com/driusan/Gob/css"
 	//"github.com/driusan/Gob/net"
 	"image"
@@ -92,7 +92,7 @@ func (b *outerBoxDrawer) Bounds() image.Rectangle {
 func (b *outerBoxDrawer) RGBA() *image.RGBA {
 	bounds := b.Bounds()
 	size := image.Rectangle{image.ZP, image.Point{bounds.Dx(), bounds.Dy()}}
-	fmt.Println(size)
+	//fmt.Println(size)
 	ri := image.NewRGBA(size)
 	/* the zero colour is transparent, this isn't necessary
 	draw.Draw(

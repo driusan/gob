@@ -72,28 +72,27 @@ type Viewport struct {
 }
 
 func paintWindow(s screen.Screen, w screen.Window, v *Viewport, page parser.Page) {
+	if v.Content == nil {
+		return
+	}
 	viewport := v.Size.Bounds()
 
-	if v.Content != nil {
-		b, err := s.NewBuffer(v.Size.Size())
-		dst := b.RGBA()
+	b, err := s.NewBuffer(v.Size.Size())
+	dst := b.RGBA()
 
-		// Fill the buffer with the window background colour before
-		// drawing the web page on top of it.
-		draw.Draw(dst, dst.Bounds(), &image.Uniform{background}, image.ZP, draw.Src)
+	// Fill the buffer with the window background colour before
+	// drawing the web page on top of it.
+	draw.Draw(dst, dst.Bounds(), &image.Uniform{background}, image.ZP, draw.Src)
 
-		// Draw the clipped portion of the page that is within view
-		draw.Draw(dst, viewport, v.Content, v.Cursor, draw.Over)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "%s", err)
-			return
-		}
-		defer b.Release()
-		draw.Draw(dst, viewport, v.Content, v.Cursor, draw.Over)
-		w.Upload(image.Point{0, 0}, b, viewport)
-	} else {
-		fmt.Fprintf(os.Stderr, "No body to render!\n")
+	// Draw the clipped portion of the page that is within view
+	draw.Draw(dst, viewport, v.Content, v.Cursor, draw.Over)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s", err)
+		return
 	}
+	defer b.Release()
+	draw.Draw(dst, viewport, v.Content, v.Cursor, draw.Over)
+	w.Upload(image.Point{0, 0}, b, viewport)
 	w.Publish()
 }
 

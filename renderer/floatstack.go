@@ -12,13 +12,16 @@ import (
 // from the stack.
 type FloatStack []*RenderableDomElement
 
-func (f FloatStack) Width() int {
+func (f FloatStack) WidthAt(loc image.Point) int {
 	if f == nil {
 		return 0
 	}
 	var width int = 0
 	for _, child := range f {
-		width += child.CSSOuterBox.Bounds().Size().X
+		bounds := child.BoxDrawRectangle
+		if loc.Y >= bounds.Min.Y && loc.Y <= bounds.Max.Y {
+			width += bounds.Size().X
+		}
 	}
 
 	return width
@@ -38,12 +41,13 @@ func (f FloatStack) ClearFloats(dot image.Point) FloatStack {
 }
 
 func (f FloatStack) NextFloatHeight() int {
-	if f == nil || len(f) == 0 {
+	if len(f) == 0 {
 		return 0
 	}
 	lastElem := f[len(f)-1]
 
-	size := lastElem.CSSOuterBox.Bounds().Size().Y
+	//size := lastElem.CSSOuterBox.Bounds().Size().Y
+	size := lastElem.BoxDrawRectangle.Size().Y
 	if size == 0 {
 		fmt.Printf("Bounds size is 0?? %s %s %s", lastElem.CSSOuterBox.Bounds(), lastElem.Data, lastElem.GetTextContent())
 	}

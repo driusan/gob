@@ -15,6 +15,7 @@ func getFontHeight(face font.Face) int {
 	return (metrics.Ascent + metrics.Descent).Ceil()
 }
 func stringSize(fntDrawer font.Drawer, textContent string) (int, error) {
+
 	var size int
 	words := strings.Fields(textContent)
 	fSize := getFontHeight(fntDrawer.Face)
