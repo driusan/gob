@@ -287,7 +287,8 @@ func (e *RenderableDomElement) Render(containerWidth int) image.Image {
 	return e.DrawPass()
 }
 
-func (e *RenderableDomElement) InvalidateLayout() {
+
+func (e *RenderableDomElement) partialInvalidateLayout() {
 	if e == nil {
 		return
 	}
@@ -299,8 +300,27 @@ func (e *RenderableDomElement) InvalidateLayout() {
 		e.lineBoxes = nil
 
 		if e.FirstChild != nil {
-			e.FirstChild.InvalidateLayout()
+			e.FirstChild.partialInvalidateLayout()
 		}
+	}
+	if e.NextSibling != nil {
+		e.NextSibling.partialInvalidateLayout()
+	}
+}
+func (e *RenderableDomElement) InvalidateLayout() {
+	if e == nil {
+		return
+	}
+	e.layoutDone = false
+	e.OverlayedContent = nil
+	e.CSSOuterBox = nil
+	e.ContentOverlay = nil
+	e.lineBoxes = nil
+	e.leftFloats = nil
+	e.rightFloats = nil
+
+	if e.FirstChild != nil {
+		e.FirstChild.InvalidateLayout()
 	}
 	if e.NextSibling != nil {
 		e.NextSibling.InvalidateLayout()
@@ -430,7 +450,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 	var reflowTriggerer *RenderableDomElement
 restartLayout:
 	if reflowTriggerer != nil {
-		e.InvalidateLayout()
+		e.partialInvalidateLayout()
 		*dot = odot
 		*nextline = onl
 		firstLine = true
@@ -482,25 +502,26 @@ restartLayout:
 			for remainingTextContent != "" {
 				if whitespace == "normal" {
 					if width-dot.X-rfWidth <= 0 {
-						lfHeight := e.leftFloats.NextFloatHeight()
-						rfHeight := e.rightFloats.NextFloatHeight()
+						lfHeight := e.leftFloats.ClearFloats(*dot).NextFloatHeight()
+						rfHeight := e.rightFloats.ClearFloats(*dot).NextFloatHeight()
 						if len(e.leftFloats) == 0 && len(e.rightFloats) == 0 {
+							// There are no floats, so just go to the next line
 							dot.X = 0
 							dot.Y += *nextline
 						}
 
 						if lfHeight > 0 && (lfHeight < rfHeight || rfHeight == 0) {
 							dot.Y += lfHeight + 1
-							//dot.Y += *nextline
-							//dot.Y += c.GetFontFace(c.GetFontSize()).Metrics().Ascent.Ceil()
-							//e.leftFloats = e.leftFloats.ClearFloats(*dot)
 							dot.X = e.leftFloats.WidthAt(*dot)
 						} else if rfHeight > 0 {
 							dot.Y += rfHeight + 1
 							//dot.Y += *nextline
 							//e.rightFloats = e.rightFloats.ClearFloats(*dot)
 						} else {
-							panic("Clearing floats didn't make any space.")
+							// There are no floats, so just go to the next line
+							dot.X = 0
+							dot.Y += *nextline
+							//panic("Clearing floats didn't make any space.")
 						}
 
 						lfWidth = e.leftFloats.WidthAt(*dot)
@@ -683,7 +704,7 @@ restartLayout:
 				// collapse child margins if applicable
 				if reflowTriggerer == nil || !(float == "left" || float == "right") {
 					childContent, _ = c.LayoutPass(width, image.ZR, &cdot, &lh)
-				} else {
+				} else if reflowTriggerer != nil {
 					childContent = c.ContentOverlay
 				}
 				c.ContentOverlay = childContent
