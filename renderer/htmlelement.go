@@ -287,7 +287,6 @@ func (e *RenderableDomElement) Render(containerWidth int) image.Image {
 	return e.DrawPass()
 }
 
-
 func (e *RenderableDomElement) partialInvalidateLayout() {
 	if e == nil {
 		return
@@ -455,16 +454,17 @@ restartLayout:
 		*nextline = onl
 		firstLine = true
 		bottommargin = 0
+		overlayed = NewDynamicMemoryDrawer(image.Rectangle{image.ZP, image.Point{width, height}})
 	}
 	for c := e.FirstChild; c != nil; c = c.NextSibling {
 		if reflowTriggerer != nil {
-				if reflowTriggerer == c {
-					reflowTriggerer = nil
-					continue
-				}
-				if float := c.GetFloat(); float == "left" || float == "right" {
-					continue
-				}
+			if reflowTriggerer == c {
+				reflowTriggerer = nil
+				continue
+			}
+			if float := c.GetFloat(); float == "left" || float == "right" {
+				continue
+			}
 		}
 		if fdot.Y < dot.Y {
 			fdot = *dot
