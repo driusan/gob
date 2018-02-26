@@ -168,8 +168,27 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 		ssize += (fSize / 3)
 	}
 	if ssize > remainingWidth {
-		ssize = remainingWidth
+		if force != true {
+			// If it's not being forced, check if at least one word
+			// fits
+			psize, _ := stringSize(fntDrawer, words[0])
+			if psize < remainingWidth {
+				// A word fits, so just keep going
+				ssize = remainingWidth
+			} else {
+				// Nothing fits, so don't consume anything
+				// since it's not being forced.
+				consumed = ""
+				unconsumed = textContent
+				return
+			}
+		} else {
+			// force is true, so just make it take up all the remaining width
+			ssize = remainingWidth
+
+		}
 	}
+
 	if ssize < 0 {
 		panic("This should never happen")
 	}
@@ -361,8 +380,6 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 	if lh := e.GetLineHeight(); lh > *nextline {
 		*nextline = lh
 	}
-	onl := *nextline
-	odot := fdot
 
 	// special cases
 	if e.Type == html.ElementNode {
@@ -446,32 +463,13 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 
 	// The bottom margin of the last child, used for collapsing margins (where applicable)
 	bottommargin := 0
-	var reflowTriggerer *RenderableDomElement
-restartLayout:
-	if reflowTriggerer != nil {
-		e.partialInvalidateLayout()
-		*dot = odot
-		*nextline = onl
-		firstLine = true
-		bottommargin = 0
-		overlayed = NewDynamicMemoryDrawer(image.Rectangle{image.ZP, image.Point{width, height}})
-	}
 	for c := e.FirstChild; c != nil; c = c.NextSibling {
-		if reflowTriggerer != nil {
-			if reflowTriggerer == c {
-				reflowTriggerer = nil
-				continue
-			}
-			if float := c.GetFloat(); float == "left" || float == "right" {
-				continue
-			}
-		}
 		if fdot.Y < dot.Y {
 			fdot = *dot
 		}
 		c.ViewportHeight = e.ViewportHeight
-		if dot.X < e.leftFloats.WidthAt(*dot) {
-			dot.X = e.leftFloats.WidthAt(*dot)
+		if dot.X < e.leftFloats.MaxX(*dot) {
+			dot.X = e.leftFloats.MaxX(*dot)
 		}
 		float := c.GetFloat()
 		switch c.Type {
@@ -486,7 +484,7 @@ restartLayout:
 			// parent.
 			c.Styles = e.Styles
 
-			lfWidth := e.leftFloats.WidthAt(*dot)
+			lfWidth := e.leftFloats.MaxX(*dot)
 			rfWidth := e.rightFloats.WidthAt(*dot)
 			if dot.X < lfWidth {
 				dot.X = lfWidth
@@ -499,34 +497,16 @@ restartLayout:
 			remainingTextContent := c.Data
 			whitespace := e.GetWhiteSpace()
 		textdraw:
-			for remainingTextContent != "" {
+			for strings.TrimSpace(remainingTextContent) != "" {
 				if whitespace == "normal" {
 					if width-dot.X-rfWidth <= 0 {
-						lfHeight := e.leftFloats.ClearFloats(*dot).NextFloatHeight()
-						rfHeight := e.rightFloats.ClearFloats(*dot).NextFloatHeight()
-						if len(e.leftFloats) == 0 && len(e.rightFloats) == 0 {
-							// There are no floats, so just go to the next line
-							dot.X = 0
-							dot.Y += *nextline
-						}
+						dot.Y += *nextline
 
-						if lfHeight > 0 && (lfHeight < rfHeight || rfHeight == 0) {
-							dot.Y += lfHeight + 1
-							dot.X = e.leftFloats.WidthAt(*dot)
-						} else if rfHeight > 0 {
-							dot.Y += rfHeight + 1
-							//dot.Y += *nextline
-							//e.rightFloats = e.rightFloats.ClearFloats(*dot)
-						} else {
-							// There are no floats, so just go to the next line
-							dot.X = 0
-							dot.Y += *nextline
-							//panic("Clearing floats didn't make any space.")
-						}
+						lfWidth = e.leftFloats.MaxX(*dot)
+						rfWidth = e.rightFloats.ClearFloats(*dot).WidthAt(*dot)
 
-						lfWidth = e.leftFloats.WidthAt(*dot)
-						rfWidth = e.rightFloats.WidthAt(*dot)
-
+						dot.X = e.leftFloats.MaxX(*dot)
+						continue
 					}
 				}
 				if width-dot.X-rfWidth <= 0 {
@@ -534,8 +514,22 @@ restartLayout:
 				}
 
 				childImage, consumed, rt := c.renderLineBox(width-dot.X-rfWidth, remainingTextContent, false, c.NextSibling != nil && c.NextSibling.GetDisplayProp() == "inline")
-				if consumed == "" && dot.X == 0 {
-					childImage, consumed, rt = c.renderLineBox(width-dot.X-rfWidth, remainingTextContent, true, c.NextSibling != nil && c.NextSibling.GetDisplayProp() == "inline")
+				if consumed == "" {
+					if dot.X == 0 {
+						// Nothing was consumed, and we're at the start of the line, so just
+						// force at least one word to be drawn.
+
+						childImage, consumed, rt = c.renderLineBox(width-dot.X-rfWidth, remainingTextContent, true, c.NextSibling != nil && c.NextSibling.GetDisplayProp() == "inline")
+					} else {
+						// Go to the next line.
+						dot.Y += *nextline
+
+						lfWidth = e.leftFloats.MaxX(*dot)
+						rfWidth = e.rightFloats.WidthAt(*dot)
+
+						dot.X = e.leftFloats.MaxX(*dot)
+						goto textdraw
+					}
 				}
 				sr := childImage.Bounds()
 				r := image.Rectangle{*dot, dot.Add(sr.Size())}
@@ -546,30 +540,25 @@ restartLayout:
 				// increase according to the box it's overlapping and try again.
 				for _, float := range e.leftFloats {
 					if r.Overlaps(float.BoxDrawRectangle) {
-						if dot.Y <= float.BoxDrawRectangle.Min.Y {
-							dot.Y = float.BoxDrawRectangle.Min.Y + 1
-						} else {
-							dot.Y = float.BoxDrawRectangle.Max.Y + 1
-						}
-						dot.X = e.leftFloats.WidthAt(*dot)
+						dot.Y += *nextline
 
-						lfWidth = e.leftFloats.WidthAt(*dot)
+						lfWidth = e.leftFloats.MaxX(*dot)
 						rfWidth = e.rightFloats.WidthAt(*dot)
+
+						dot.X = e.leftFloats.MaxX(*dot)
 						continue textdraw
 					}
 				}
 				// same for right floats
 				for _, float := range e.rightFloats {
 					if r.Overlaps(float.BoxDrawRectangle) {
-						if dot.Y <= float.BoxDrawRectangle.Min.Y {
-							dot.Y = float.BoxDrawRectangle.Min.Y + 1
-						} else {
-							dot.Y = float.BoxDrawRectangle.Max.Y + 1
-						}
-						dot.X = e.leftFloats.WidthAt(*dot)
+						dot.Y += *nextline
 
-						lfWidth = e.leftFloats.WidthAt(*dot)
+						lfWidth = e.leftFloats.MaxX(*dot)
 						rfWidth = e.rightFloats.WidthAt(*dot)
+
+						dot.X = e.leftFloats.MaxX(*dot)
+
 						continue textdraw
 					}
 				}
@@ -578,7 +567,7 @@ restartLayout:
 				remainingTextContent = rt
 				overlayed.GrowBounds(r)
 
-				c.lineBoxes = append(c.lineBoxes, lineBox{childImage, *dot})
+				e.lineBoxes = append(e.lineBoxes, lineBox{childImage, *dot})
 				switch e.GetWhiteSpace() {
 				case "pre":
 					dot.Y += *nextline
@@ -591,11 +580,8 @@ restartLayout:
 					if r.Max.X >= width-rfWidth {
 						// there's no space left on this line, so advance dot to the next line.
 						dot.Y += *nextline
-						// clear the floats that have been passed, and then move dot to the edge
-						// of the left float.
-						//e.leftFloats = e.leftFloats.ClearFloats(*dot)
-						//e.rightFloats = e.rightFloats.ClearFloats(*dot)
-						lfWidth = e.leftFloats.WidthAt(*dot)
+
+						lfWidth = e.leftFloats.MaxX(*dot)
 						rfWidth = e.rightFloats.WidthAt(*dot)
 
 						dot.X = lfWidth
@@ -702,11 +688,7 @@ restartLayout:
 
 				var childContent image.Image
 				// collapse child margins if applicable
-				if reflowTriggerer == nil || !(float == "left" || float == "right") {
-					childContent, _ = c.LayoutPass(width, image.ZR, &cdot, &lh)
-				} else if reflowTriggerer != nil {
-					childContent = c.ContentOverlay
-				}
+				childContent, _ = c.LayoutPass(width, image.ZR, &cdot, &lh)
 				c.ContentOverlay = childContent
 				box, contentbox := c.calcCSSBox(childContent)
 				c.BoxContentRectangle = contentbox
@@ -714,9 +696,10 @@ restartLayout:
 
 				r := image.Rectangle{fdot, fdot.Add(sr.Size())}
 
+			positionFloats:
 				switch float {
 				case "right":
-					if fdot.Y < dot.Y {
+					if fdot.Y <= dot.Y {
 						fdot.Y = dot.Y
 						fdot.X = dot.X
 					}
@@ -728,7 +711,7 @@ restartLayout:
 						Min: image.Point{rightFloatX - size.X, fdot.Y},
 						Max: image.Point{rightFloatX, size.Y + fdot.Y},
 					}
-					leftFloatX := leftFloat.WidthAt(fdot)
+					leftFloatX := leftFloat.MaxX(fdot)
 					fdot.X = leftFloatX
 					if r.Min.X <= leftFloatX {
 						lfHeight := leftFloat.ClearFloats(fdot).NextFloatHeight()
@@ -736,10 +719,10 @@ restartLayout:
 
 						if lfHeight > 0 && (lfHeight <= rfHeight || rfHeight == 0) {
 							fdot.Y += lfHeight
-							fdot.X = leftFloat.WidthAt(fdot)
+							fdot.X = leftFloat.MaxX(fdot)
 						} else if rfHeight > 0 {
 							fdot.Y += rfHeight
-							fdot.X = leftFloat.WidthAt(fdot)
+							fdot.X = leftFloat.MaxX(fdot)
 						} else {
 							panic("Clearing floats didn't make any space.")
 						}
@@ -750,13 +733,30 @@ restartLayout:
 							Max: image.Point{width - rightFloatX, size.Y + fdot.Y},
 						}
 					}
+
+					for _, line := range e.lineBoxes {
+						// Check if the box overlaps with any line. If so, just
+						// move the float down, because there's definitely no room on
+						// this line because we're dealing with a right float.
+						lineBounds := image.Rectangle{
+							line.origin,
+							line.origin.Add(line.Image.Bounds().Size()),
+						}
+						if r.Overlaps(lineBounds) {
+							fdot.Y += *nextline
+							fdot.X = 0
+							// Recalculate all the rectangle offsets and floating
+							// dot stuff now that we've moved the box (again)
+							goto positionFloats
+						}
+					}
 				case "left":
-					if fdot.Y < dot.Y {
+					if fdot.Y <= dot.Y {
 						fdot.Y = dot.Y
 						fdot.X = dot.X
 					}
 					size := sr.Size()
-					leftFloatX := e.leftFloats.WidthAt(fdot)
+					leftFloatX := e.leftFloats.MaxX(fdot)
 					fdot.X = leftFloatX
 					r = image.Rectangle{
 						Min: image.Point{leftFloatX, fdot.Y},
@@ -768,32 +768,121 @@ restartLayout:
 
 						if lfHeight > 0 && (lfHeight <= rfHeight || rfHeight == 0) {
 							fdot.Y += lfHeight
-							fdot.X = e.leftFloats.WidthAt(fdot)
+							fdot.X = e.leftFloats.MaxX(fdot)
 						} else if rfHeight > 0 {
 							fdot.Y += rfHeight
-							fdot.X = e.leftFloats.WidthAt(fdot)
+							fdot.X = e.leftFloats.MaxX(fdot)
 						} else {
 							panic("Clearing floats didn't make any space.")
 						}
 
-						leftFloatX = e.leftFloats.ClearFloats(fdot).WidthAt(fdot)
+						leftFloatX = e.leftFloats.MaxX(fdot)
 						r = image.Rectangle{
 							Min: image.Point{leftFloatX, fdot.Y},
 							Max: image.Point{leftFloatX + size.X, size.Y + fdot.Y},
 						}
 					}
+
+					if len(e.lineBoxes) > 0 {
+						// We need to do two passes for left floats: one to check if we can just move the
+						// text or if we need to move the box itself, and another to actually move it/them.
+						hasOverlap := false
+						canMoveText := true
+						for _, line := range e.lineBoxes {
+							lineBounds := image.Rectangle{
+								line.origin,
+								line.origin.Add(line.Image.Bounds().Size()),
+							}
+							if r.Overlaps(lineBounds) {
+								hasOverlap = true
+								lsize := lineBounds.Size()
+								o := line.origin
+								if r.Max.X+lsize.X+e.rightFloats.ClearFloats(o).WidthAt(o) >= width {
+									canMoveText = false
+									break
+								}
+							}
+						}
+
+						// Second pass: move text or float
+						if hasOverlap {
+							if canMoveText {
+								// Move the text
+								nd := r.Max.X
+								for i, line := range e.lineBoxes {
+									lineBounds := image.Rectangle{
+										line.origin,
+										line.origin.Add(line.Image.Bounds().Size()),
+									}
+									if r.Overlaps(lineBounds) {
+										line.origin.X = nd
+										e.lineBoxes[i] = line
+
+										lsize := lineBounds.Size()
+										o := line.origin
+
+										// Check if there's still room for more text when we begin rendering again
+										// and move dot to the appropriate place.
+										if r.Max.X+lsize.X+e.rightFloats.ClearFloats(o).WidthAt(o) >= width {
+											// There's no more space, adjust dot
+											// to the next line.
+											dot.Y += *nextline
+											dot.X = e.leftFloats.MaxX(*dot)
+										} else {
+											// There's still space on this line,
+											// so move dot over.
+											dot.X = e.leftFloats.MaxX(o) + r.Size().X + lsize.X
+											nd = dot.X
+										}
+									}
+								}
+							} else {
+								// No room to move the text into, so move the
+								// box down instead.
+								fdot.Y += *nextline
+								fdot.X = e.leftFloats.MaxX(fdot)
+								goto positionFloats
+							}
+						}
+						/*
+							if r.Overlaps(lineBounds) {
+								if lsize := lineBounds.Size(); width-lsize.X-r.Size().X-e.rightFloats.WidthAt(lastLine.origin)-e.leftFloats.MaxX(lastLine.origin) > 0 {
+									// Move the text.
+									lastLine.origin.X = r.Max.X
+									e.lineBoxes[len(e.lineBoxes)-1] = lastLine
+									o := lastLine.origin
+									if lastLine.origin.X+lsize.X+e.rightFloats.ClearFloats(o).WidthAt(o) >= width {
+										// There's no more space, adjust dot
+										// to the next line.
+										dot.Y += *nextline
+										dot.X = e.leftFloats.MaxX(*dot)
+
+									} else {
+										// There's still space on this line,
+										// so move dot over.
+										dot.X = e.leftFloats.MaxX(o) + r.Size().X + lsize.X
+									}
+								} else {
+									// No room to move the text into, so move the
+									// box down instead.
+									fdot.Y += *nextline
+									fdot.X = e.leftFloats.MaxX(fdot)
+									goto positionFloats
+								}
+							}
+						*/
+
+					}
+				default:
 				}
 				overlayed.GrowBounds(r)
 				c.BoxDrawRectangle = r
-
-				if reflowTriggerer == nil {
-					if sr.Size().Y > 0 {
-						switch float {
-						case "left":
-							e.leftFloats = append(e.leftFloats, c)
-						case "right":
-							e.rightFloats = append(e.rightFloats, c)
-						}
+				if sr.Size().Y > 0 {
+					switch float {
+					case "left":
+						e.leftFloats = append(e.leftFloats, c)
+					case "right":
+						e.rightFloats = append(e.rightFloats, c)
 					}
 				}
 
@@ -809,21 +898,9 @@ restartLayout:
 					imageMap.Add(area.Content, newArea)
 				}
 
-				// now draw the content on top of the outer box
-				contentStart := dot.Add(contentbox.Min)
-				contentBounds := c.ContentOverlay.Bounds()
-				cr := image.Rectangle{contentStart, contentStart.Add(contentBounds.Size())}
-				overlayed.GrowBounds(cr)
-
 				switch float {
 				case "left", "right":
-					// floated boxes don't affect dot.
-					if reflowTriggerer == nil {
-						reflowTriggerer = c
-						goto restartLayout
-					} else if reflowTriggerer == c {
-						reflowTriggerer = nil
-					}
+					// floated boxes don't affect dot
 				case "none":
 					fallthrough
 				default:
@@ -836,6 +913,7 @@ restartLayout:
 					} else {
 						dot.X = 0
 						dot.Y = r.Max.Y
+						//dot.X = e.leftFloats.WidthAt(*dot)
 
 						if c.GetPaddingBottom() == 0 && c.GetBorderBottomWidth() == 0 {
 							bottommargin = c.GetMarginBottomSize()
@@ -880,7 +958,7 @@ func (e *RenderableDomElement) DrawPass() image.Image {
 		switch c.Type {
 
 		case html.TextNode:
-			for _, box := range c.lineBoxes {
+			for _, box := range e.lineBoxes {
 				sr := box.Image.Bounds()
 				r := image.Rectangle{box.origin, box.origin.Add(sr.Size())}
 				if e.FirstPageOnly && r.Min.Y > e.ViewportHeight {

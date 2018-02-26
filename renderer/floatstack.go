@@ -27,6 +27,26 @@ func (f FloatStack) WidthAt(loc image.Point) int {
 	return width
 }
 
+// MaxX returns the highest X coordinate in the FloatStack, at height
+// loc. This is mostly used to get the left edge of left floats at a
+// certain height.
+func (f FloatStack) MaxX(loc image.Point) int {
+	if f == nil {
+		return 0
+	}
+	var max int = 0
+	for _, child := range f {
+		bounds := child.BoxDrawRectangle
+		if loc.Y >= bounds.Min.Y && loc.Y < bounds.Max.Y {
+			if bounds.Max.X > max {
+				max = bounds.Max.X
+			}
+		}
+	}
+
+	return max
+}
+
 // Remove any floats that are past dot from the float stack and return
 // the floats that have not yet been cleared.
 func (f FloatStack) ClearFloats(dot image.Point) FloatStack {
