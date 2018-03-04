@@ -388,6 +388,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 			var loadedImage bool
 			var iwidth, iheight int
 			var ewidth, eheight bool
+
 			for _, attr := range e.Attr {
 				switch attr.Key {
 				case "src":
@@ -419,20 +420,42 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 					}
 					loadedImage = true
 				case "width":
-					iwidth, _ = strconv.Atoi(attr.Val)
+					if !ewidth {
+						iwidth, _ = strconv.Atoi(attr.Val)
+						ewidth = true
+						if !eheight {
+							iheight = 0
+						}
+					}
+				case "height":
+					if !eheight {
+						iheight, _ = strconv.Atoi(attr.Val)
+						eheight = true
+						if !ewidth {
+							iwidth = 0
+						}
+					}
+				}
+			}
+
+			if css := e.Styles.Width.GetValue(); css != "" {
+				if w := e.GetWidth(); w > 0 {
 					ewidth = true
+					iwidth = w
 					if !eheight {
 						iheight = 0
 					}
-				case "height":
-					iheight, _ = strconv.Atoi(attr.Val)
+				}
+			}
+			if css := e.Styles.Height.GetValue(); css != "" {
+				if h := e.GetHeight(); h > 0 {
 					eheight = true
+					iheight = h
 					if !ewidth {
 						iwidth = 0
 					}
 				}
 			}
-
 			if iwidth != 0 || iheight != 0 {
 				e.ContentOverlay = resize.Resize(uint(iwidth), uint(iheight), e.ContentOverlay, resize.NearestNeighbor)
 				sz := e.ContentOverlay.Bounds().Size()
@@ -445,12 +468,21 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 			if e.Styles.Height.GetValue() == "" {
 				e.Styles.Height = css.NewPxValue(iheight)
 			}
-			e.Styles.Overflow = css.NewValue("hidden")
-			overlayed = NewDynamicMemoryDrawer(image.Rectangle{image.ZP, image.Point{width, height}})
+			//e.Styles.Overflow = css.NewValue("hidden")
+			overlayed = NewDynamicMemoryDrawer(image.Rectangle{image.ZP, image.Point{iwidth, iheight}})
 			if loadedImage {
-				_, contentbox := e.calcCSSBox(e.ContentOverlay)
+				e.contentWidth = iwidth
+				box, contentbox := e.calcCSSBox(e.ContentOverlay)
 				e.BoxContentRectangle = contentbox
 				overlayed.GrowBounds(contentbox)
+				dot.X += box.Bounds().Size().X
+				if e.Styles.LineHeight.GetValue() == "" {
+					e.Styles.LineHeight = css.NewPxValue(iheight)
+				}
+				if iheight > *nextline {
+					*nextline = iheight
+				}
+				//return box, *dot
 			}
 			return e.ContentOverlay, *dot
 		}
@@ -648,7 +680,9 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 					if float == "none" {
 						dot.X = 0
 						if c.PrevSibling != nil {
-							dot.Y += c.PrevSibling.GetLineHeight()
+							fmt.Printf("PrevSibling %v nextline %v\n", c.Data, *nextline)
+							dot.Y += *nextline //c.PrevSibling.GetLineHeight()
+							*nextline = c.GetLineHeight()
 						}
 					}
 				}
@@ -844,34 +878,6 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 								goto positionFloats
 							}
 						}
-						/*
-							if r.Overlaps(lineBounds) {
-								if lsize := lineBounds.Size(); width-lsize.X-r.Size().X-e.rightFloats.WidthAt(lastLine.origin)-e.leftFloats.MaxX(lastLine.origin) > 0 {
-									// Move the text.
-									lastLine.origin.X = r.Max.X
-									e.lineBoxes[len(e.lineBoxes)-1] = lastLine
-									o := lastLine.origin
-									if lastLine.origin.X+lsize.X+e.rightFloats.ClearFloats(o).WidthAt(o) >= width {
-										// There's no more space, adjust dot
-										// to the next line.
-										dot.Y += *nextline
-										dot.X = e.leftFloats.MaxX(*dot)
-
-									} else {
-										// There's still space on this line,
-										// so move dot over.
-										dot.X = e.leftFloats.MaxX(o) + r.Size().X + lsize.X
-									}
-								} else {
-									// No room to move the text into, so move the
-									// box down instead.
-									fdot.Y += *nextline
-									fdot.X = e.leftFloats.MaxX(fdot)
-									goto positionFloats
-								}
-							}
-						*/
-
 					}
 				default:
 				}
@@ -913,7 +919,6 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 					} else {
 						dot.X = 0
 						dot.Y = r.Max.Y
-						//dot.X = e.leftFloats.WidthAt(*dot)
 
 						if c.GetPaddingBottom() == 0 && c.GetBorderBottomWidth() == 0 {
 							bottommargin = c.GetMarginBottomSize()
