@@ -223,3 +223,11 @@ func TestMultpleSelectors(t *testing.T) {
 	// BUG(driusan): The final tie break is not implemente2
 	assertSelector(t, sty[1], `ul li li`)
 }
+
+// There was a regression at some point where if the first selector was an ID selector, it
+// wouldn't get parsed. This ensures that it's fixed.
+func TestIdRegression(t *testing.T) {
+	sty, _ := ParseStylesheet(`#one { display: what; } #two { display: yay; }`, AuthorSrc, noopURLer{}, nil, 0)
+	assertSelector(t, sty[0], `#one`)
+	assertSelector(t, sty[1], `#two`)
+}

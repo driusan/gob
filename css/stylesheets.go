@@ -163,7 +163,6 @@ func ParseStylesheet(val string, src StyleSource, importLoader net.URLReader, ur
 					curSelector.Selector += token.Value
 					context = matchingSelector
 					spaceIfMatch = false
-
 				case "=":
 					curSelector.Selector += token.Value
 					// the actual value is a TokenString, not a TokenIdent,
@@ -189,7 +188,8 @@ func ParseStylesheet(val string, src StyleSource, importLoader net.URLReader, ur
 					curValue = StyleValue{}
 					curAttribute = ""
 					spaceIfMatch = false
-
+				default:
+					panic("Unhandled character " + token.Value)
 				}
 			case matchingAttribute:
 				switch token.Value {
@@ -282,7 +282,7 @@ func ParseStylesheet(val string, src StyleSource, importLoader net.URLReader, ur
 			fallthrough
 		case scanner.TokenHash, scanner.TokenNumber:
 			switch context {
-			case matchingSelector, appendingSelector:
+			case startContext, matchingSelector, appendingSelector:
 				curSelector.Selector += token.Value
 				spaceIfMatch = false
 			case matchingValue:
