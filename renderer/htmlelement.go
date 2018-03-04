@@ -475,14 +475,29 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				box, contentbox := e.calcCSSBox(e.ContentOverlay)
 				e.BoxContentRectangle = contentbox
 				overlayed.GrowBounds(contentbox)
-				dot.X += box.Bounds().Size().X
-				if e.Styles.LineHeight.GetValue() == "" {
-					e.Styles.LineHeight = css.NewPxValue(iheight)
+
+				switch e.GetDisplayProp() {
+				case "block":
+					dot.Y += box.Bounds().Size().Y
+					dot.X = 0
+					e.BoxDrawRectangle = box.Bounds()
+					return e.ContentOverlay, *dot
+				default:
+					fallthrough
+				case "inline", "inline-block":
+					//if e.Styles.LineHeight.GetValue() == "" {
+					//	e.Styles.LineHeight = css.NewPxValue(iheight)
+					//}
+					e.Parent.lineBoxes = append(
+						e.Parent.lineBoxes,
+						lineBox{e.ContentOverlay, *dot},
+					)
+					dot.X += box.Bounds().Size().X
+					if iheight > *nextline {
+						*nextline = iheight
+					}
 				}
-				if iheight > *nextline {
-					*nextline = iheight
-				}
-				//return box, *dot
+				return box, *dot
 			}
 			return e.ContentOverlay, *dot
 		}
@@ -533,6 +548,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				if whitespace == "normal" {
 					if width-dot.X-rfWidth <= 0 {
 						dot.Y += *nextline
+						*nextline = c.GetLineHeight()
 
 						lfWidth = e.leftFloats.MaxX(*dot)
 						rfWidth = e.rightFloats.ClearFloats(*dot).WidthAt(*dot)
@@ -545,6 +561,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 					continue
 				}
 
+				var childImage image.Image
 				childImage, consumed, rt := c.renderLineBox(width-dot.X-rfWidth, remainingTextContent, false, c.NextSibling != nil && c.NextSibling.GetDisplayProp() == "inline")
 				if consumed == "" {
 					if dot.X == 0 {
@@ -555,6 +572,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 					} else {
 						// Go to the next line.
 						dot.Y += *nextline
+						*nextline = c.GetLineHeight()
 
 						lfWidth = e.leftFloats.MaxX(*dot)
 						rfWidth = e.rightFloats.WidthAt(*dot)
@@ -563,6 +581,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 						goto textdraw
 					}
 				}
+
 				sr := childImage.Bounds()
 				r := image.Rectangle{*dot, dot.Add(sr.Size())}
 
@@ -573,6 +592,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				for _, float := range e.leftFloats {
 					if r.Overlaps(float.BoxDrawRectangle) {
 						dot.Y += *nextline
+						*nextline = c.GetLineHeight()
 
 						lfWidth = e.leftFloats.MaxX(*dot)
 						rfWidth = e.rightFloats.WidthAt(*dot)
@@ -585,6 +605,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				for _, float := range e.rightFloats {
 					if r.Overlaps(float.BoxDrawRectangle) {
 						dot.Y += *nextline
+						*nextline = c.GetLineHeight()
 
 						lfWidth = e.leftFloats.MaxX(*dot)
 						rfWidth = e.rightFloats.WidthAt(*dot)
@@ -597,12 +618,21 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 
 				// Nothing overlapped, so use this line box.
 				remainingTextContent = rt
+
+				/*
+				box, rr := c.calcCSSBox(childImage)
+				c.ContentOverlay = childImage
+				c.BoxContentRectangle = rr
+				c.BoxDrawRectangle = rr
+				sr = box.Bounds()
+				*/
 				overlayed.GrowBounds(r)
 
 				e.lineBoxes = append(e.lineBoxes, lineBox{childImage, *dot})
 				switch e.GetWhiteSpace() {
 				case "pre":
 					dot.Y += *nextline
+					*nextline = c.GetLineHeight()
 					dot.X = lfWidth
 				case "nowrap":
 					fallthrough // dot.X = r.Max.X
@@ -612,6 +642,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 					if r.Max.X >= width-rfWidth {
 						// there's no space left on this line, so advance dot to the next line.
 						dot.Y += *nextline
+						*nextline = c.GetLineHeight()
 
 						lfWidth = e.leftFloats.MaxX(*dot)
 						rfWidth = e.rightFloats.WidthAt(*dot)
@@ -630,6 +661,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 			if c.Data == "br" {
 				dot.X = 0
 				dot.Y += *nextline
+				*nextline = c.GetLineHeight()
 				continue
 			}
 			switch display := c.GetDisplayProp(); display {
@@ -673,14 +705,13 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				dot.X = newDot.X
 				dot.Y = newDot.Y
 			case "block", "inline-block", "table", "table-inline", "list-item":
-				if dot.X != 0 && display != "inline-block" {
+				if dot.X != e.leftFloats.MaxX(*dot) && display != "inline-block" {
 					// This means the previous child was an inline item, and we should position dot
 					// as if there were an implicit box around it.
 					// floated elements don't affect dot, so only do this if it's not floated.
 					if float == "none" {
 						dot.X = 0
 						if c.PrevSibling != nil {
-							fmt.Printf("PrevSibling %v nextline %v\n", c.Data, *nextline)
 							dot.Y += *nextline //c.PrevSibling.GetLineHeight()
 							*nextline = c.GetLineHeight()
 						}
@@ -778,6 +809,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 						}
 						if r.Overlaps(lineBounds) {
 							fdot.Y += *nextline
+							*nextline = c.GetLineHeight()
 							fdot.X = 0
 							// Recalculate all the rectangle offsets and floating
 							// dot stuff now that we've moved the box (again)
@@ -861,6 +893,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 											// There's no more space, adjust dot
 											// to the next line.
 											dot.Y += *nextline
+											*nextline = c.GetLineHeight()
 											dot.X = e.leftFloats.MaxX(*dot)
 										} else {
 											// There's still space on this line,
@@ -968,6 +1001,17 @@ func (e *RenderableDomElement) DrawPass() image.Image {
 				r := image.Rectangle{box.origin, box.origin.Add(sr.Size())}
 				if e.FirstPageOnly && r.Min.Y > e.ViewportHeight {
 					return e.OverlayedContent
+				}
+				if c.CSSOuterBox != nil {
+					println("text border")
+					sr := c.CSSOuterBox.Bounds()
+					draw.Draw(
+						e.OverlayedContent,
+						c.BoxDrawRectangle,
+						c.CSSOuterBox,
+						sr.Min,
+						draw.Over,
+					)
 				}
 				draw.Draw(e.OverlayedContent, r, box.Image, sr.Min, draw.Src)
 			}
