@@ -518,3 +518,18 @@ func (e *RenderableDomElement) GetOverflow() string {
 		return "visible"
 	}
 }
+
+func (e *RenderableDomElement) GetVerticalAlign() string {
+	switch s := strings.ToLower(e.Styles.VerticalAlign.GetValue()); s {
+	case "baseline", "sub", "super", "top", "text-top", "middle", "botom", "text-bottom":
+		return s
+	case "inherit":
+		if e.Parent == nil {
+			return "baseline"
+		}
+		return e.Parent.GetVerticalAlign()
+	default:
+		// FIXME: Handle lengths and percentage values
+		return "baseline"
+	}
+}

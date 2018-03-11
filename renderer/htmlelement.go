@@ -63,7 +63,8 @@ type RenderableDomElement struct {
 	containerWidth  int
 	containerHeight int
 
-	lineBoxes []lineBox
+	curLine   []*lineBox
+	lineBoxes []*lineBox
 
 	resolver   net.URLReader
 	layoutDone bool
@@ -85,7 +86,11 @@ func (e RenderableDomElement) String() string {
 type lineBox struct {
 	//image  image.Image
 	image.Image
-	origin image.Point
+	origin   image.Point
+	baseline int
+
+	content string // for debugging, may be removed
+	el      *RenderableDomElement
 }
 
 func (e *RenderableDomElement) Walk(callback func(*RenderableDomElement)) {
@@ -106,7 +111,7 @@ func (e *RenderableDomElement) Walk(callback func(*RenderableDomElement)) {
 	}
 }
 
-func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent string, force bool, inlinesibling bool) (img *image.RGBA, consumed, unconsumed string) {
+func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent string, force bool, inlinesibling bool) (img *image.RGBA, consumed, unconsumed string, baseline int) {
 	if remainingWidth < 0 {
 		panic("No room to render text")
 	}
@@ -194,7 +199,8 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 	}
 	img = image.NewRGBA(image.Rectangle{image.ZP, image.Point{ssize, lineheight}})
 
-	fntDrawer.Dot = fixed.P(start, fontFace.Metrics().Ascent.Floor())
+	baseline = fontFace.Metrics().Ascent.Floor()
+	fntDrawer.Dot = fixed.P(start, baseline)
 	fntDrawer.Dst = img
 
 	defer func() {
@@ -381,6 +387,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 		*nextline = lh
 	}
 
+	e.curLine = make([]*lineBox, 0)
 	// special cases
 	if e.Type == html.ElementNode {
 		switch strings.ToLower(e.Data) {
@@ -488,10 +495,9 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 					//if e.Styles.LineHeight.GetValue() == "" {
 					//	e.Styles.LineHeight = css.NewPxValue(iheight)
 					//}
-					e.Parent.lineBoxes = append(
-						e.Parent.lineBoxes,
-						lineBox{e.ContentOverlay, *dot},
-					)
+					lb := lineBox{e.ContentOverlay, *dot, iheight, "[img]", e}
+					e.Parent.lineBoxes = append(e.Parent.lineBoxes, &lb)
+					e.Parent.curLine = append(e.Parent.curLine, &lb)
 					dot.X += box.Bounds().Size().X
 					if iheight > *nextline {
 						*nextline = iheight
@@ -554,6 +560,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 						rfWidth = e.rightFloats.ClearFloats(*dot).WidthAt(*dot)
 
 						dot.X = e.leftFloats.MaxX(*dot)
+						e.advanceLine(dot)
 						continue
 					}
 				}
@@ -562,13 +569,13 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				}
 
 				var childImage image.Image
-				childImage, consumed, rt := c.renderLineBox(width-dot.X-rfWidth, remainingTextContent, false, c.NextSibling != nil && c.NextSibling.GetDisplayProp() == "inline")
+				childImage, consumed, rt, baseline := c.renderLineBox(width-dot.X-rfWidth, remainingTextContent, false, c.NextSibling != nil && c.NextSibling.GetDisplayProp() == "inline")
 				if consumed == "" {
 					if dot.X == 0 {
 						// Nothing was consumed, and we're at the start of the line, so just
 						// force at least one word to be drawn.
 
-						childImage, consumed, rt = c.renderLineBox(width-dot.X-rfWidth, remainingTextContent, true, c.NextSibling != nil && c.NextSibling.GetDisplayProp() == "inline")
+						childImage, consumed, rt, baseline = c.renderLineBox(width-dot.X-rfWidth, remainingTextContent, true, c.NextSibling != nil && c.NextSibling.GetDisplayProp() == "inline")
 					} else {
 						// Go to the next line.
 						dot.Y += *nextline
@@ -578,6 +585,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 						rfWidth = e.rightFloats.WidthAt(*dot)
 
 						dot.X = e.leftFloats.MaxX(*dot)
+						e.advanceLine(dot)
 						goto textdraw
 					}
 				}
@@ -598,6 +606,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 						rfWidth = e.rightFloats.WidthAt(*dot)
 
 						dot.X = e.leftFloats.MaxX(*dot)
+						e.advanceLine(dot)
 						continue textdraw
 					}
 				}
@@ -611,7 +620,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 						rfWidth = e.rightFloats.WidthAt(*dot)
 
 						dot.X = e.leftFloats.MaxX(*dot)
-
+						e.advanceLine(dot)
 						continue textdraw
 					}
 				}
@@ -619,16 +628,11 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				// Nothing overlapped, so use this line box.
 				remainingTextContent = rt
 
-				/*
-				box, rr := c.calcCSSBox(childImage)
-				c.ContentOverlay = childImage
-				c.BoxContentRectangle = rr
-				c.BoxDrawRectangle = rr
-				sr = box.Bounds()
-				*/
 				overlayed.GrowBounds(r)
 
-				e.lineBoxes = append(e.lineBoxes, lineBox{childImage, *dot})
+				lb := lineBox{childImage, *dot, baseline, consumed, c}
+				e.lineBoxes = append(e.lineBoxes, &lb)
+				e.curLine = append(e.curLine, &lb)
 				switch e.GetWhiteSpace() {
 				case "pre":
 					dot.Y += *nextline
@@ -648,6 +652,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 						rfWidth = e.rightFloats.WidthAt(*dot)
 
 						dot.X = lfWidth
+						e.advanceLine(dot)
 					} else {
 						// there's still space on this line, so move dot to the end
 						// of the rendered text.
@@ -662,6 +667,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				dot.X = 0
 				dot.Y += *nextline
 				*nextline = c.GetLineHeight()
+				e.advanceLine(dot)
 				continue
 			}
 			switch display := c.GetDisplayProp(); display {
@@ -967,7 +973,6 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 
 				}
 			}
-
 		}
 	}
 	e.ImageMap = imageMap
@@ -1088,4 +1093,52 @@ func (e *RenderableDomElement) DrawPass() image.Image {
 		}
 	}
 	return e.OverlayedContent
+}
+
+func (e *RenderableDomElement) advanceLine(dot *image.Point) {
+	if len(e.curLine) > 1 {
+		// If there was more than 1 element, re-adjust all their positions with respect to
+		// the vertical-align property.
+		println("Multi-box line", len(e.curLine))
+		baseline := 0
+		maxsize := 0
+
+		// FIXME: This is a hack. The baseline/lineheight should be calculated in accordance with
+		// the CSS spec.
+		// Step 1. Figure out how big the line really is and where the baseline is.
+		for _, l := range e.curLine {
+			if height := l.Image.Bounds().Size().Y; height > maxsize {
+				maxsize = height
+			}
+			if l.content != "[img]" && l.baseline > baseline {
+				baseline = l.baseline
+			}
+			println("\t", l.content, l.el.GetVerticalAlign(), l.Image.Bounds().Size().Y)
+		}
+		println(maxsize, baseline)
+
+		// Step 2: Adjust the image origins with respect to the baseline.
+		for _, l := range e.curLine {
+			switch align := l.el.GetVerticalAlign(); align {
+			case "text-bottom":
+				l.origin.Y += maxsize - l.Image.Bounds().Size().Y
+			case "text-top":
+				l.origin.Y += maxsize - baseline // - l.Image.Bounds().Size().Y
+			case "middle":
+				/*if s := l.Image.Bounds().Size().Y; l.origin.Y + s > dot.Y {
+					// Nothing, it was already aligned to the top
+					dot.Y = l.origin.Y + s
+				}*/
+				l.origin.Y += (maxsize / 2) // - (l.Image.Bounds().Size().Y / 2)
+			default:
+				l.origin.Y += maxsize - l.Image.Bounds().Size().Y
+				println("Unhandled vertical-align ", align)
+			}
+			if s := l.Image.Bounds().Size().Y; l.origin.Y+s > dot.Y {
+				// Nothing, it was already aligned to the top
+				dot.Y = l.origin.Y + s
+			}
+		}
+	}
+	e.curLine = make([]*lineBox, 0)
 }
