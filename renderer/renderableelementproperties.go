@@ -479,7 +479,7 @@ func (e *RenderableDomElement) GetFontStyle() font.Style {
 }
 
 func (e *RenderableDomElement) GetFontFamily() css.FontFamily {
-	switch s := strings.ToLower(e.Styles.FontStyle.GetValue()); s {
+	switch s := strings.ToLower(e.Styles.FontFamily.GetValue()); s {
 	case "sans-serif", "serif", "monospace":
 		return css.FontFamily(s)
 	case "fantasy", "cursive":
