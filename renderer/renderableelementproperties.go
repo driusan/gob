@@ -44,7 +44,7 @@ func stringSize(fntDrawer font.Drawer, textContent string) (int, error) {
 }
 
 func (e *RenderableDomElement) GetLineHeight() int {
-	// inheritd == yes
+	// inherited == yes
 	// percentage relative to the font size of the element itself
 	fSize := e.GetFontSize()
 	if e.Styles == nil {
@@ -52,18 +52,30 @@ func (e *RenderableDomElement) GetLineHeight() int {
 			fontFace := e.GetFontFace(fSize)
 			return getFontHeight(fontFace)
 		}
-		fontFace := e.GetFontFace(fSize)
-		return getFontHeight(fontFace)
+		return e.Parent.getLineHeight(fSize)
 	}
 	stringVal := e.Styles.LineHeight.GetValue()
-	if stringVal == "" {
+	if stringVal == "" || stringVal == "inherit" {
 		if e.Parent == nil {
 			fontFace := e.GetFontFace(fSize)
 			return getFontHeight(fontFace)
 		}
-		fontFace := e.GetFontFace(fSize)
-		return getFontHeight(fontFace)
+		return e.Parent.getLineHeight(fSize)
+	}
+	return e.getLineHeight(fSize)
+}
 
+// calculate the line height in pixels assuming a font size of fsize
+// (Used to ensure when a child inherits the line height, it's relative to
+// its own font size, not the parent's.
+func (e *RenderableDomElement) getLineHeight(fSize int) int {
+	stringVal := e.Styles.LineHeight.GetValue()
+	if stringVal == "" || stringVal == "inherit" {
+		if e.Parent == nil {
+			fontFace := e.GetFontFace(fSize)
+			return getFontHeight(fontFace)
+		}
+		return e.Parent.getLineHeight(fSize)
 	}
 	lHeightSize, err := css.ConvertUnitToPx(fSize, fSize, stringVal)
 	if err != nil {
