@@ -113,10 +113,10 @@ func BenchmarkRenderLayoutOnly(b *testing.B) {
 	loader := net.DefaultReader{}
 	f := strings.NewReader(content)
 	parsedhtml := parser.LoadPage(f, loader, nil)
-	var lh int
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		parsedhtml.Content.LayoutPass(1024, image.ZR, &image.Point{0, 0}, nil, nil, &lh)
+		var lh int
+		parsedhtml.Content.LayoutPass(1024, image.ZR, &image.Point{0, 0}, &lh)
 	}
 }
 func BenchmarkRenderDrawOnly(b *testing.B) {
@@ -124,7 +124,7 @@ func BenchmarkRenderDrawOnly(b *testing.B) {
 	f := strings.NewReader(content)
 	parsedhtml := parser.LoadPage(f, loader, nil)
 	var lh int
-	parsedhtml.Content.LayoutPass(1024, image.ZR, &image.Point{0, 0}, nil, nil, &lh)
+	parsedhtml.Content.LayoutPass(1024, image.ZR, &image.Point{0, 0}, &lh)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		parsedhtml.Content.DrawPass()

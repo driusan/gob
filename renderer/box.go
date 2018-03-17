@@ -675,9 +675,9 @@ func (e *RenderableDomElement) GetBackgroundImage() image.Image {
 // image which should be used to overlay content.
 // The returned image does *not* have the content overlayed, it only
 // has the margin/background/borders drawn on it.
-func (e *RenderableDomElement) calcCSSBox(content image.Image) (image.Image, image.Rectangle) {
+func (e *RenderableDomElement) calcCSSBox(contentSize image.Point) (image.Image, image.Rectangle) {
 	// calculate the size of the box.
-	size := content.Bounds().Size()
+	size := contentSize //content.Bounds().Size()
 	if width := e.GetWidth(); width >= 0 {
 		size.X = width
 	}
