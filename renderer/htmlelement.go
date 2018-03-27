@@ -69,6 +69,10 @@ type RenderableDomElement struct {
 	layoutDone bool
 
 	leftFloats, rightFloats FloatStack
+
+	// The number of child bullet items that have been drawn.
+	// Used for determining the counter to place next to the list item
+	numBullets int
 }
 
 func (e RenderableDomElement) String() string {
@@ -174,7 +178,7 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 		ssize += (fSize / 3)
 	}
 	if ssize > remainingWidth {
-		if force != true {
+		if force != true && len(words) > 0 {
 			// If it's not being forced, check if at least one word
 			// fits
 			psize, _ := stringSize(fntDrawer, words[0])
@@ -191,7 +195,6 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 		} else {
 			// force is true, so just make it take up all the remaining width
 			ssize = remainingWidth
-
 		}
 	}
 
@@ -524,6 +527,12 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 			if dot.X < lfWidth {
 				dot.X = lfWidth
 			}
+
+			if disp := c.Parent.GetDisplayProp(); disp == "list-item" {
+				// Leave space for the list marker. This is the same amount
+				// added by the stylesheet in Firefox
+				dot.X += c.listIndent()
+			}
 			if firstLine == true {
 				dot.X += c.GetTextIndent(width)
 				firstLine = false
@@ -568,6 +577,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 
 						dot.X = e.leftFloats.MaxX(*dot)
 						e.advanceLine(dot)
+						dot.X += c.listIndent()
 						goto textdraw
 					}
 				}
@@ -624,7 +634,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 					*nextline = c.GetLineHeight()
 					dot.X = lfWidth
 				case "nowrap":
-					fallthrough // dot.X = r.Max.X
+					fallthrough
 				case "normal":
 					fallthrough
 				default:
@@ -638,6 +648,10 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 
 						dot.X = lfWidth
 						e.advanceLine(dot)
+
+						// Leave space for the list marker. This is the same amount
+						// added by the stylesheet in Firefox
+						dot.X += c.listIndent()
 					} else {
 						// there's still space on this line, so move dot to the end
 						// of the rendered text.
@@ -728,7 +742,6 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 
 						// If it's the first child of a collapsed margin, also collapse the margin in the child container.
 						if c.PrevSibling == nil {
-							println("Collapsing child margins")
 							if tm > bottommargin {
 								cdot.Y -= bottommargin
 							} else {
@@ -1005,15 +1018,12 @@ func (e *RenderableDomElement) DrawPass() image.Image {
 			if c.Data == "br" {
 				continue
 			}
-			switch c.GetDisplayProp() {
+			switch display := c.GetDisplayProp(); display {
 			case "none":
 				continue
 			default:
 				fallthrough
 			case "inline", "inline-block":
-				if strings.ToLower(c.Data) == "span" {
-					println("Drawing span")
-				}
 				childContent := c.DrawPass()
 
 				c.ContentOverlay = childContent
@@ -1025,10 +1035,7 @@ func (e *RenderableDomElement) DrawPass() image.Image {
 					bounds.Min,
 					draw.Over,
 				)
-			case "list-item", "table", "table-inline":
-				// Hacks which are displayed as blocks because they're not implemented
-				fallthrough
-			case "block":
+			case "block", "table", "table-inline", "list-item":
 				// draw the border, background, and CSS outer box.
 				childContent := c.DrawPass()
 				c.ContentOverlay = childContent
@@ -1060,6 +1067,10 @@ func (e *RenderableDomElement) DrawPass() image.Image {
 						contentBounds.Min,
 						draw.Over,
 					)
+					if display == "list-item" {
+						e.numBullets++
+						c.drawBullet(e.OverlayedContent, c.BoxDrawRectangle.Min, c.BoxContentRectangle.Min, e.numBullets)
+					}
 				case "hidden":
 					draw.DrawMask(
 						e.OverlayedContent,
@@ -1073,17 +1084,42 @@ func (e *RenderableDomElement) DrawPass() image.Image {
 				}
 
 			}
-
 		}
 	}
 	return e.OverlayedContent
 }
 
+func (e *RenderableDomElement) drawBullet(dst draw.Image, drawRectangle, contentRectangle image.Point, bulletNum int) {
+	clr := e.GetColor()
+	fSize := e.GetFontSize()
+	fontFace := e.GetFontFace(fSize)
+	fntDrawer := font.Drawer{
+		Dst:  dst,
+		Src:  &image.Uniform{clr},
+		Face: fontFace,
+	}
+	// FIXME: Add list-style-type support
+	// normal bullet:
+	bullet := "\u2219"
+	println(e.GetListStyleType())
+	if e.GetListStyleType() == "decimal" {
+		bullet = fmt.Sprintf("%d.", bulletNum)
+	}
+	bulletSize := fntDrawer.MeasureString(bullet)
+	fontMetrics := fontFace.Metrics()
+	fntDrawer.Dot = fixed.P(
+		// Center the X coordinate in the middle of the empty space between the draw rectangle
+		// and the content rectangle
+		drawRectangle.X+contentRectangle.X+(20-bulletSize.Ceil()/2),
+		// And have the height at the stop of the first line.
+		drawRectangle.Y+contentRectangle.Y+fontMetrics.Ascent.Floor(), //(fontMetrics.Height.Ceil() / 2),
+	)
+	fntDrawer.DrawString(bullet)
+}
 func (e *RenderableDomElement) advanceLine(dot *image.Point) {
 	if len(e.curLine) > 1 {
 		// If there was more than 1 element, re-adjust all their positions with respect to
 		// the vertical-align property.
-		//println("Multi-box line", len(e.curLine))
 		baseline := 0
 		maxsize := 0
 
@@ -1097,9 +1133,7 @@ func (e *RenderableDomElement) advanceLine(dot *image.Point) {
 			if l.content != "[img]" && l.baseline > baseline {
 				baseline = l.baseline
 			}
-			//println("\t", l.content, l.el.GetVerticalAlign(), l.Image.Bounds().Size().Y)
 		}
-		//println(maxsize, baseline)
 
 		// Step 2: Adjust the image origins with respect to the baseline.
 		for _, l := range e.curLine {
@@ -1112,13 +1146,25 @@ func (e *RenderableDomElement) advanceLine(dot *image.Point) {
 				l.origin.Y += (maxsize / 2)
 			default:
 				l.origin.Y += maxsize - l.Content.Bounds().Size().Y
-				//println("Unhandled vertical-align ", align)
 			}
 			if s := l.Content.Bounds().Size().Y; l.origin.Y+s > dot.Y {
 				// Nothing, it was already aligned to the top
 				dot.Y = l.origin.Y + s
 			}
 		}
+
 	}
 	e.curLine = make([]*lineBox, 0)
+}
+func (e *RenderableDomElement) listIndent() int {
+	if e == nil {
+		return 0
+	}
+	i := 0
+	for c := e; c.Parent != nil; c = c.Parent {
+		if c.GetDisplayProp() == "list-item" {
+			i += 40
+		}
+	}
+	return i
 }

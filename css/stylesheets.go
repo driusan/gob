@@ -74,6 +74,25 @@ const (
 	atImport
 )
 
+func (p parsingContext) String() string {
+	switch p {
+	case startContext:
+		return "start"
+	case matchingSelector:
+		return "selector"
+	case matchingAttribute:
+		return "attribute"
+	case matchingValue:
+		return "value"
+	case appendingSelector:
+		return "appendingselector"
+	case atImport:
+		return "@import"
+	default:
+		panic("Unhandled parsingContext")
+	}
+}
+
 func appendStyles(s []StyleRule, selectors []CSSSelector, attr StyleAttribute, val StyleValue, src StyleSource, order uint) ([]StyleRule, error) {
 	if attr == "" {
 		return s, nil
@@ -188,8 +207,10 @@ func ParseStylesheet(val string, src StyleSource, importLoader net.URLReader, ur
 					curValue = StyleValue{}
 					curAttribute = ""
 					spaceIfMatch = false
+				case ";":
+					continue
 				default:
-					panic("Unhandled character " + token.Value)
+					panic(fmt.Sprintf("Unhandled character %v in context %v", token.Value, context))
 				}
 			case matchingAttribute:
 				switch token.Value {

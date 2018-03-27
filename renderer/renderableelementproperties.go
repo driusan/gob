@@ -179,8 +179,6 @@ func (e RenderableDomElement) GetDisplayProp() string {
 				"inline-block":
 				return "block"
 			case "list-item":
-				// FIXME: This should generate a principle box and a marker box,
-				// but for now just pretending it's a block simplifies things
 				return "list-item"
 			default:
 				return cssVal
@@ -543,5 +541,21 @@ func (e *RenderableDomElement) GetVerticalAlign() string {
 	default:
 		// FIXME: Handle lengths and percentage values
 		return "baseline"
+	}
+}
+
+func (e *RenderableDomElement) GetListStyleType() string {
+	switch s := strings.ToLower(e.Styles.ListStyleType.GetValue()); s {
+	case "disc", "circle", "square", "decimal", "decimal-leading-zero", "lower-roman",
+		"upper-roman", "lower-greek", "lower-latin", "upper-latin", "armenian", "georgian",
+		"lower-alpha", "upper-alpha", "none":
+		return s
+	case "inherit":
+		fallthrough
+	default:
+		if e.Parent == nil {
+			return "disc"
+		}
+		return e.Parent.GetListStyleType()
 	}
 }
