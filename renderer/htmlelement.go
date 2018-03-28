@@ -528,11 +528,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				dot.X = lfWidth
 			}
 
-			if disp := c.Parent.GetDisplayProp(); disp == "list-item" {
-				// Leave space for the list marker. This is the same amount
-				// added by the stylesheet in Firefox
-				dot.X += c.listIndent()
-			}
+			dot.X += c.listIndent()
 			if firstLine == true {
 				dot.X += c.GetTextIndent(width)
 				firstLine = false
@@ -762,14 +758,14 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				c.BoxContentRectangle = contentbox
 				sr := box.Bounds()
 
+				if fdot.Y <= dot.Y {
+					fdot.Y = dot.Y
+					fdot.X = dot.X
+				}
 				r := image.Rectangle{fdot, fdot.Add(sr.Size())}
 			positionFloats:
 				switch float {
 				case "right":
-					if fdot.Y <= dot.Y {
-						fdot.Y = dot.Y
-						fdot.X = dot.X
-					}
 					size := sr.Size()
 					rightFloat := e.rightFloats.ClearFloats(fdot)
 					leftFloat := e.leftFloats.ClearFloats(fdot)
@@ -819,10 +815,6 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 						}
 					}
 				case "left":
-					if fdot.Y <= dot.Y {
-						fdot.Y = dot.Y
-						fdot.X = dot.X
-					}
 					size := sr.Size()
 					leftFloatX := e.leftFloats.MaxX(fdot)
 					fdot.X = leftFloatX
@@ -1101,18 +1093,18 @@ func (e *RenderableDomElement) drawBullet(dst draw.Image, drawRectangle, content
 	// FIXME: Add list-style-type support
 	// normal bullet:
 	bullet := "\u2219"
-	println(e.GetListStyleType())
 	if e.GetListStyleType() == "decimal" {
 		bullet = fmt.Sprintf("%d.", bulletNum)
 	}
 	bulletSize := fntDrawer.MeasureString(bullet)
 	fontMetrics := fontFace.Metrics()
+	bulletOffset := e.listIndent()
 	fntDrawer.Dot = fixed.P(
 		// Center the X coordinate in the middle of the empty space between the draw rectangle
 		// and the content rectangle
-		drawRectangle.X+contentRectangle.X+(20-bulletSize.Ceil()/2),
-		// And have the height at the stop of the first line.
-		drawRectangle.Y+contentRectangle.Y+fontMetrics.Ascent.Floor(), //(fontMetrics.Height.Ceil() / 2),
+		drawRectangle.X+contentRectangle.X+bulletOffset-(20-bulletSize.Ceil()/2),
+		// And have the height at the top of the first line.
+		drawRectangle.Y+contentRectangle.Y+fontMetrics.Ascent.Floor(),
 	)
 	fntDrawer.DrawString(bullet)
 }
@@ -1161,7 +1153,7 @@ func (e *RenderableDomElement) listIndent() int {
 		return 0
 	}
 	i := 0
-	for c := e; c.Parent != nil; c = c.Parent {
+	for c := e; c != nil; c = c.Parent {
 		if c.GetDisplayProp() == "list-item" {
 			i += 40
 		}
