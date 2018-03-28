@@ -762,7 +762,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 					fdot.Y = dot.Y
 					fdot.X = dot.X
 				}
-				r := image.Rectangle{fdot, fdot.Add(sr.Size())}
+				r := image.Rectangle{*dot, dot.Add(sr.Size())}
 			positionFloats:
 				switch float {
 				case "right":
