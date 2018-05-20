@@ -1,7 +1,6 @@
 package css
 
 import (
-	//	"Gob/dom"
 	"golang.org/x/net/html"
 	"strings"
 )
@@ -9,6 +8,10 @@ import (
 type CSSSelector struct {
 	Selector    string
 	OrderNumber uint
+}
+
+func (c CSSSelector) String() string {
+	return c.Selector
 }
 
 func parseSelectors(val string, orderStart uint) []CSSSelector {
@@ -26,17 +29,18 @@ func parseSelectors(val string, orderStart uint) []CSSSelector {
 // off and separatedly matched. It will recursively call itself stripping off
 // one id or class part each time, until there's either left or something
 // didn't match
-func matchIDAndClassSelector(el *html.Node, s string) bool {
+func matchIDAndClassAndPseudoSelector(el *html.Node, s string, st State) bool {
 	if el == nil || el.Type != html.ElementNode || len(s) < 1 {
 		return false
 	}
 	remainingData := ""
 	classSelector := ""
+	pseudoSelector := ""
 	idSelector := ""
 	switch s[0] {
 	case '.':
 		chopped := s[1:]
-		if idx := strings.IndexAny(chopped, "*.#"); idx != -1 {
+		if idx := strings.IndexAny(chopped, "*.#:"); idx != -1 {
 			classSelector = chopped[0:idx]
 			remainingData = chopped[idx:]
 		} else {
@@ -45,13 +49,23 @@ func matchIDAndClassSelector(el *html.Node, s string) bool {
 		}
 	case '#':
 		chopped := s[1:]
-		if idx := strings.IndexAny(s[1:], "*.#"); idx != -1 {
+		if idx := strings.IndexAny(s[1:], "*.#:"); idx != -1 {
 			idSelector = chopped[0:idx]
 			remainingData = chopped[idx:]
 		} else {
 			idSelector = chopped
 			remainingData = ""
 		}
+	case ':':
+		chopped := s[1:]
+		if idx := strings.IndexAny(s[1:], "*.#:"); idx != -1 {
+			pseudoSelector = chopped[0:idx]
+			remainingData = chopped[idx:]
+		} else {
+			pseudoSelector = chopped
+			remainingData = ""
+		}
+
 	default:
 		return false
 	}
@@ -89,6 +103,32 @@ func matchIDAndClassSelector(el *html.Node, s string) bool {
 			return false
 		}
 	}
+	switch pseudoSelector {
+	case "link":
+		if st.Link == false {
+			return false
+		}
+	case "visited":
+		if st.Link == false {
+			return false
+		}
+		// If it's true, keep checking other remainingData criteria
+		if st.Visited == false {
+			return false
+		}
+		// If it's true, keep checking other remainingData criteria
+	case "active":
+		if st.Link == false {
+			return false
+		}
+		if st.Active == false {
+			return false
+		}
+		// If it's true, keep checking other remainingData criteria
+	default:
+		//panic("Unsupported pseudo-selector" + pseudoSelector)
+		return false
+	}
 
 	// all the classes and ids have been matched.
 	if remainingData == "" {
@@ -100,16 +140,17 @@ func matchIDAndClassSelector(el *html.Node, s string) bool {
 		return false
 	}
 	// check the unconsumed pieces
-	return matchIDAndClassSelector(el, remainingData)
+	return matchIDAndClassAndPseudoSelector(el, remainingData, st)
 }
-func matchBasicSelector(el *html.Node, s string) bool {
+
+func matchBasicSelector(el *html.Node, s string, st State) bool {
 	if el == nil || len(s) < 1 || el.Type != html.ElementNode {
 		return false
 	}
 	elementMatchTag := ""
 	remainingData := ""
 
-	if idx := strings.IndexAny(s, "*.#"); idx != -1 {
+	if idx := strings.IndexAny(s, "*.#:"); idx != -1 {
 		elementMatchTag = s[0:idx]
 		remainingData = s[idx:]
 		if remainingData[0] == '*' {
@@ -126,37 +167,38 @@ func matchBasicSelector(el *html.Node, s string) bool {
 		return true
 	}
 
-	return matchIDAndClassSelector(el, remainingData)
+	return matchIDAndClassAndPseudoSelector(el, remainingData, st)
 }
-func recursiveParentMatches(el *html.Node, selectorPieces []string, requireMatch bool) bool {
+
+func recursiveParentMatches(el *html.Node, selectorPieces []string, requireMatch bool, s State) bool {
 	switch len(selectorPieces) {
 	case 0:
 		return false
 	case 1:
-		if matchBasicSelector(el, selectorPieces[0]) {
+		if matchBasicSelector(el, selectorPieces[0], s) {
 			return true
 		}
 		if el == nil {
 			return false
 		}
-		return recursiveParentMatches(el.Parent, selectorPieces, requireMatch)
+		return recursiveParentMatches(el.Parent, selectorPieces, requireMatch, s)
 	default:
 		lastSelector := selectorPieces[len(selectorPieces)-1]
 		otherSelectors := selectorPieces[0 : len(selectorPieces)-1]
-		if matchBasicSelector(el, lastSelector) == true {
-			return recursiveParentMatches(el.Parent, otherSelectors, false)
+		if matchBasicSelector(el, lastSelector, s) == true {
+			return recursiveParentMatches(el.Parent, otherSelectors, false, s)
 		} else if requireMatch {
 			return false
 		}
-		return recursiveParentMatches(el.Parent, otherSelectors, false)
+		return recursiveParentMatches(el.Parent, otherSelectors, false, s)
 	}
 }
-func (s CSSSelector) Matches(el *html.Node) bool {
+func (s CSSSelector) Matches(el *html.Node, st State) bool {
 	pieces := strings.Fields(s.Selector)
 	if len(pieces) <= 1 {
-		return matchBasicSelector(el, pieces[0])
+		return matchBasicSelector(el, pieces[0], st)
 	}
-	return recursiveParentMatches(el, pieces, true)
+	return recursiveParentMatches(el, pieces, true, st)
 }
 
 func (s CSSSelector) NumberIDs() int {

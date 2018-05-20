@@ -1,6 +1,8 @@
 package renderer
 
 import (
+	"strings"
+
 	"github.com/driusan/Gob/css"
 	"github.com/driusan/Gob/dom"
 	"github.com/driusan/Gob/net"
@@ -16,6 +18,14 @@ func ConvertNodeToRenderableElement(root *html.Node, loader net.URLReader) (*Ren
 		Element:  (*dom.Element)(root),
 		Styles:   new(css.StyledElement),
 		resolver: loader,
+	}
+	if root.Type == html.ElementNode && strings.ToLower(root.Data) == "a" {
+		if href := element.GetAttribute("href"); href != "" {
+			element.State.Link = true
+			if u, err := net.ParseURL(href); err == nil && loader.HasVisited(u) {
+				element.State.Visited = true
+			}
+		}
 	}
 
 	element.FirstChild, _ = ConvertNodeToRenderableElement(root.FirstChild, loader)

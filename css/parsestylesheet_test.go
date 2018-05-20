@@ -12,6 +12,9 @@ type noopURLer struct{}
 func (l noopURLer) GetURL(u *url.URL) (body io.ReadCloser, resp int, err error) {
 	return nil, 404, nil
 }
+func (l noopURLer) HasVisited(u *url.URL) bool {
+	return false
+}
 
 func TestParseStylesheet(t *testing.T) {
 	tests := []struct {

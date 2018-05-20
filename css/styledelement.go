@@ -503,6 +503,10 @@ func (e *StyledElement) AddStyle(s StyleRule) {
 	return
 }
 
+func (e *StyledElement) ClearStyles() {
+	e.rules = nil
+}
+
 // SortStyles will sort the rules on this element according to the CSS spec, which states
 //
 // 1. Find all declarations that apply too element/property (already done when this is called)

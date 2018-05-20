@@ -35,6 +35,7 @@ func ParseURL(urlS string) (*url.URL, error) {
 
 type URLReader interface {
 	GetURL(u *url.URL) (body io.ReadCloser, statuscode int, err error)
+	HasVisited(u *url.URL) bool
 }
 
 type DefaultReader struct{}
@@ -68,6 +69,14 @@ func (d DefaultReader) GetURL(u *url.URL) (body io.ReadCloser, statuscode int, e
 		}
 		return resp.Body, resp.StatusCode, nil
 	}
+}
+func (d DefaultReader) HasVisited(u *url.URL) bool {
+	l := GetCacheLocation(u)
+	if l == "" {
+		return false
+	}
+	_, err := os.Stat(l)
+	return !os.IsNotExist(err)
 }
 
 func GetCacheLocation(resource *url.URL) string {

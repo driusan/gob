@@ -30,9 +30,7 @@ func LoadPage(r io.Reader, loader net.URLReader, urlContext *url.URL) Page {
 		panic("Couldn't find HTML element")
 	}
 
-	//fmt.Printf("root: %s\n", root)
 	for c := root.FirstChild; c != nil; c = c.NextSibling {
-		//fmt.Printf("Investigating %s\n", c)
 		if c.Type == html.ElementNode && c.Data == "body" {
 			body = c
 			break
@@ -48,20 +46,28 @@ func LoadPage(r io.Reader, loader net.URLReader, urlContext *url.URL) Page {
 	userAgentStyles, cssOrder := css.ParseStylesheet(string(sheet), css.UserAgentSrc, loader, urlContext, cssOrder)
 
 	p := Page{
-		Content: renderable,
-		URL:     nil,
+		Content:         renderable,
+		URL:             urlContext,
+		userAgentStyles: userAgentStyles,
+		authorStyles:    styles,
 	}
+	p.ReapplyStyles()
+	return p
+}
 
-	renderable.Walk(func(el *renderer.RenderableDomElement) {
-		el.PageLocation = urlContext
-		for _, rule := range userAgentStyles {
-			if rule.Matches((*html.Node)(el.Element)) {
+func (p *Page) ReapplyStyles() {
+	cssOrder := uint(0)
+	p.Content.Walk(func(el *renderer.RenderableDomElement) {
+		el.Styles.ClearStyles()
+		el.PageLocation = p.URL
+		for _, rule := range p.userAgentStyles {
+			if rule.Matches((*html.Node)(el.Element), el.State) {
 				el.Styles.AddStyle(rule)
 			}
 		}
 
-		for _, rule := range styles {
-			if rule.Matches((*html.Node)(el.Element)) {
+		for _, rule := range p.authorStyles {
+			if rule.Matches((*html.Node)(el.Element), el.State) {
 				el.Styles.AddStyle(rule)
 			}
 		}
@@ -110,7 +116,6 @@ func LoadPage(r io.Reader, loader net.URLReader, urlContext *url.URL) Page {
 			p.Background = background
 		}
 	})
-	return p
 }
 
 func fontSizeToPx(val string, parent *renderer.RenderableDomElement) int {

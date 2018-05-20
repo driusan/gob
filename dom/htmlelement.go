@@ -30,5 +30,12 @@ func (e Element) GetAttribute(attr string) string {
 
 }
 
+func (e Element) IsLink() bool {
+	if e.Type != html.ElementNode {
+		return false
+	}
+	return e.Data == "a" && e.GetAttribute("href") != ""
+}
+
 func (e Element) OnClick() {
 }

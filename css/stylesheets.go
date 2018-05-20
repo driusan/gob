@@ -371,6 +371,6 @@ func ParseStylesheet(val string, src StyleSource, importLoader net.URLReader, ur
 	return s, orderNo
 }
 
-func (r StyleRule) Matches(el *html.Node) bool {
-	return r.Selector.Matches(el)
+func (r StyleRule) Matches(el *html.Node, st State) bool {
+	return r.Selector.Matches(el, st)
 }

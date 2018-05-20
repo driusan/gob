@@ -23,7 +23,7 @@ import (
 	"image/draw"
 	"net/url"
 	"os"
-	"runtime/pprof"
+	//"runtime/pprof"
 )
 
 var (
@@ -97,9 +97,11 @@ func paintWindow(s screen.Screen, w screen.Window, v *Viewport, page parser.Page
 }
 
 func main() {
-	f, _ := os.Create("test.profile")
-	pprof.StartCPUProfile(f)
-	defer pprof.StopCPUProfile()
+	/*
+		f, _ := os.Create("test.profile")
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
+	*/
 
 	filename := "file:test.html"
 	if len(os.Args) > 1 {
@@ -217,9 +219,23 @@ func main() {
 										renderNewPageIntoViewport(s, w, &v, p)
 									}
 								}
+							case mouse.DirPress:
+								if el.State.Link == true {
+									el.State.Active = true
+									page.ReapplyStyles()
+									page.Content.InvalidateLayout()
+									debugelement(el)
+									renderNewPageIntoViewport(s, w, &v, page)
+								}
 							default:
 								if el.Type == html.ElementNode && el.Data == "a" {
 									//fmt.Printf("Hovering over link %s\n", el.GetAttribute("href"))
+								}
+								if el != hover {
+									if hover != nil {
+										hover.State.Hover = false
+									}
+									el.State.Hover = true
 								}
 								if el.Type == html.ElementNode {
 									hover = el
@@ -234,6 +250,7 @@ func main() {
 		}
 	})
 }
+
 func loadNewPage(context *url.URL, path string) (parser.Page, error) {
 	u, err := url.Parse(path)
 	if err != nil {

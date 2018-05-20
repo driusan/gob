@@ -73,6 +73,8 @@ type RenderableDomElement struct {
 	// The number of child bullet items that have been drawn.
 	// Used for determining the counter to place next to the list item
 	numBullets int
+
+	State css.State
 }
 
 func (e RenderableDomElement) String() string {
