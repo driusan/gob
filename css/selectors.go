@@ -125,6 +125,14 @@ func matchIDAndClassAndPseudoSelector(el *html.Node, s string, st State) bool {
 			return false
 		}
 		// If it's true, keep checking other remainingData criteria
+	case "first-line", "first-letter":
+		// Always match pseudo-elements, the calling needs to selectively apply them
+		if strings.IndexAny(remainingData, ".#") != -1 {
+			// pseudo-elements must be at the end of the selector according to the CSS
+			// spec
+			return false
+		}
+	case "":
 	default:
 		//panic("Unsupported pseudo-selector" + pseudoSelector)
 		return false

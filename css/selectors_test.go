@@ -214,8 +214,7 @@ func TestCSS1ParentSelector(t *testing.T) {
 	}
 }
 
-/*
-func TestCSS1LinkSelector(t *testing.T) {
+func TestCSS1PseudoSelector(t *testing.T) {
 	f := strings.NewReader(content)
 	doc, err := html.Parse(f)
 	if err != nil {
@@ -239,19 +238,13 @@ func TestCSS1LinkSelector(t *testing.T) {
 	// [...]
 	//</div>
 	var st State
-	rule := StyleRule{Selector: CSSSelector{":link", 0}}
-	if rule.Matches(h1, st) != false {
-		t.Error("h1 is not a link")
+	rule := StyleRule{Selector: CSSSelector{"h1:first-line", 0}}
+	if rule.Matches(h1, st) != true {
+		t.Error("h1 did not match first-line ")
 	}
-	if rule.Matches(h1.FirstChild, st) != true {
-		t.Error("h1's child should be a link")
-	}
-	// h1.NextSibling = whitespace, NextSibling.NextSibling = <a class="extra" ...
-	if rule.Matches(h1.NextSibling.NextSibling, st) != true {
-		t.Errorf("h1's sibling should be a link")
-	}
-	if rule.Matches(h1.NextSibling.NextSibling.NextSibling.NextSibling, st) != false {
-		t.Error("h1's second sibling is a named anchor, not a link")
+
+	rule = StyleRule{Selector: CSSSelector{".title:first-line", 0}}
+	if rule.Matches(h1, st) != true {
+		t.Error("h1 is did not match first-line by class")
 	}
 }
-*/

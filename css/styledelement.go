@@ -185,6 +185,13 @@ func (e *StyledElement) SetFontSize(size int) {
 	e.fontSize = size
 }
 
+func (e StyledElement) MergeStyles(other ...*StyledElement) StyledElement {
+	for _, o := range other {
+		e.rules = append(e.rules, o.rules...)
+	}
+	return e
+}
+
 type FontFamily string
 
 func (e StyledElement) GetFontFace(fsize int, fontFamily FontFamily, weight font.Weight, style font.Style) font.Face {
@@ -541,7 +548,6 @@ func (e *StyledElement) populateValues() {
 			e.FontWeight = rule.Value
 		case "font-size":
 			e.FontSize = rule.Value
-
 		case "color":
 			e.Color = rule.Value
 		case "background-color":

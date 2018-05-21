@@ -34,7 +34,11 @@ type Renderer interface {
 
 type RenderableDomElement struct {
 	*dom.Element
-	Styles *css.StyledElement
+	Styles            *css.StyledElement
+	ConditionalStyles struct {
+		Unconditional          *css.StyledElement
+		FirstLine, FirstLetter *css.StyledElement
+	}
 
 	Parent      *RenderableDomElement
 	FirstChild  *RenderableDomElement
@@ -523,6 +527,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 			// because their style should be identical to their
 			// parent.
 			c.Styles = e.Styles
+			c.ConditionalStyles = e.ConditionalStyles
 
 			lfWidth := e.leftFloats.MaxX(*dot)
 			rfWidth := e.rightFloats.WidthAt(*dot)
@@ -534,6 +539,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 			if firstLine == true {
 				dot.X += c.GetTextIndent(width)
 				firstLine = false
+			} else {
 			}
 
 			remainingTextContent := c.Data
@@ -626,6 +632,8 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				lb := lineBox{childImage, borderImage, *dot, cr.Min, baseline, consumed, c}
 				e.lineBoxes = append(e.lineBoxes, &lb)
 				e.curLine = append(e.curLine, &lb)
+				e.Styles = e.ConditionalStyles.Unconditional
+				c.Styles = c.ConditionalStyles.Unconditional
 				switch e.GetWhiteSpace() {
 				case "pre":
 					dot.Y += *nextline
@@ -1111,7 +1119,8 @@ func (e *RenderableDomElement) drawBullet(dst draw.Image, drawRectangle, content
 	fntDrawer.DrawString(bullet)
 }
 func (e *RenderableDomElement) advanceLine(dot *image.Point) {
-	if len(e.curLine) > 1 {
+	if len(e.curLine) >= 1 {
+		e.Styles = e.ConditionalStyles.Unconditional
 		// If there was more than 1 element, re-adjust all their positions with respect to
 		// the vertical-align property.
 		baseline := 0
@@ -1149,6 +1158,7 @@ func (e *RenderableDomElement) advanceLine(dot *image.Point) {
 
 	}
 	e.curLine = make([]*lineBox, 0)
+	//e.Styles = e.ConditionalStyles.FirstLine
 }
 func (e *RenderableDomElement) listIndent() int {
 	if e == nil {

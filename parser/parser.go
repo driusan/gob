@@ -59,16 +59,37 @@ func (p *Page) ReapplyStyles() {
 	cssOrder := uint(0)
 	p.Content.Walk(func(el *renderer.RenderableDomElement) {
 		el.Styles.ClearStyles()
+		el.ConditionalStyles = struct {
+			Unconditional *css.StyledElement
+			FirstLine     *css.StyledElement
+			FirstLetter   *css.StyledElement
+		}{
+			new(css.StyledElement),
+			new(css.StyledElement),
+			new(css.StyledElement),
+		}
 		el.PageLocation = p.URL
 		for _, rule := range p.userAgentStyles {
 			if rule.Matches((*html.Node)(el.Element), el.State) {
-				el.Styles.AddStyle(rule)
+				if strings.Index(rule.Selector.Selector, "first-line") >= 0 {
+					el.ConditionalStyles.FirstLine.AddStyle(rule)
+				} else if strings.Index(rule.Selector.Selector, "first-letter") >= 0 {
+					el.ConditionalStyles.FirstLetter.AddStyle(rule)
+				} else {
+					el.ConditionalStyles.Unconditional.AddStyle(rule)
+				}
 			}
 		}
 
 		for _, rule := range p.authorStyles {
 			if rule.Matches((*html.Node)(el.Element), el.State) {
-				el.Styles.AddStyle(rule)
+				if strings.Index(rule.Selector.Selector, "first-line") >= 0 {
+					el.ConditionalStyles.FirstLine.AddStyle(rule)
+				} else if strings.Index(rule.Selector.Selector, "first-letter") >= 0 {
+					el.ConditionalStyles.FirstLetter.AddStyle(rule)
+				} else {
+					el.ConditionalStyles.Unconditional.AddStyle(rule)
+				}
 			}
 		}
 
@@ -90,23 +111,49 @@ func (p *Page) ReapplyStyles() {
 
 		// TODO(driusan): User styles too
 
-		el.Styles.SortStyles()
+		fl := el.ConditionalStyles.FirstLine.MergeStyles(
+			el.ConditionalStyles.Unconditional,
+		)
+		el.ConditionalStyles.FirstLine = &fl
+		flet := el.ConditionalStyles.FirstLetter.MergeStyles(
+			el.ConditionalStyles.FirstLine,
+		)
+		el.ConditionalStyles.FirstLetter = &flet
+
+		el.ConditionalStyles.Unconditional.SortStyles()
+		el.ConditionalStyles.FirstLine.SortStyles()
+		el.ConditionalStyles.FirstLetter.SortStyles()
 
 		// Set the font size for this element, because em and ex
 		// units depend on it.
-		switch strVal := el.Styles.FontSize.GetValue(); strVal {
+		var base int
+		switch strVal := el.ConditionalStyles.Unconditional.FontSize.GetValue(); strVal {
 		case "":
 			// nothing specified, so inherit from parent, or
 			// fall back on default if there is no parent.
 			if el.Parent == nil {
-				el.Styles.SetFontSize(css.DefaultFontSize)
+				el.ConditionalStyles.Unconditional.SetFontSize(css.DefaultFontSize)
+				base = css.DefaultFontSize
 			} else {
 				size, _ := el.Parent.Styles.GetFontSize()
-				el.Styles.SetFontSize(size)
+				el.ConditionalStyles.Unconditional.SetFontSize(size)
+				base = size
 			}
 		default:
-			el.Styles.SetFontSize(fontSizeToPx(strVal, el.Parent))
+			// el.Styles.SetFontSize(fontSizeToPx(strVal, el.Parent))
+			base = fontSizeToPx(strVal, el.Parent)
+			el.ConditionalStyles.Unconditional.SetFontSize(base)
 		}
+		switch strVal := el.ConditionalStyles.FirstLine.FontSize.GetValue(); strVal {
+		case "":
+			el.ConditionalStyles.FirstLine.SetFontSize(base)
+		default:
+			base = fontSizeToPx(strVal, el.Parent)
+			el.ConditionalStyles.FirstLine.SetFontSize(base)
+			println(strVal, el.GetTextContent())
+		}
+
+		el.Styles = el.ConditionalStyles.FirstLine
 
 		if el.Type == html.ElementNode && strings.ToLower(el.Data) == "body" {
 			background := el.GetBackgroundColor()
