@@ -137,6 +137,9 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 	case "lowercase":
 		textContent = strings.ToLower(textContent)
 	}
+
+	smallcaps := e.FontVariant() == "small-caps"
+
 	fSize := e.GetFontSize()
 	fontFace := e.GetFontFace(fSize)
 	var dot int
@@ -250,12 +253,13 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 
 	for i, word := range words {
 		var wordleft string
-		if firstletter {
+		wordSizeInPx := fntDrawer.MeasureString(word).Ceil()
+
+		if firstletter || smallcaps {
 			wordleft = word[1:]
 			word = string(word[0])
 		}
 	startword:
-		wordSizeInPx := fntDrawer.MeasureString(word).Ceil()
 		if dot+wordSizeInPx > remainingWidth && whitespace != "nowrap" {
 			// The word doesn't fit on this line.
 			if strings.Index(word, "-") >= 0 {
@@ -295,13 +299,28 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 			}
 			return
 		}
+
+		if smallcaps {
+			if len(word) > 0 {
+				if unicode.IsLower(rune(word[0])) {
+					fontFace = e.GetFontFace(fSize * 8 / 10)
+					fntDrawer.Face = fontFace
+				} else {
+					fontFace = e.GetFontFace(fSize)
+					fntDrawer.Face = fontFace
+				}
+			}
+			word = strings.ToUpper(word)
+		}
+
 		fntDrawer.DrawString(word)
-		if firstletter {
+
+		if firstletter || smallcaps {
 			if len(word) > 0 {
 				if unicode.IsLetter(rune(word[0])) {
 					e.Styles = e.ConditionalStyles.FirstLine
 					firstletter = false
-					fSize := e.GetFontSize()
+					fSize = e.GetFontSize()
 					fontFace = e.GetFontFace(fSize)
 					clr = e.GetColor()
 
@@ -311,16 +330,21 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 			}
 
 			if len(wordleft) > 0 {
-				if firstletter {
-					// The letter printed was not a letter, so keep going
-					// character by character until we get to the first letter
-					word = string(wordleft[0])
+				if !smallcaps {
+					if firstletter {
+						// The letter printed was not a letter, so keep going
+						// character by character until we get to the first letter
+						word = string(wordleft[0])
+					} else {
+						// A letter was printed, so print the remaining part
+						// of the word.
+						word = wordleft
+					}
+					wordleft = wordleft[1:]
 				} else {
-					// A letter was printed, so print the remaining part
-					// of the word.
-					word = wordleft
+					word = string(wordleft[0])
+					wordleft = wordleft[1:]
 				}
-				wordleft = wordleft[1:]
 				goto startword
 			} else {
 				firstletter = false

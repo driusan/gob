@@ -491,6 +491,25 @@ func (e *RenderableDomElement) GetFontFamily() css.FontFamily {
 	return e.Parent.GetFontFamily()
 
 }
+
+func (e *RenderableDomElement) FontVariant() string {
+	// FIXME: Make this an enum/const, not a string
+
+	switch s := strings.ToLower(e.Styles.FontVariant.GetValue()); s {
+	case "normal", "":
+		return "normal"
+	case "small-caps":
+		return s
+	case "inherit":
+		if e.Parent == nil {
+			return "normal"
+		}
+		return e.Parent.FontVariant()
+	default:
+		return "normal"
+	}
+}
+
 func (e *RenderableDomElement) GetFontFace(fsize int) font.Face {
 	return e.Styles.GetFontFace(fsize, e.GetFontFamily(), e.GetFontWeight(), e.GetFontStyle())
 }
@@ -510,6 +529,7 @@ func (e *RenderableDomElement) GetWhiteSpace() string {
 	return e.Parent.GetWhiteSpace()
 
 }
+
 func (e *RenderableDomElement) GetOverflow() string {
 	switch s := strings.ToLower(e.Styles.Overflow.GetValue()); s {
 	case "visible", "":
