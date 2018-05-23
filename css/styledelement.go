@@ -182,7 +182,11 @@ func (e StyledElement) String() string {
 	return fmt.Sprintf("%v", e.rules)
 }
 func (e *StyledElement) SetFontSize(size int) {
-	e.fontSize = size
+	if size < 0 {
+		e.fontSize = DefaultFontSize
+	} else {
+		e.fontSize = size
+	}
 }
 
 func (e StyledElement) MergeStyles(other ...*StyledElement) StyledElement {
