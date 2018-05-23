@@ -220,7 +220,7 @@ func main() {
 									}
 								}
 							case mouse.DirPress:
-								if el.State.Link == true {
+								if el.State.Link == true || el.State.Visited == true {
 									el.State.Active = true
 									page.ReapplyStyles()
 									page.Content.InvalidateLayout()

@@ -21,9 +21,10 @@ func ConvertNodeToRenderableElement(root *html.Node, loader net.URLReader) (*Ren
 	}
 	if root.Type == html.ElementNode && strings.ToLower(root.Data) == "a" {
 		if href := element.GetAttribute("href"); href != "" {
-			element.State.Link = true
 			if u, err := net.ParseURL(href); err == nil && loader.HasVisited(u) {
 				element.State.Visited = true
+			} else {
+				element.State.Link = true
 			}
 		}
 	}
