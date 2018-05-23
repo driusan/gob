@@ -231,3 +231,16 @@ func TestIdRegression(t *testing.T) {
 	assertSelector(t, sty[0], `#one`)
 	assertSelector(t, sty[1], `#two`)
 }
+
+func TestInvalidIdentifier(t *testing.T) {
+	sty, _ := ParseStylesheet(`.one {color: green;}
+	.1 {color: red;}
+	.a1 {color: green;}
+	P.two {color: purple;}`, AuthorSrc, noopURLer{}, nil, 0)
+	if len(sty) != 3 {
+		t.Fatalf("Parsed invalid identifier which starts with digit: got %v", sty)
+	}
+	assertSelector(t, sty[0], ".one")
+	assertSelector(t, sty[1], ".a1")
+	assertSelector(t, sty[2], "P.two")
+}

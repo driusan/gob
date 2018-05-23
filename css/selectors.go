@@ -1,8 +1,9 @@
 package css
 
 import (
-	"golang.org/x/net/html"
 	"strings"
+
+	"golang.org/x/net/html"
 )
 
 type CSSSelector struct {
@@ -226,6 +227,7 @@ func (s CSSSelector) NumberElements() int {
 	}
 	return elems
 }
+
 func (s CSSSelector) NumberPseudo() int {
 	return strings.Count(s.Selector, ":")
 }

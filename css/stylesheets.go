@@ -119,10 +119,18 @@ func ParseStylesheet(val string, src StyleSource, importLoader net.URLReader, ur
 	spaceIfMatch := false
 	var importURL *url.URL
 	scn := scanner.New(val)
+	invalidSelector := false
 	for {
 		token := scn.Next()
 		if token.Type == scanner.TokenEOF {
 			break
+		}
+		if invalidSelector {
+			if token.Value == "}" {
+				invalidSelector = false
+			}
+			curSelector = CSSSelector{}
+			continue
 		}
 		switch token.Type {
 		// Different kinds of comments
@@ -301,7 +309,14 @@ func ParseStylesheet(val string, src StyleSource, importLoader net.URLReader, ur
 				importURL = urlContext.ResolveReference(iu)
 			}
 			fallthrough
-		case scanner.TokenHash, scanner.TokenNumber:
+		case scanner.TokenNumber:
+			switch context {
+			case startContext, matchingSelector, appendingSelector:
+				invalidSelector = true
+				continue
+			}
+			fallthrough
+		case scanner.TokenHash:
 			switch context {
 			case startContext, matchingSelector, appendingSelector:
 				curSelector.Selector += token.Value
