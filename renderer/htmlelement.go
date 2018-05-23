@@ -322,6 +322,8 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 				}
 				wordleft = wordleft[1:]
 				goto startword
+			} else {
+				firstletter = false
 			}
 		}
 
