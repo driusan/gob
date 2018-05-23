@@ -247,4 +247,14 @@ func TestCSS1PseudoSelector(t *testing.T) {
 	if rule.Matches(h1, st) != true {
 		t.Error("h1 is did not match first-line by class")
 	}
+
+	rule = StyleRule{Selector: CSSSelector{"h1:first-letter", 0}}
+	if rule.Matches(h1, st) != true {
+		t.Error("h1 did not match first-line ")
+	}
+
+	rule = StyleRule{Selector: CSSSelector{".title:first-letter", 0}}
+	if rule.Matches(h1, st) != true {
+		t.Error("h1 is did not match first-line by class")
+	}
 }

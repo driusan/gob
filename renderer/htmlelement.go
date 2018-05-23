@@ -122,9 +122,12 @@ func (e *RenderableDomElement) Walk(callback func(*RenderableDomElement)) {
 	}
 }
 
-func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent string, force bool, inlinesibling bool) (img *image.RGBA, consumed, unconsumed string, baseline int) {
+func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent string, force bool, inlinesibling bool, firstletter bool) (img *image.RGBA, consumed, unconsumed string, baseline int) {
 	if remainingWidth < 0 {
 		panic("No room to render text")
+	}
+	if firstletter {
+		e.Styles = e.ConditionalStyles.FirstLetter
 	}
 	switch e.GetTextTransform() {
 	case "capitalize":
@@ -246,6 +249,12 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 	}
 
 	for i, word := range words {
+		var wordleft string
+		if firstletter {
+			wordleft = word[1:]
+			word = string(word[0])
+		}
+	startword:
 		wordSizeInPx := fntDrawer.MeasureString(word).Ceil()
 		if dot+wordSizeInPx > remainingWidth && whitespace != "nowrap" {
 			// The word doesn't fit on this line.
@@ -287,6 +296,34 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 			return
 		}
 		fntDrawer.DrawString(word)
+		if firstletter {
+			if len(word) > 0 {
+				if unicode.IsLetter(rune(word[0])) {
+					e.Styles = e.ConditionalStyles.FirstLine
+					firstletter = false
+					fSize := e.GetFontSize()
+					fontFace = e.GetFontFace(fSize)
+					clr = e.GetColor()
+
+					fntDrawer.Src = &image.Uniform{clr}
+					fntDrawer.Face = fontFace
+				}
+			}
+
+			if len(wordleft) > 0 {
+				if firstletter {
+					// The letter printed was not a letter, so keep going
+					// character by character until we get to the first letter
+					word = string(wordleft[0])
+				} else {
+					// A letter was printed, so print the remaining part
+					// of the word.
+					word = wordleft
+				}
+				wordleft = wordleft[1:]
+				goto startword
+			}
+		}
 
 		if i == len(words)-1 {
 			if !inlinesibling {
@@ -309,8 +346,10 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 		}
 		fntDrawer.Dot.X = fixed.Int26_6(dot << 6)
 	}
-	unconsumed = ""
-	consumed = textContent
+	if !firstletter {
+		unconsumed = ""
+		consumed = textContent
+	}
 	return
 }
 
@@ -503,6 +542,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 	overlayed = NewDynamicMemoryDrawer(image.Rectangle{image.ZP, image.Point{width, height}})
 
 	firstLine := true
+	firstletter := true
 	imageMap := NewImageMap()
 
 	// The bottom margin of the last child, used for collapsing margins (where applicable)
@@ -539,7 +579,6 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 			if firstLine == true {
 				dot.X += c.GetTextIndent(width)
 				firstLine = false
-			} else {
 			}
 
 			remainingTextContent := c.Data
@@ -564,13 +603,13 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				}
 
 				var childImage image.Image
-				childImage, consumed, rt, baseline := c.renderLineBox(width-dot.X-rfWidth, remainingTextContent, false, c.NextSibling != nil && c.NextSibling.GetDisplayProp() == "inline")
+				childImage, consumed, rt, baseline := c.renderLineBox(width-dot.X-rfWidth, remainingTextContent, false, c.NextSibling != nil && c.NextSibling.GetDisplayProp() == "inline", firstletter)
 				if consumed == "" {
 					if dot.X == 0 {
 						// Nothing was consumed, and we're at the start of the line, so just
 						// force at least one word to be drawn.
 
-						childImage, consumed, rt, baseline = c.renderLineBox(width-dot.X-rfWidth, remainingTextContent, true, c.NextSibling != nil && c.NextSibling.GetDisplayProp() == "inline")
+						childImage, consumed, rt, baseline = c.renderLineBox(width-dot.X-rfWidth, remainingTextContent, true, c.NextSibling != nil && c.NextSibling.GetDisplayProp() == "inline", firstletter)
 					} else {
 						// Go to the next line.
 						dot.Y += *nextline
@@ -585,6 +624,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 						goto textdraw
 					}
 				}
+				firstletter = false
 
 				size := childImage.Bounds().Size()
 				size.Y = c.GetLineHeight() - c.GetBorderBottomWidth() - c.GetBorderTopWidth()

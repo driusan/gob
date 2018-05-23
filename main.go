@@ -56,7 +56,7 @@ func debugelement(el *renderer.RenderableDomElement) {
 		cur = (*dom.Element)(cur.Parent)
 	}
 	fmt.Printf("Hovering over: %v (%v)\n", name, el.GetTextContent())
-	fmt.Printf("Styles applied: %v\n", el.Styles)
+	fmt.Printf("Styles applied: %v\n", el.ConditionalStyles)
 }
 
 type Viewport struct {

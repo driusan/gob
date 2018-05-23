@@ -144,13 +144,21 @@ func (p *Page) ReapplyStyles() {
 			base = fontSizeToPx(strVal, el.Parent)
 			el.ConditionalStyles.Unconditional.SetFontSize(base)
 		}
+
 		switch strVal := el.ConditionalStyles.FirstLine.FontSize.GetValue(); strVal {
 		case "":
 			el.ConditionalStyles.FirstLine.SetFontSize(base)
 		default:
 			base = fontSizeToPx(strVal, el.Parent)
 			el.ConditionalStyles.FirstLine.SetFontSize(base)
-			println(strVal, el.GetTextContent())
+		}
+
+		switch strVal := el.ConditionalStyles.FirstLetter.FontSize.GetValue(); strVal {
+		case "":
+			el.ConditionalStyles.FirstLetter.SetFontSize(base)
+		default:
+			base = fontSizeToPx(strVal, el.Parent)
+			el.ConditionalStyles.FirstLetter.SetFontSize(base)
 		}
 
 		el.Styles = el.ConditionalStyles.FirstLine
