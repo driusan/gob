@@ -94,10 +94,10 @@ func (p *Page) ReapplyStyles() {
 		}
 
 		for _, attr := range el.Element.Attr {
-			if attr.Key == "style" {
+			if strings.ToLower(attr.Key) == "style" {
 				vals := css.ParseBlock(attr.Val)
 				for name, val := range vals {
-					el.Styles.AddStyle(
+					el.ConditionalStyles.Unconditional.AddStyle(
 						css.StyleRule{
 							Selector: css.CSSSelector{"", cssOrder},
 							Name:     name,

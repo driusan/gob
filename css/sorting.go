@@ -17,6 +17,8 @@ type byCSSPrecedence []StyleRule
 func specificityLess(i, j StyleRule) bool {
 	if i.Src == InlineStyleSrc {
 		return true
+	} else if j.Src == InlineStyleSrc {
+		return false
 	}
 
 	iNumIDs := i.Selector.NumberIDs()
