@@ -50,6 +50,10 @@ func (r byCSSPrecedence) Less(i, j int) bool {
 	switch r[i].Src {
 	case InlineStyleSrc:
 		if r[j].Src != InlineStyleSrc {
+			if !r[i].Value.Important && r[j].Value.Important {
+				// Important overrides inline styles
+				return false
+			}
 			return true
 		}
 		return specificityLess(r[i], r[j])
