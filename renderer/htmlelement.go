@@ -501,7 +501,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				}
 			}
 
-			if css := e.Styles.Width.GetValue(); css != "" {
+			if css := e.Styles.Width.Value; css != "" {
 				if w := e.GetWidth(); w > 0 {
 					ewidth = true
 					iwidth = w
@@ -510,7 +510,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 					}
 				}
 			}
-			if css := e.Styles.Height.GetValue(); css != "" {
+			if css := e.Styles.Height.Value; css != "" {
 				if h := e.GetHeight(); h > 0 {
 					eheight = true
 					iheight = h
@@ -525,10 +525,10 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				iwidth = sz.X
 				iheight = sz.Y
 			}
-			if e.Styles.Width.GetValue() == "" {
+			if e.Styles.Width.Value == "" {
 				e.Styles.Width = css.NewPxValue(iwidth)
 			}
-			if e.Styles.Height.GetValue() == "" {
+			if e.Styles.Height.Value == "" {
 				e.Styles.Height = css.NewPxValue(iheight)
 			}
 			//e.Styles.Overflow = css.NewValue("hidden")
@@ -590,10 +590,28 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 
 			// text nodes are inline elements that didn't match
 			// anything when adding styles, but that's okay,
-			// because their style should be identical to their
+			// because their style should be inherited from their
 			// parent.
 			c.Styles = e.Styles
 			c.ConditionalStyles = e.ConditionalStyles
+
+			// Exception: Inline element borders get applied to each line, but
+			// if the parent is a block it only goes around the block itself
+			if c.Parent.GetDisplayProp() != "inline" {
+				c.ConditionalStyles.Unconditional = new(css.StyledElement)
+				c.Styles = new(css.StyledElement)
+				*c.ConditionalStyles.Unconditional = *e.ConditionalStyles.Unconditional
+				*c.Styles = *e.Styles
+
+				c.ConditionalStyles.Unconditional.BorderLeftWidth.Value = "0"
+				c.ConditionalStyles.Unconditional.BorderRightWidth.Value = "0"
+				c.ConditionalStyles.Unconditional.BorderTopWidth.Value = "0"
+				c.ConditionalStyles.Unconditional.BorderBottomWidth.Value = "0"
+				c.Styles.BorderLeftWidth.Value = "0"
+				c.Styles.BorderRightWidth.Value = "0"
+				c.Styles.BorderTopWidth.Value = "0"
+				c.Styles.BorderBottomWidth.Value = "0"
+			}
 
 			lfWidth := e.leftFloats.MaxX(*dot)
 			rfWidth := e.rightFloats.WidthAt(*dot)

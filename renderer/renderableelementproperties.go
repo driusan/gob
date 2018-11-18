@@ -54,7 +54,7 @@ func (e *RenderableDomElement) GetLineHeight() int {
 		}
 		return e.Parent.getLineHeight(fSize)
 	}
-	stringVal := e.Styles.LineHeight.GetValue()
+	stringVal := e.Styles.LineHeight.Value
 	if stringVal == "" || stringVal == "inherit" {
 		if e.Parent == nil {
 			fontFace := e.GetFontFace(fSize)
@@ -69,7 +69,7 @@ func (e *RenderableDomElement) GetLineHeight() int {
 // (Used to ensure when a child inherits the line height, it's relative to
 // its own font size, not the parent's.
 func (e *RenderableDomElement) getLineHeight(fSize int) int {
-	stringVal := e.Styles.LineHeight.GetValue()
+	stringVal := e.Styles.LineHeight.Value
 	if stringVal == "" || stringVal == "inherit" {
 		if e.Parent == nil {
 			fontFace := e.GetFontFace(fSize)
@@ -103,7 +103,7 @@ func (e *RenderableDomElement) GetFontSize() int {
 }
 
 func (e RenderableDomElement) GetBackgroundColor() color.Color {
-	switch bgc := e.Styles.BackgroundColor.GetValue(); bgc {
+	switch bgc := e.Styles.BackgroundColor.Value; bgc {
 	case "inherit":
 		if e.Parent == nil {
 			return dfltBackground
@@ -146,7 +146,7 @@ func (e RenderableDomElement) GetColor() color.Color {
 }
 
 func (e RenderableDomElement) GetFloat() string {
-	switch float := e.Styles.Float.GetValue(); float {
+	switch float := e.Styles.Float.Value; float {
 	case "inherit":
 		return e.Parent.GetFloat()
 	case "left", "right", "none":
@@ -201,7 +201,7 @@ func (e *RenderableDomElement) GetTextDecoration() string {
 		return "none"
 	}
 
-	switch decoration := e.Styles.TextDecoration.GetValue(); decoration {
+	switch decoration := e.Styles.TextDecoration.Value; decoration {
 	case "inherit":
 		return e.Parent.GetTextDecoration()
 	default:
@@ -222,7 +222,7 @@ func (e RenderableDomElement) GetTextTransform() string {
 		return "none"
 	}
 
-	switch transformation := e.Styles.TextTransform.GetValue(); transformation {
+	switch transformation := e.Styles.TextTransform.Value; transformation {
 	case "inherit":
 		return e.Parent.GetTextTransform()
 	case "capitalize", "uppercase", "lowercase", "none":
@@ -243,7 +243,7 @@ func (e RenderableDomElement) GetTextIndent(containerWidth int) int {
 		}
 		return e.Parent.GetTextIndent(containerWidth)
 	}
-	val := e.Styles.TextIndent.GetValue()
+	val := e.Styles.TextIndent.Value
 	if val == "" {
 		if e.Parent == nil {
 			return 0
@@ -262,7 +262,7 @@ func (e RenderableDomElement) GetContainerWidth(containerWidth int) int {
 	if e.Styles == nil {
 		return width
 	}
-	cssVal := e.Styles.Width.GetValue()
+	cssVal := e.Styles.Width.Value
 	switch cssVal {
 	case "inherit":
 		if e.Parent == nil {
@@ -283,7 +283,7 @@ func (e RenderableDomElement) GetMaxHeight() int {
 	if e.Styles == nil {
 		return -1
 	}
-	cssVal := e.Styles.MaxHeight.GetValue()
+	cssVal := e.Styles.MaxHeight.Value
 	switch cssVal {
 	case "inherit":
 		if e.Parent == nil {
@@ -304,7 +304,7 @@ func (e RenderableDomElement) GetMaxWidth() int {
 	if e.Styles == nil {
 		return -1
 	}
-	cssVal := e.Styles.MaxWidth.GetValue()
+	cssVal := e.Styles.MaxWidth.Value
 	switch cssVal {
 	case "inherit":
 		if e.Parent == nil {
@@ -325,7 +325,7 @@ func (e RenderableDomElement) GetHeight() int {
 	if e.Styles == nil {
 		return -1
 	}
-	cssVal := e.Styles.Height.GetValue()
+	cssVal := e.Styles.Height.Value
 	switch cssVal {
 	case "inherit":
 		if e.Parent == nil {
@@ -346,7 +346,7 @@ func (e RenderableDomElement) GetWidth() int {
 	if e.Styles == nil {
 		return -1
 	}
-	cssVal := e.Styles.Width.GetValue()
+	cssVal := e.Styles.Width.Value
 	switch cssVal {
 	case "inherit":
 		if e.Parent == nil {
@@ -367,7 +367,7 @@ func (e RenderableDomElement) GetMinWidth() int {
 	if e.Styles == nil {
 		return 0
 	}
-	cssVal := e.Styles.MinWidth.GetValue()
+	cssVal := e.Styles.MinWidth.Value
 	switch cssVal {
 	case "inherit":
 		if e.Parent == nil {
@@ -388,7 +388,7 @@ func (e RenderableDomElement) GetMinHeight() int {
 	if e.Styles == nil {
 		return 0
 	}
-	cssVal := e.Styles.MinHeight.GetValue()
+	cssVal := e.Styles.MinHeight.Value
 	switch cssVal {
 	case "inherit":
 		if e.Parent == nil {
@@ -407,7 +407,7 @@ func (e RenderableDomElement) GetMinHeight() int {
 }
 
 func (e *RenderableDomElement) GetFontWeight() font.Weight {
-	switch e.Styles.FontWeight.GetValue() {
+	switch e.Styles.FontWeight.Value {
 	case "normal":
 		return font.WeightNormal
 	case "100":
@@ -458,7 +458,7 @@ func (e *RenderableDomElement) GetFontWeight() font.Weight {
 	}
 }
 func (e *RenderableDomElement) GetFontStyle() font.Style {
-	switch s := e.Styles.FontStyle.GetValue(); s {
+	switch s := e.Styles.FontStyle.Value; s {
 	case "normal":
 		return font.StyleNormal
 	case "italic":
@@ -477,7 +477,7 @@ func (e *RenderableDomElement) GetFontStyle() font.Style {
 }
 
 func (e *RenderableDomElement) GetFontFamily() css.FontFamily {
-	switch s := strings.ToLower(e.Styles.FontFamily.GetValue()); s {
+	switch s := strings.ToLower(e.Styles.FontFamily.Value); s {
 	case "sans-serif", "serif", "monospace":
 		return css.FontFamily(s)
 	case "fantasy", "cursive":
@@ -495,7 +495,7 @@ func (e *RenderableDomElement) GetFontFamily() css.FontFamily {
 func (e *RenderableDomElement) FontVariant() string {
 	// FIXME: Make this an enum/const, not a string
 
-	switch s := strings.ToLower(e.Styles.FontVariant.GetValue()); s {
+	switch s := strings.ToLower(e.Styles.FontVariant.Value); s {
 	case "normal", "":
 		return "normal"
 	case "small-caps":
@@ -515,7 +515,7 @@ func (e *RenderableDomElement) GetFontFace(fsize int) font.Face {
 }
 
 func (e *RenderableDomElement) GetWhiteSpace() string {
-	switch s := strings.ToLower(e.Styles.WhiteSpace.GetValue()); s {
+	switch s := strings.ToLower(e.Styles.WhiteSpace.Value); s {
 	case "normal", "pre", "nowrap":
 		return s
 	case "pre-wrap", "pre-line":
@@ -531,7 +531,7 @@ func (e *RenderableDomElement) GetWhiteSpace() string {
 }
 
 func (e *RenderableDomElement) GetOverflow() string {
-	switch s := strings.ToLower(e.Styles.Overflow.GetValue()); s {
+	switch s := strings.ToLower(e.Styles.Overflow.Value); s {
 	case "visible", "":
 		return "visible"
 	case "hidden":
@@ -550,7 +550,7 @@ func (e *RenderableDomElement) GetOverflow() string {
 }
 
 func (e *RenderableDomElement) GetVerticalAlign() string {
-	switch s := strings.ToLower(e.Styles.VerticalAlign.GetValue()); s {
+	switch s := strings.ToLower(e.Styles.VerticalAlign.Value); s {
 	case "baseline", "sub", "super", "top", "text-top", "middle", "botom", "text-bottom":
 		return s
 	case "inherit":
@@ -565,7 +565,7 @@ func (e *RenderableDomElement) GetVerticalAlign() string {
 }
 
 func (e *RenderableDomElement) GetListStyleType() string {
-	switch s := strings.ToLower(e.Styles.ListStyleType.GetValue()); s {
+	switch s := strings.ToLower(e.Styles.ListStyleType.Value); s {
 	case "disc", "circle", "square", "decimal", "decimal-leading-zero", "lower-roman",
 		"upper-roman", "lower-greek", "lower-latin", "upper-latin", "armenian", "georgian",
 		"lower-alpha", "upper-alpha", "none":

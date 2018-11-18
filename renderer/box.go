@@ -235,7 +235,7 @@ func (e RenderableDomElement) GetBorderBottomWidth() int {
 	if e.Styles == nil {
 		return 0
 	}
-	value := e.Styles.BorderBottomWidth.GetValue()
+	value := e.Styles.BorderBottomWidth.Value
 	if value == "" {
 		// No style, use default.
 		return 0
@@ -258,7 +258,7 @@ func (e RenderableDomElement) GetBorderBottomColor() *color.RGBA {
 	if e.Styles == nil {
 		return dfltBorder
 	}
-	value := e.Styles.BorderBottomColor.GetValue()
+	value := e.Styles.BorderBottomColor.Value
 	if value == "" {
 		return dfltBorder
 	}
@@ -278,7 +278,7 @@ func (e RenderableDomElement) GetBorderTopWidth() int {
 	if e.Styles == nil {
 		return 0
 	}
-	value := e.Styles.BorderTopWidth.GetValue()
+	value := e.Styles.BorderTopWidth.Value
 	if value == "" {
 		// No style, use default.
 		return 0
@@ -301,7 +301,7 @@ func (e RenderableDomElement) GetBorderTopColor() *color.RGBA {
 	if e.Styles == nil {
 		return dfltBorder
 	}
-	value := e.Styles.BorderTopColor.GetValue()
+	value := e.Styles.BorderTopColor.Value
 	if value == "" {
 		return dfltBorder
 	}
@@ -322,7 +322,7 @@ func (e RenderableDomElement) GetBorderLeftWidth() int {
 	if e.Styles == nil {
 		return 0
 	}
-	value := e.Styles.BorderLeftWidth.GetValue()
+	value := e.Styles.BorderLeftWidth.Value
 	if value == "" {
 		// No style, use default.
 		return 0
@@ -345,7 +345,7 @@ func (e RenderableDomElement) GetBorderLeftColor() *color.RGBA {
 	if e.Styles == nil {
 		return dfltBorder
 	}
-	value := e.Styles.BorderLeftColor.GetValue()
+	value := e.Styles.BorderLeftColor.Value
 	if value == "" {
 		return dfltBorder
 	}
@@ -366,7 +366,7 @@ func (e RenderableDomElement) GetBorderRightWidth() int {
 	if e.Styles == nil {
 		return 0
 	}
-	value := e.Styles.BorderRightWidth.GetValue()
+	value := e.Styles.BorderRightWidth.Value
 	if value == "" {
 		// No style, use default.
 		return 0
@@ -389,7 +389,7 @@ func (e RenderableDomElement) GetBorderRightColor() *color.RGBA {
 	if e.Styles == nil {
 		return dfltBorder
 	}
-	value := e.Styles.BorderRightColor.GetValue()
+	value := e.Styles.BorderRightColor.Value
 	if value == "" {
 		return dfltBorder
 	}
@@ -406,7 +406,7 @@ func (e RenderableDomElement) GetBorderRightColor() *color.RGBA {
 	return c
 }
 func (e RenderableDomElement) GetMarginLeftSize() int {
-	switch value := e.Styles.MarginLeft.GetValue(); value {
+	switch value := e.Styles.MarginLeft.Value; value {
 	case "":
 		return 0
 	case "inherit":
@@ -415,7 +415,7 @@ func (e RenderableDomElement) GetMarginLeftSize() int {
 		}
 		return e.Parent.GetMarginLeftSize()
 	case "auto":
-		if e.Styles.MarginRight.GetValue() == "auto" {
+		if e.Styles.MarginRight.Value == "auto" {
 			// return calculate how much is needed to center
 			return (e.containerWidth - e.contentWidth - e.GetBorderLeftWidth() - e.GetBorderRightWidth() - e.GetPaddingLeft() - e.GetPaddingRight()) / 2
 		}
@@ -430,7 +430,7 @@ func (e RenderableDomElement) GetMarginLeftSize() int {
 	}
 }
 func (e RenderableDomElement) GetMarginRightSize() int {
-	value := e.Styles.MarginRight.GetValue()
+	value := e.Styles.MarginRight.Value
 	if value == "" {
 		// No style, use default.
 		return 0
@@ -450,7 +450,7 @@ func (e RenderableDomElement) GetMarginRightSize() int {
 	return val
 }
 func (e RenderableDomElement) GetMarginTopSize() int {
-	value := e.Styles.MarginTop.GetValue()
+	value := e.Styles.MarginTop.Value
 	if value == "" {
 		// No style, use default.
 		return 0
@@ -471,7 +471,7 @@ func (e RenderableDomElement) GetMarginTopSize() int {
 }
 
 func (e RenderableDomElement) GetMarginBottomSize() int {
-	value := e.Styles.MarginBottom.GetValue()
+	value := e.Styles.MarginBottom.Value
 	if value == "" {
 		// No style, use default.
 		return 0
@@ -491,7 +491,7 @@ func (e RenderableDomElement) GetMarginBottomSize() int {
 	return val
 }
 func (e RenderableDomElement) GetPaddingLeft() int {
-	value := e.Styles.PaddingLeft.GetValue()
+	value := e.Styles.PaddingLeft.Value
 	if value == "" {
 		// No style, use default.
 		return 0
@@ -511,7 +511,7 @@ func (e RenderableDomElement) GetPaddingLeft() int {
 	return val
 }
 func (e RenderableDomElement) GetPaddingRight() int {
-	value := e.Styles.PaddingRight.GetValue()
+	value := e.Styles.PaddingRight.Value
 	if value == "" {
 		// No style, use default.
 		return 0
@@ -531,7 +531,7 @@ func (e RenderableDomElement) GetPaddingRight() int {
 	return val
 }
 func (e RenderableDomElement) GetPaddingTop() int {
-	value := e.Styles.PaddingTop.GetValue()
+	value := e.Styles.PaddingTop.Value
 	if value == "" {
 		// No style, use default.
 		return 0
@@ -551,7 +551,7 @@ func (e RenderableDomElement) GetPaddingTop() int {
 	return val
 }
 func (e RenderableDomElement) GetPaddingBottom() int {
-	value := e.Styles.PaddingBottom.GetValue()
+	value := e.Styles.PaddingBottom.Value
 	if value == "" {
 		// No style, use default.
 		return 0
@@ -574,7 +574,7 @@ func (e RenderableDomElement) GetBorderTopStyle() string {
 	if e.Styles == nil {
 		return "none"
 	}
-	val := e.Styles.BorderTopStyle.GetValue()
+	val := e.Styles.BorderTopStyle.Value
 	if val == "" {
 		return "none"
 	}
@@ -590,7 +590,7 @@ func (e RenderableDomElement) GetBorderBottomStyle() string {
 	if e.Styles == nil {
 		return "none"
 	}
-	val := e.Styles.BorderBottomStyle.GetValue()
+	val := e.Styles.BorderBottomStyle.Value
 	if val == "" {
 		return "none"
 	}
@@ -606,7 +606,7 @@ func (e RenderableDomElement) GetBorderLeftStyle() string {
 	if e.Styles == nil {
 		return "none"
 	}
-	val := e.Styles.BorderLeftStyle.GetValue()
+	val := e.Styles.BorderLeftStyle.Value
 	if val == "" {
 		return "none"
 	}
@@ -622,7 +622,7 @@ func (e RenderableDomElement) GetBorderRightStyle() string {
 	if e.Styles == nil {
 		return "none"
 	}
-	val := e.Styles.BorderRightStyle.GetValue()
+	val := e.Styles.BorderRightStyle.Value
 	if val == "" {
 		return "none"
 	}
@@ -636,7 +636,7 @@ func (e RenderableDomElement) GetBorderRightStyle() string {
 }
 
 func (e *RenderableDomElement) GetBackgroundRepeat() string {
-	repeat := e.Styles.BackgroundRepeat.GetValue()
+	repeat := e.Styles.BackgroundRepeat.Value
 	switch strings.ToLower(repeat) {
 	case "inherit":
 		return e.Parent.GetBackgroundRepeat()

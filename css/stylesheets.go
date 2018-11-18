@@ -27,16 +27,14 @@ type Stylesheet []StyleRule
 type StyleAttribute string
 
 type StyleValue struct {
-	string
+	Value     string
 	Important bool
 }
 
 func (sv StyleValue) String() string {
-	return sv.string
+	return sv.Value
 }
-func (sv StyleValue) GetValue() string {
-	return sv.string
-}
+
 func ParseBlock(val string) map[StyleAttribute]StyleValue {
 	m := make(map[StyleAttribute]StyleValue)
 	pieces := strings.Split(val, ";")
@@ -168,10 +166,10 @@ func ParseStylesheet(val string, src StyleSource, importLoader net.URLReader, ur
 				if token.Value == "important" {
 					curValue.Important = true
 				} else {
-					if curValue.string == "" {
-						curValue.string = token.Value
+					if curValue.Value == "" {
+						curValue.Value = token.Value
 					} else {
-						curValue.string += " " + token.Value
+						curValue.Value += " " + token.Value
 					}
 				}
 			}
@@ -246,13 +244,13 @@ func ParseStylesheet(val string, src StyleSource, importLoader net.URLReader, ur
 			case matchingValue:
 				switch token.Value {
 				case "-":
-					curValue.string += token.Value
+					curValue.Value += token.Value
 					spaceIfMatch = false
 				case ",":
-					curValue.string += token.Value
+					curValue.Value += token.Value
 					spaceIfMatch = true
 				case ")":
-					curValue.string += token.Value
+					curValue.Value += token.Value
 				case ";":
 					if curAttribute != "" {
 						s, _ = appendStyles(s, blockSelectors, curAttribute, curValue, src, orderNo)
@@ -322,14 +320,14 @@ func ParseStylesheet(val string, src StyleSource, importLoader net.URLReader, ur
 				curSelector.Selector += token.Value
 				spaceIfMatch = false
 			case matchingValue:
-				if curValue.string == "" {
-					curValue.string += token.Value
+				if curValue.Value == "" {
+					curValue.Value += token.Value
 				} else {
 					if spaceIfMatch {
-						curValue.string += " "
+						curValue.Value += " "
 						spaceIfMatch = false
 					}
-					curValue.string += token.Value
+					curValue.Value += token.Value
 				}
 
 			}
@@ -342,10 +340,10 @@ func ParseStylesheet(val string, src StyleSource, importLoader net.URLReader, ur
 				spaceIfMatch = false
 			case matchingValue:
 				spaceIfMatch = false
-				if curValue.string == "" {
-					curValue.string = token.Value
+				if curValue.Value == "" {
+					curValue.Value = token.Value
 				} else {
-					curValue.string += " " + token.Value
+					curValue.Value += " " + token.Value
 				}
 
 			}
@@ -363,14 +361,14 @@ func ParseStylesheet(val string, src StyleSource, importLoader net.URLReader, ur
 		case scanner.TokenDimension, scanner.TokenPercentage:
 			switch context {
 			case matchingValue:
-				if curValue.string == "" {
-					curValue.string = token.Value
+				if curValue.Value == "" {
+					curValue.Value = token.Value
 				} else {
 					if spaceIfMatch {
-						curValue.string += " "
+						curValue.Value += " "
 						spaceIfMatch = false
 					}
-					curValue.string += token.Value
+					curValue.Value += token.Value
 				}
 			}
 		case scanner.TokenAtKeyword:

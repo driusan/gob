@@ -301,13 +301,13 @@ func (e StyledElement) GetFontSize() (int, error) {
 }
 
 func (e *StyledElement) expandBoxBorderShorthand(att StyleAttribute, s StyleRule) {
-	values := strings.Fields(s.Value.string)
+	values := strings.Fields(s.Value.Value)
 	switch len(values) {
 	case 0:
 		return
 	case 1:
 		s.Name = "border-top-" + att
-		s.Value.string = values[0]
+		s.Value.Value = values[0]
 		e.rules = append(e.rules, s)
 		s.Name = "border-right-" + att
 		e.rules = append(e.rules, s)
@@ -317,63 +317,63 @@ func (e *StyledElement) expandBoxBorderShorthand(att StyleAttribute, s StyleRule
 		e.rules = append(e.rules, s)
 	case 2:
 		s.Name = "border-top-" + att
-		s.Value.string = values[0]
+		s.Value.Value = values[0]
 
 		e.rules = append(e.rules, s)
 		s.Name = "border-bottom-" + att
 		e.rules = append(e.rules, s)
 
-		s.Value.string = values[1]
+		s.Value.Value = values[1]
 		s.Name = "border-right-" + att
 		e.rules = append(e.rules, s)
 		s.Name = "border-left-" + att
 		e.rules = append(e.rules, s)
 	case 3:
 		s.Name = "border-top-" + att
-		s.Value.string = values[0]
+		s.Value.Value = values[0]
 		e.rules = append(e.rules, s)
 
 		s.Name = "border-right-" + att
-		s.Value.string = values[1]
+		s.Value.Value = values[1]
 		e.rules = append(e.rules, s)
 		s.Name = "border-left-" + att
 		e.rules = append(e.rules, s)
 
 		s.Name = "border-bottom-" + att
-		s.Value.string = values[2]
+		s.Value.Value = values[2]
 		e.rules = append(e.rules, s)
 	case 4:
 		fallthrough
 	default:
 		s.Name = "border-top-" + att
-		s.Value.string = values[0]
+		s.Value.Value = values[0]
 		e.rules = append(e.rules, s)
 
 		s.Name = "border-right-" + att
-		s.Value.string = values[1]
+		s.Value.Value = values[1]
 		e.rules = append(e.rules, s)
 
 		s.Name = "border-bottom-" + att
-		s.Value.string = values[2]
+		s.Value.Value = values[2]
 		e.rules = append(e.rules, s)
 
 		s.Name = "border-left-" + att
-		s.Value.string = values[3]
+		s.Value.Value = values[3]
 		e.rules = append(e.rules, s)
 	}
 }
 
 func (e *StyledElement) expandBorderShorthand(attrib StyleAttribute, s StyleRule) {
-	values := strings.Fields(s.Value.string)
+	values := strings.Fields(s.Value.Value)
 	for _, v := range values {
 		if IsLength(v) {
-			s.Value.string = v
+			s.Value.Value = v
 			e.expandBoxBorderShorthand("width", s)
 		} else if IsBorderStyle(v) {
-			s.Value.string = v
+			s.Value.Value = v
 			e.expandBoxBorderShorthand("style", s)
 		} else if IsColor(v) {
-			s.Value.string = v
+			s.Value.Value = v
 			e.expandBoxBorderShorthand("color", s)
 		} else {
 			fmt.Fprintln(os.Stderr, "Didn't know what to do with border property", v)
@@ -381,13 +381,13 @@ func (e *StyledElement) expandBorderShorthand(attrib StyleAttribute, s StyleRule
 	}
 }
 func (e *StyledElement) expandBoxSideShorthand(attrib StyleAttribute, s StyleRule) {
-	values := strings.Fields(s.Value.string)
+	values := strings.Fields(s.Value.Value)
 	switch len(values) {
 	case 0:
 		return
 	case 1:
 		s.Name = attrib + "-top"
-		s.Value.string = values[0]
+		s.Value.Value = values[0]
 		e.rules = append(e.rules, s)
 		s.Name = attrib + "-right"
 		e.rules = append(e.rules, s)
@@ -397,71 +397,71 @@ func (e *StyledElement) expandBoxSideShorthand(attrib StyleAttribute, s StyleRul
 		e.rules = append(e.rules, s)
 	case 2:
 		s.Name = attrib + "-top"
-		s.Value.string = values[0]
+		s.Value.Value = values[0]
 		e.rules = append(e.rules, s)
 		s.Name = attrib + "-bottom"
 		e.rules = append(e.rules, s)
 
 		s.Name = attrib + "-right"
-		s.Value.string = values[1]
+		s.Value.Value = values[1]
 		e.rules = append(e.rules, s)
 		s.Name = attrib + "-left"
 		e.rules = append(e.rules, s)
 	case 3:
 		s.Name = attrib + "-top"
-		s.Value.string = values[0]
+		s.Value.Value = values[0]
 		e.rules = append(e.rules, s)
 
 		s.Name = attrib + "-right"
-		s.Value.string = values[1]
+		s.Value.Value = values[1]
 		e.rules = append(e.rules, s)
 		s.Name = attrib + "-left"
 		e.rules = append(e.rules, s)
 
 		s.Name = attrib + "-bottom"
-		s.Value.string = values[2]
+		s.Value.Value = values[2]
 		e.rules = append(e.rules, s)
 	case 4:
 		fallthrough
 	default:
 		s.Name = attrib + "-top"
-		s.Value.string = values[0]
+		s.Value.Value = values[0]
 		e.rules = append(e.rules, s)
 
 		s.Name = attrib + "-right"
-		s.Value.string = values[1]
+		s.Value.Value = values[1]
 		e.rules = append(e.rules, s)
 
 		s.Name = attrib + "-bottom"
-		s.Value.string = values[2]
+		s.Value.Value = values[2]
 		e.rules = append(e.rules, s)
 
 		s.Name = attrib + "-left"
-		s.Value.string = values[3]
+		s.Value.Value = values[3]
 		e.rules = append(e.rules, s)
 	}
 }
 
 func (e *StyledElement) expandBackgroundShorthand(s StyleRule) {
-	values := strings.Fields(s.Value.string)
+	values := strings.Fields(s.Value.Value)
 
 	// hack to build background-color from the shorthand even
 	// though we split on whitespace and rgb(1, 2, 3) has whitespace
 	buildColour := false
 	for _, val := range values {
 		if buildColour {
-			e.rules[len(e.rules)-1].Value.string += (" " + val)
+			e.rules[len(e.rules)-1].Value.Value += (" " + val)
 			if strings.Index(val, ")") >= 0 {
 				buildColour = false
 			}
 		}
 		if val == "none" || IsURL(val) {
 			s.Name = "background-image"
-			s.Value.string = val
+			s.Value.Value = val
 			e.rules = append(e.rules, s)
 		} else if IsColor(val) {
 			s.Name = "background-color"
-			s.Value.string = val
+			s.Value.Value = val
 			e.rules = append(e.rules, s)
 			if string(val[0:4]) == "rgb(" {
 				buildColour = true
@@ -470,20 +470,20 @@ func (e *StyledElement) expandBackgroundShorthand(s StyleRule) {
 		switch val {
 		case "repeat", "repeat-x", "repeat-y", "no-repeat":
 			s.Name = "background-repeat"
-			s.Value.string = val
+			s.Value.Value = val
 			e.rules = append(e.rules, s)
 		case "scroll", "fixed":
 			s.Name = "background-attachment"
-			s.Value.string = val
+			s.Value.Value = val
 			e.rules = append(e.rules, s)
 		case "left", "right", "top", "center", "bottom":
 			s.Name = "background-position"
-			s.Value.string = val
+			s.Value.Value = val
 			e.rules = append(e.rules, s)
 		default:
 			if IsPercentage(val) || IsLength(val) {
 				s.Name = "background-position"
-				s.Value.string = val
+				s.Value.Value = val
 				e.rules = append(e.rules, s)
 			}
 		}
@@ -667,7 +667,7 @@ func (e *StyledElement) populateValues() {
 func (e *StyledElement) DisplayProp() string {
 	for _, rule := range e.rules {
 		if string(rule.Name) == "display" {
-			return rule.Value.string
+			return rule.Value.Value
 		}
 	}
 	return ""
@@ -686,7 +686,7 @@ func (e *StyledElement) GetAttribute(attr string) StyleValue {
 // is left as an exercise for the caller, since the CSS package doesn't
 // know the host/path to resolve relative URLs
 func (e StyledElement) GetBackgroundImage() (string, error) {
-	bgi := e.BackgroundImage.GetValue()
+	bgi := e.BackgroundImage.Value
 	switch bgi {
 	case "", "none":
 		return "", NoStyles
@@ -707,7 +707,7 @@ func (e StyledElement) GetBackgroundImage() (string, error) {
 }
 
 func (e StyledElement) GetColor(defaultColour color.Color) (color.Color, error) {
-	switch e.Color.string {
+	switch e.Color.Value {
 	case "inherit":
 		return defaultColour, InheritValue
 	case "transparent":
@@ -715,6 +715,6 @@ func (e StyledElement) GetColor(defaultColour color.Color) (color.Color, error) 
 	case "":
 		return defaultColour, NoStyles
 	default:
-		return ConvertColorToRGBA(e.Color.string)
+		return ConvertColorToRGBA(e.Color.Value)
 	}
 }

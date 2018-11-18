@@ -127,7 +127,7 @@ func (p *Page) ReapplyStyles() {
 		// Set the font size for this element, because em and ex
 		// units depend on it.
 		var base int
-		switch strVal := el.ConditionalStyles.Unconditional.FontSize.GetValue(); strVal {
+		switch strVal := el.ConditionalStyles.Unconditional.FontSize.Value; strVal {
 		case "":
 			// nothing specified, so inherit from parent, or
 			// fall back on default if there is no parent.
@@ -145,7 +145,7 @@ func (p *Page) ReapplyStyles() {
 			el.ConditionalStyles.Unconditional.SetFontSize(base)
 		}
 
-		switch strVal := el.ConditionalStyles.FirstLine.FontSize.GetValue(); strVal {
+		switch strVal := el.ConditionalStyles.FirstLine.FontSize.Value; strVal {
 		case "":
 			el.ConditionalStyles.FirstLine.SetFontSize(base)
 		default:
@@ -153,7 +153,7 @@ func (p *Page) ReapplyStyles() {
 			el.ConditionalStyles.FirstLine.SetFontSize(base)
 		}
 
-		switch strVal := el.ConditionalStyles.FirstLetter.FontSize.GetValue(); strVal {
+		switch strVal := el.ConditionalStyles.FirstLetter.FontSize.Value; strVal {
 		case "":
 			el.ConditionalStyles.FirstLetter.SetFontSize(base)
 		default:
