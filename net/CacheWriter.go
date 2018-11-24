@@ -40,13 +40,17 @@ func GetCacheWriter(source io.ReadCloser, cachedir string, resource *url.URL) io
 		dir = filepath.Join(cachedir, resource.Scheme, resource.Host)
 		err := os.MkdirAll(dir, 0700)
 		if err != nil {
+			fmt.Printf("could not make cache dir %v", err)
 			return source
 		}
 
 	}
 	if dir != "" {
 		filename := filepath.Join(dir, escapeString(resource.Path+"?"+resource.RawQuery))
-		writer, _ := os.Create(filename)
+		writer, err := os.Create(filename)
+		if err != nil {
+			panic(err)
+		}
 		return &CacheWriter{
 			Tee:     io.TeeReader(source, writer),
 			ToClose: writer,

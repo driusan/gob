@@ -1,7 +1,6 @@
 package net
 
 import (
-	//	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -50,7 +49,6 @@ func (d DefaultReader) GetURL(u *url.URL) (body io.ReadCloser, statuscode int, e
 		return f, 200, err
 	default:
 		if cached := getCacheReader(u); cached != nil {
-			//fmt.Printf("Using cache for %s\n", u)
 			return cached, 200, nil
 		}
 
@@ -64,7 +62,7 @@ func (d DefaultReader) GetURL(u *url.URL) (body io.ReadCloser, statuscode int, e
 		if resp.StatusCode == 200 {
 			// Only cache 200 response codes, because the filesystem doesn't store
 			// information about the response code in the cache..
-			cw := GetCacheWriter(resp.Body, "/home/driusan/.gob/cache/", u)
+			cw := GetCacheWriter(resp.Body, GetCacheDir(), u)
 			return cw, 200, nil
 		}
 		return resp.Body, resp.StatusCode, nil
@@ -79,15 +77,15 @@ func (d DefaultReader) HasVisited(u *url.URL) bool {
 	return !os.IsNotExist(err)
 }
 
-func GetCacheLocation(resource *url.URL) string {
+func GetCacheDir() string {
 	user, err := user.Current()
 	if err != nil {
 		return ""
 	}
-	cachedir := user.HomeDir + "/.gob/cache/"
-	if resource.Scheme == "" || resource.Host == "" {
-		return ""
-	}
+	return filepath.Join(user.HomeDir, ".gob", "cache")
+}
+func GetCacheLocation(resource *url.URL) string {
+	cachedir := GetCacheDir()
 	dir := filepath.Join(cachedir, resource.Scheme, resource.Host)
 	if dir == "" {
 		return ""
