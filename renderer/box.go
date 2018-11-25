@@ -1,7 +1,6 @@
 package renderer
 
 import (
-	// "fmt"
 	"image"
 	"image/color"
 	// the standard draw package doesn't have Copy, which we need for background Repeat.
@@ -867,42 +866,65 @@ func (e *RenderableDomElement) getEffectiveMarginBottom() int {
 		return margin
 	}
 
-	if lc.GetFloat() != "none" /* || lc.GetBorderBottomWidth() != 0 || lc.GetPaddingBottom() != 0 */ {
+	if lc.GetFloat() != "none" {
 		return margin
 	}
 
-	if bs := lc.getEffectiveMarginBottom(); bs > margin {
+	if bs := lc.getEffectiveMarginBottom(); margin > 0 && bs > margin {
+		return bs
+	} else if margin < 0 && bs < margin {
 		return bs
 	}
 	return margin
 }
 
-func (e RenderableDomElement) prevElement() *RenderableDomElement {
+func (e *RenderableDomElement) prevElement() *RenderableDomElement {
 	var lastel *RenderableDomElement
-	for c := e.PrevSibling; ; c = c.PrevSibling {
-		if c == nil {
-			// no children
+	/*
+		FIXME: PrevSibling isn't being set correctly by when converting from
+		net/html to *RenderableDomElement, as a hack we use NextSibling of the
+		parent until the next sibling is us.
+
+		This manifests itself on the 2 negative margins test at
+		https://www.w3.org/Style/CSS/Test/CSS1/current/sec411.htm
+		because with previous sibling not being set properly, one of the margins
+		is positive. Retest if before removing this.
+		for c := e.PrevSibling; ; c = c.PrevSibling {
+			if c == nil {
+				// no children
+				return lastel
+			}
+			switch c.Type {
+			case html.ElementNode:
+				lastel = c
+			default:
+			}
+			if c.PrevSibling == nil {
+				return lastel
+			}
+		}
+
+	*/
+	for c := e.Parent.FirstChild; ; c = c.NextSibling {
+
+		if c.NextSibling == e || c.NextSibling == nil {
 			return lastel
 		}
-		if c.Type == html.ElementNode {
+
+		switch c.Type {
+		case html.ElementNode:
 			lastel = c
-		}
-		if c.PrevSibling == nil {
-			return lastel
+		default:
 		}
 	}
 	panic("Exited loop infinite loop")
-
 }
 
-func (e RenderableDomElement) marginCollapseOffset() int {
+func (e *RenderableDomElement) marginCollapseOffset() int {
 	if e.GetFloat() != "none" {
 		return 0
 	}
 
-	if e.GetFloat() != "none" || e.GetPaddingTop() != 0 || e.GetBorderTopWidth() != 0 {
-		return 0
-	}
 	prev := e.prevElement()
 	if prev == nil {
 		return 0
@@ -917,20 +939,30 @@ func (e RenderableDomElement) marginCollapseOffset() int {
 	if prev.GetDisplayProp() == "inline" {
 		return 0
 	}
+	mbottom := prev.getEffectiveMarginBottom()
+	mtop := e.GetMarginTopSize()
+	if e.GetPaddingTop() != 0 || e.GetBorderTopWidth() != 0 {
+		// FIXME: Remove this hack.
+		rbottom := prev.GetMarginBottomSize()
+		if rbottom < 0 && mtop < 0 {
+			if mtop < rbottom {
+				return mtop
+			}
+			return rbottom
+		}
+		return 0
+	}
+
 	if prev == nil || prev.GetFloat() != "none" || prev.GetPaddingBottom() != 0 || prev.GetBorderBottomWidth() != 0 {
 		return 0
 	}
 
-	mbottom := prev.getEffectiveMarginBottom()
-	mtop := e.GetMarginTopSize()
-
-	if mbottom >= 0 && mtop >= 0 {
+	if mbottom > 0 && mtop > 0 {
 		if mtop > mbottom {
 			return mtop
 		}
 		return mbottom
 	} else if mbottom < 0 && mtop < 0 {
-		println("Negative collapsing bottom", mbottom, " top", mtop, e.GetTextContent())
 		if mtop > mbottom {
 			return mtop
 		}
