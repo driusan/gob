@@ -1,15 +1,18 @@
 package renderer
 
 import (
-	//	"fmt"
-	"github.com/driusan/Gob/css"
-	//"github.com/driusan/Gob/net"
+	// "fmt"
 	"image"
 	"image/color"
 	// the standard draw package doesn't have Copy, which we need for background Repeat.
 	"image/draw"
 	"net/url"
 	"strings"
+
+	"golang.org/x/net/html"
+
+	"github.com/driusan/Gob/css"
+	//"github.com/driusan/Gob/net"
 )
 
 type BoxOffset struct {
@@ -110,11 +113,11 @@ func (b *outerBoxDrawer) RGBA() *image.RGBA {
 		image.Rectangle{
 			Min: image.Point{
 				X: b.Margin.Left.Width,
-				Y: b.Margin.Top.Width,
+				Y: 0, // b.Margin.Top.Width,
 			},
 			Max: image.Point{
 				X: bounds.Max.X - b.Margin.Right.Width,
-				Y: bounds.Max.Y - b.Margin.Bottom.Width,
+				Y: bounds.Max.Y - 0, /* b.Margin.Bottom.Width*/
 			},
 		},
 		b.background,
@@ -201,10 +204,10 @@ func (b *outerBoxDrawer) GetContentOrigin() image.Point {
 func (b *outerBoxDrawer) At(x, y int) color.Color {
 	bounds := b.Bounds()
 	// Deal with the margin
-	if y < b.Margin.Top.Width || x < b.Margin.Left.Width {
+	if y < 0 /*b.Margin.Top.Width*/ || x < b.Margin.Left.Width {
 		return &color.RGBA{0, 0, 0, 0}
 	}
-	if y > (bounds.Max.Y-b.Margin.Bottom.Width) || x > (bounds.Max.X-b.Margin.Right.Width) {
+	if y > (bounds.Max.Y /*-b.Margin.Bottom.Width*/) || x > (bounds.Max.X-b.Margin.Right.Width) {
 		return &color.RGBA{0, 0, 0, 0}
 	}
 
@@ -217,7 +220,7 @@ func (b *outerBoxDrawer) At(x, y int) color.Color {
 		return b.Border.Left.Color
 	}
 
-	if y > bounds.Max.Y-b.Border.Bottom.Width-b.Margin.Bottom.Width {
+	if y > bounds.Max.Y-b.Border.Bottom.Width /*-b.Margin.Bottom.Width*/ {
 		return b.Border.Bottom.Color
 	}
 
@@ -483,6 +486,7 @@ func (e RenderableDomElement) GetMarginBottomSize() int {
 		return e.Parent.GetMarginBottomSize()
 
 	}
+
 	fontsize := e.GetFontSize()
 	val, err := css.ConvertUnitToPx(fontsize, e.containerWidth, value)
 	if err != nil {
@@ -803,10 +807,12 @@ func (e *RenderableDomElement) calcCSSBox(contentSize image.Point) (image.Image,
 
 	box := &outerBoxDrawer{
 		Margin: BoxMargins{
-			Top:    BoxMargin{Width: e.GetMarginTopSize()},
-			Left:   BoxMargin{Width: e.GetMarginLeftSize()},
-			Right:  BoxMargin{Width: e.GetMarginRightSize()},
-			Bottom: BoxMargin{Width: e.GetMarginBottomSize()},
+			// Do not include top or bottom margins in the image to make collapsing easier.
+			Top:    BoxMargin{Width: 0}, // e.GetMarginTopSize()},
+			Bottom: BoxMargin{Width: 0}, //
+
+			Left:  BoxMargin{Width: e.GetMarginLeftSize()},
+			Right: BoxMargin{Width: e.GetMarginRightSize()},
 		},
 		Border: BoxBorders{
 			Top:    BoxBorder{BoxOffset: BoxOffset{Width: e.GetBorderTopWidth()}, Color: e.GetBorderTopColor(), Style: e.GetBorderTopStyle()},
@@ -829,4 +835,110 @@ func (e *RenderableDomElement) calcCSSBox(contentSize image.Point) (image.Image,
 		Min: corigin,
 		Max: image.Point{X: corigin.X + size.X, Y: corigin.Y + size.Y},
 	}
+}
+
+func (e *RenderableDomElement) getLastChild() *RenderableDomElement {
+	var lastel *RenderableDomElement
+	for c := e.FirstChild; ; c = c.NextSibling {
+		if c == nil {
+			// no children
+			return lastel
+		}
+		if c.Type == html.ElementNode {
+			lastel = c
+		}
+		if c.NextSibling == nil {
+			return lastel
+		}
+	}
+	panic("Exited loop infinite loop")
+}
+
+// Gets the size of the bottom margin, taking collapsing with the
+// last child into effect if applicable.
+func (e *RenderableDomElement) getEffectiveMarginBottom() int {
+	margin := e.GetMarginBottomSize()
+	lc := e.getLastChild()
+	if lc == nil {
+		// no children to collapse with
+		return margin
+	}
+	if lc.GetDisplayProp() == "inline" {
+		return margin
+	}
+
+	if lc.GetFloat() != "none" /* || lc.GetBorderBottomWidth() != 0 || lc.GetPaddingBottom() != 0 */ {
+		return margin
+	}
+
+	if bs := lc.getEffectiveMarginBottom(); bs > margin {
+		return bs
+	}
+	return margin
+}
+
+func (e RenderableDomElement) prevElement() *RenderableDomElement {
+	var lastel *RenderableDomElement
+	for c := e.PrevSibling; ; c = c.PrevSibling {
+		if c == nil {
+			// no children
+			return lastel
+		}
+		if c.Type == html.ElementNode {
+			lastel = c
+		}
+		if c.PrevSibling == nil {
+			return lastel
+		}
+	}
+	panic("Exited loop infinite loop")
+
+}
+
+func (e RenderableDomElement) marginCollapseOffset() int {
+	if e.GetFloat() != "none" {
+		return 0
+	}
+
+	if e.GetFloat() != "none" || e.GetPaddingTop() != 0 || e.GetBorderTopWidth() != 0 {
+		return 0
+	}
+	prev := e.prevElement()
+	if prev == nil {
+		return 0
+	}
+	for prev.GetDisplayProp() == "inline" || prev.GetFloat() != "none" {
+		prev = prev.prevElement()
+		if prev == nil {
+			return 0
+		}
+
+	}
+	if prev.GetDisplayProp() == "inline" {
+		return 0
+	}
+	if prev == nil || prev.GetFloat() != "none" || prev.GetPaddingBottom() != 0 || prev.GetBorderBottomWidth() != 0 {
+		return 0
+	}
+
+	mbottom := prev.getEffectiveMarginBottom()
+	mtop := e.GetMarginTopSize()
+
+	if mbottom >= 0 && mtop >= 0 {
+		if mtop > mbottom {
+			return mtop
+		}
+		return mbottom
+	} else if mbottom < 0 && mtop < 0 {
+		println("Negative collapsing bottom", mbottom, " top", mtop, e.GetTextContent())
+		if mtop > mbottom {
+			return mtop
+		}
+		return mbottom
+	} else if mbottom < 0 && mtop >= 0 {
+		return 0
+	} else if mtop < 0 && mbottom >= 0 {
+		return 0
+	}
+	return 0
 }

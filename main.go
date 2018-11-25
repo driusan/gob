@@ -134,6 +134,7 @@ func main() {
 			case key.Event:
 				switch e.Code {
 				case key.CodeEscape:
+					fmt.Println("URL was: ", page.URL)
 					return
 				case key.CodeLeftArrow:
 					if e.Direction == key.DirPress {

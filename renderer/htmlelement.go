@@ -572,7 +572,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 	imageMap := NewImageMap()
 
 	// The bottom margin of the last child, used for collapsing margins (where applicable)
-	bottommargin := 0
+	//bottommargin := 0
 	for c := e.FirstChild; c != nil; c = c.NextSibling {
 		if fdot.Y < dot.Y {
 			fdot = *dot
@@ -757,6 +757,8 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				dot.Y += *nextline
 				*nextline = c.GetLineHeight()
 				e.advanceLine(dot)
+				dot.Y += e.GetMarginBottomSize()
+
 				continue
 			}
 			switch display := c.GetDisplayProp(); display {
@@ -773,9 +775,14 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				}
 				c.leftFloats = e.leftFloats
 				c.rightFloats = e.rightFloats
+				dot.Y += c.GetMarginTopSize()
+
 				childContent, newDot := c.LayoutPass(width, image.ZR, &image.Point{dot.X, dot.Y}, nextline)
+
 				c.ContentOverlay = childContent
 				_, contentbox := c.calcCSSBox(childContent.Bounds().Size())
+				dot.Y += c.GetMarginBottomSize()
+
 				c.BoxContentRectangle = contentbox
 				overlayed.GrowBounds(contentbox)
 
@@ -798,6 +805,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				}
 				dot.X = newDot.X
 				dot.Y = newDot.Y
+
 			case "block", "inline-block", "table", "table-inline", "list-item":
 				if dot.X != e.leftFloats.MaxX(*dot) && display != "inline-block" {
 					// This means the previous child was an inline item, and we should position dot
@@ -812,37 +820,17 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 					}
 				}
 
+				if float == "none" {
+					dot.Y += c.GetMarginTopSize()
+					dot.Y -= c.marginCollapseOffset()
+				} else {
+					fdot.Y += c.GetMarginTopSize()
+				}
+
 				// draw the border, background, and CSS outer box.
 				var lh int
 
 				cdot := image.Point{}
-				// Collapse margins before doing layout
-				if display != "inline-block" {
-					if tm := c.GetMarginTopSize(); tm != 0 && bottommargin != 0 && c.GetPaddingTop() == 0 && c.GetBorderTopWidth() == 0 {
-						// collapse margins
-						if tm > bottommargin {
-							// Remove the bottom margin that was already added,
-							// because this top margin is bigger
-							dot.Y -= bottommargin
-						} else {
-							// Remove the new top margin, because the previous
-							// bottom margin was bigger.
-							dot.Y -= tm
-						}
-
-						// If it's the first child of a collapsed margin, also collapse the margin in the child container.
-						if c.PrevSibling == nil {
-							if tm > bottommargin {
-								cdot.Y -= bottommargin
-							} else {
-								cdot.Y -= tm
-							}
-						}
-					}
-					if mt := c.GetMarginTopSize(); mt < 0 {
-						dot.Y += mt
-					}
-				}
 
 				var childContent image.Image
 				// collapse child margins if applicable
@@ -1000,6 +988,10 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 							}
 						}
 					}
+					// The CSS box didn't include margin because of collapsing, so
+					// we need to add it back.
+					r.Min.Y -= c.GetMarginTopSize()
+					r.Max.Y += c.GetMarginBottomSize()
 				default:
 				}
 				overlayed.GrowBounds(r)
@@ -1041,15 +1033,8 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 						dot.X = 0
 						dot.Y = r.Max.Y
 
-						if c.GetPaddingBottom() == 0 && c.GetBorderBottomWidth() == 0 {
-							bottommargin = c.GetMarginBottomSize()
-						} else {
-							bottommargin = 0
-						}
-
-						if mb := c.GetMarginBottomSize(); mb < 0 {
+						if mb := c.getEffectiveMarginBottom(); mb != 0 {
 							dot.Y += mb
-							bottommargin = 0
 						}
 					}
 
@@ -1127,6 +1112,15 @@ func (e *RenderableDomElement) DrawPass() image.Image {
 				c.ContentOverlay = childContent
 				//var drawMask image.Image
 				//maskP := image.ZP
+
+				// when doing the layout the boxDrawRectangle was fudged
+				// for floats to make it easier to calculate intersections
+				// when doing the layout. Now we need to adjust.
+				switch c.GetFloat() {
+				case "left", "right":
+					c.BoxDrawRectangle.Min.Y += c.GetMarginTopSize()
+					c.BoxDrawRectangle.Max.Y -= c.GetMarginBottomSize()
+				}
 				if c.CSSOuterBox != nil {
 					sr := c.CSSOuterBox.Bounds()
 					draw.Draw(
@@ -1137,7 +1131,6 @@ func (e *RenderableDomElement) DrawPass() image.Image {
 						draw.Over,
 					)
 				}
-
 				// now draw the content on top of the outer box
 				contentStart := c.BoxDrawRectangle.Min.Add(c.BoxContentRectangle.Min)
 				contentBounds := c.ContentOverlay.Bounds()
