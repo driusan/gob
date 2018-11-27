@@ -596,21 +596,43 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 			c.ConditionalStyles = e.ConditionalStyles
 
 			// Exception: Inline element borders get applied to each line, but
-			// if the parent is a block it only goes around the block itself
+			// if the parent is a block we shouldn't inherit the block border properties.
 			if c.Parent.GetDisplayProp() != "inline" {
 				c.ConditionalStyles.Unconditional = new(css.StyledElement)
+				c.ConditionalStyles.FirstLine = new(css.StyledElement)
+				c.ConditionalStyles.FirstLetter = new(css.StyledElement)
 				c.Styles = new(css.StyledElement)
+
 				*c.ConditionalStyles.Unconditional = *e.ConditionalStyles.Unconditional
+				*c.ConditionalStyles.FirstLine = *e.ConditionalStyles.FirstLine
+				*c.ConditionalStyles.FirstLetter = *e.ConditionalStyles.FirstLetter
 				*c.Styles = *e.Styles
 
-				c.ConditionalStyles.Unconditional.BorderLeftWidth.Value = "0"
-				c.ConditionalStyles.Unconditional.BorderRightWidth.Value = "0"
-				c.ConditionalStyles.Unconditional.BorderTopWidth.Value = "0"
-				c.ConditionalStyles.Unconditional.BorderBottomWidth.Value = "0"
-				c.Styles.BorderLeftWidth.Value = "0"
-				c.Styles.BorderRightWidth.Value = "0"
-				c.Styles.BorderTopWidth.Value = "0"
-				c.Styles.BorderBottomWidth.Value = "0"
+				resetboxprop := func(el *css.StyledElement) {
+					el.BorderLeftWidth.Value = "0"
+					el.BorderRightWidth.Value = "0"
+					el.BorderTopWidth.Value = "0"
+					el.BorderBottomWidth.Value = "0"
+
+					el.PaddingLeft.Value = "0"
+					el.PaddingRight.Value = "0"
+					el.PaddingTop.Value = "0"
+					el.PaddingBottom.Value = "0"
+
+					el.MarginTop.Value = "0"
+					el.MarginLeft.Value = "0"
+					el.MarginRight.Value = "0"
+					el.MarginBottom.Value = "0"
+
+					el.BackgroundColor.Value = "transparent"
+					el.BackgroundImage.Value = ""
+				}
+
+				resetboxprop(c.Styles)
+				resetboxprop(c.ConditionalStyles.Unconditional)
+				resetboxprop(c.ConditionalStyles.FirstLine)
+				resetboxprop(c.ConditionalStyles.FirstLetter)
+
 			}
 
 			lfWidth := e.leftFloats.MaxX(*dot)
