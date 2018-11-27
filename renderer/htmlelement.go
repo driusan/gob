@@ -642,6 +642,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 						continue
 					}
 				}
+
 				if width-dot.X-rfWidth <= 0 {
 					continue
 				}
@@ -832,12 +833,22 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 
 				cdot := image.Point{}
 
+				if c.GetDisplayProp() == "block" {
+					c.leftFloats = make(FloatStack, len(e.leftFloats))
+					for i, lf := range e.leftFloats {
+						// We tell the element that it has the whole width,
+						// but add new floats (adjusted to the child's coordinate
+						// space) so that if it goes past the existing floats it'll
+						// go back to the full width.
+						c.leftFloats[i] = new(RenderableDomElement)
+						c.leftFloats[i].BoxDrawRectangle = lf.BoxDrawRectangle.Sub(image.Point{0, dot.Y})
+					}
+				}
 				var childContent image.Image
-				// collapse child margins if applicable
 				childContent, _ = c.LayoutPass(width, image.ZR, &cdot, &lh)
 				c.ContentOverlay = childContent
 				box, contentbox := c.calcCSSBox(childContent.Bounds().Size())
-				c.BoxContentRectangle = contentbox
+				c.BoxContentRectangle = contentbox.Sub(image.Point{dot.X, 0})
 				sr := box.Bounds()
 
 				if fdot.Y <= dot.Y {
@@ -845,6 +856,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 					fdot.X = dot.X
 				}
 				r := image.Rectangle{*dot, dot.Add(sr.Size())}
+				r.Sub(image.Point{dot.X, 0})
 			positionFloats:
 				switch float {
 				case "right":
