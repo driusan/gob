@@ -930,6 +930,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 							goto positionFloats
 						}
 					}
+					c.BoxContentRectangle = contentbox
 				case "left":
 					size := sr.Size()
 					leftFloatX := e.leftFloats.MaxX(fdot)
@@ -1026,6 +1027,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 					// we need to add it back.
 					r.Min.Y -= c.GetMarginTopSize()
 					r.Max.Y += c.GetMarginBottomSize()
+					c.BoxContentRectangle = contentbox
 				default:
 				}
 				overlayed.GrowBounds(r)
