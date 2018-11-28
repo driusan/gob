@@ -544,7 +544,6 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 					dot.Y += box.Bounds().Size().Y
 					dot.X = 0
 					e.BoxDrawRectangle = box.Bounds()
-					return e.ContentOverlay, *dot
 				default:
 					fallthrough
 				case "inline", "inline-block":
@@ -559,7 +558,6 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 						*nextline = iheight
 					}
 				}
-				return box, *dot
 			}
 			return e.ContentOverlay, *dot
 		}
@@ -598,6 +596,8 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 			// Exception: Inline element borders get applied to each line, but
 			// if the parent is a block we shouldn't inherit the block border properties.
 			if c.Parent.GetDisplayProp() != "inline" {
+				// FIXME: Move these into the GetX functions instead of doing so much
+				// memory copying.
 				c.ConditionalStyles.Unconditional = new(css.StyledElement)
 				c.ConditionalStyles.FirstLine = new(css.StyledElement)
 				c.ConditionalStyles.FirstLetter = new(css.StyledElement)
