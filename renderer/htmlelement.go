@@ -853,17 +853,27 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				// draw the border, background, and CSS outer box.
 				var lh int
 
-				cdot := image.Point{}
+				cdot := image.Point{0, 0}
 
-				if c.GetDisplayProp() == "block" {
+				if c.GetDisplayProp() == "block" && float == "none" {
+					// We tell the element that it has the whole width,
+					// but add new floats (adjusted to the child's coordinate
+					// space) so that if it goes past the existing floats it'll
+					// go back to the full width. The adjustment only applies to
+					// the height, because otherwise it's the horizontal plane
+					// we're trying to track intersections with.
+					// Floats don't inherit the other floats, because the parent
+					// will make them collide and move them appropriately, they
+					// don't take up line space from each other internally.
 					c.leftFloats = make(FloatStack, len(e.leftFloats))
+					c.rightFloats = make(FloatStack, len(e.rightFloats))
 					for i, lf := range e.leftFloats {
-						// We tell the element that it has the whole width,
-						// but add new floats (adjusted to the child's coordinate
-						// space) so that if it goes past the existing floats it'll
-						// go back to the full width.
 						c.leftFloats[i] = new(RenderableDomElement)
 						c.leftFloats[i].BoxDrawRectangle = lf.BoxDrawRectangle.Sub(image.Point{0, dot.Y})
+					}
+					for i, lf := range e.rightFloats {
+						c.rightFloats[i] = new(RenderableDomElement)
+						c.rightFloats[i].BoxDrawRectangle = lf.BoxDrawRectangle.Sub(image.Point{0, dot.Y})
 					}
 				}
 				var childContent image.Image
@@ -878,7 +888,6 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 					fdot.X = dot.X
 				}
 				r := image.Rectangle{*dot, dot.Add(sr.Size())}
-				r.Sub(image.Point{dot.X, 0})
 			positionFloats:
 				switch float {
 				case "right":
