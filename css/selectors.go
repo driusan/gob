@@ -119,7 +119,7 @@ func matchIDAndClassAndPseudoSelector(el *html.Node, s string, st State) bool {
 		}
 		// If it's true, keep checking other remainingData criteria
 	case "active":
-		if st.Link == false {
+		if st.Link == false && st.Visited == false {
 			return false
 		}
 		if st.Active == false {

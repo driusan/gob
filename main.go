@@ -33,6 +33,7 @@ var (
 
 // for debugging
 var hover *renderer.RenderableDomElement
+var activeEl *renderer.RenderableDomElement
 
 func debugelement(el *renderer.RenderableDomElement) {
 	cur := el.Element
@@ -219,13 +220,20 @@ func main() {
 									if err == nil {
 										renderNewPageIntoViewport(s, w, &v, p, true)
 									}
+								} else if activeEl != nil {
+									activeEl.State.Active = false
+									activeEl = nil
+									page.ReapplyStyles()
+									page.Content.InvalidateLayout()
+									renderNewPageIntoViewport(s, w, &v, page, false)
+
 								}
 							case mouse.DirPress:
 								if el.State.Link == true || el.State.Visited == true {
+									activeEl = el
 									el.State.Active = true
 									page.ReapplyStyles()
 									page.Content.InvalidateLayout()
-									debugelement(el)
 									renderNewPageIntoViewport(s, w, &v, page, false)
 								}
 							default:
