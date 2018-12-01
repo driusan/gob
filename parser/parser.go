@@ -8,7 +8,6 @@ import (
 	"golang.org/x/net/html"
 	"image/color"
 	"io"
-	"io/ioutil"
 	"net/url"
 	"strconv"
 	"strings"
@@ -42,8 +41,7 @@ func LoadPage(r io.Reader, loader net.URLReader, urlContext *url.URL) Page {
 
 	renderable, _ := renderer.ConvertNodeToRenderableElement(body, loader)
 
-	sheet, _ := ioutil.ReadFile("useragent.css")
-	userAgentStyles, cssOrder := css.ParseStylesheet(string(sheet), css.UserAgentSrc, loader, urlContext, cssOrder)
+	userAgentStyles, cssOrder := css.ParseStylesheet(css.DefaultCSS, css.UserAgentSrc, loader, urlContext, cssOrder)
 
 	p := Page{
 		Content:         renderable,

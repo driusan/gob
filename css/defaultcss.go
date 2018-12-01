@@ -1,4 +1,6 @@
-html, address,
+package css
+
+const DefaultCSS = `html, address,
 blockquote,
 body, dd, div,
 dl, dt, fieldset, form,
@@ -74,4 +76,4 @@ BDO[DIR="rtl"]  { direction: rtl; unicode-bidi: bidi-override }
 body { margin: 8px; }
 :link { text-decoration: underline; color: blue; }
 noscript { display: block; }
-script, style { display: none; }
+script, style { display: none; }`

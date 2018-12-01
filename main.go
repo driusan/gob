@@ -263,12 +263,17 @@ func loadNewPage(context *url.URL, path string) (parser.Page, error) {
 	} else {
 		newURL = context.ResolveReference(u)
 	}
+
 	loader := net.DefaultReader{}
 	r, _, err := loader.GetURL(newURL)
 	if err != nil {
 		return parser.Page{}, err
 	}
 	defer r.Close()
+
+	// Add a slash to ensure that relative URLs get parsed relative to the
+	// URL, not relative to
+	newURL.Path += "/"
 	p := parser.LoadPage(r, loader, newURL)
 	p.URL = newURL
 	p.Content.InvalidateLayout()
