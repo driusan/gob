@@ -539,20 +539,28 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				e.BoxContentRectangle = contentbox
 				overlayed.GrowBounds(contentbox)
 
-				switch e.GetDisplayProp() {
-				case "block":
-					dot.Y += box.Bounds().Size().Y
-					dot.X = 0
-					e.BoxDrawRectangle = box.Bounds()
+				switch e.GetFloat() {
+				case "right":
+					e.Parent.positionRightFloat(*dot, box.Bounds().Size(), e, nextline)
+				case "left":
+					e.Parent.positionLeftFloat(*dot, box.Bounds().Size(), e, nextline)
 				default:
-					fallthrough
-				case "inline", "inline-block":
-					//if e.Styles.LineHeight.GetValue() == "" {
-					//	e.Styles.LineHeight = css.NewPxValue(iheight)
-					//}
+					switch e.GetDisplayProp() {
+					case "block":
+						dot.Y += box.Bounds().Size().Y
+						dot.X = 0
+					default:
+						fallthrough
+					case "inline", "inline-block":
+						//if e.Styles.LineHeight.GetValue() == "" {
+						//	e.Styles.LineHeight = css.NewPxValue(iheight)
+						//}
+					}
 					lb := lineBox{e.ContentOverlay, nil, *dot, *dot, iheight, "[img]", e}
 					e.Parent.lineBoxes = append(e.Parent.lineBoxes, &lb)
 					e.Parent.curLine = append(e.Parent.curLine, &lb)
+					e.BoxDrawRectangle = image.Rectangle{*dot, dot.Add(box.Bounds().Size())}
+
 					dot.X += box.Bounds().Size().X
 					if iheight > *nextline {
 						*nextline = iheight
@@ -796,15 +804,19 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 					dot.X += c.GetTextIndent(width)
 					firstLine = false
 				}
-				c.leftFloats = e.leftFloats
-				c.rightFloats = e.rightFloats
-				dot.Y += c.GetMarginTopSize()
+				if c.GetFloat() == "none" {
+					c.leftFloats = e.leftFloats
+					c.rightFloats = e.rightFloats
+					dot.Y += c.GetMarginTopSize()
+				}
 
 				childContent, newDot := c.LayoutPass(width, image.ZR, &image.Point{dot.X, dot.Y}, nextline)
 
 				c.ContentOverlay = childContent
 				_, contentbox := c.calcCSSBox(childContent.Bounds().Size())
-				dot.Y += c.GetMarginBottomSize()
+				if c.GetFloat() == "none" {
+					dot.Y += c.GetMarginBottomSize()
+				}
 
 				c.BoxContentRectangle = contentbox
 				overlayed.GrowBounds(contentbox)
@@ -826,9 +838,11 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 						imageMap.Add(area.Content, newArea)
 					}
 				}
-				dot.X = newDot.X
-				dot.Y = newDot.Y
 
+				if c.GetFloat() == "none" {
+					dot.X = newDot.X
+					dot.Y = newDot.Y
+				}
 			case "block", "inline-block", "table", "table-inline", "list-item":
 				if dot.X != e.leftFloats.MaxX(*dot) && display != "inline-block" {
 					// This means the previous child was an inline item, and we should position dot
@@ -877,6 +891,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 					}
 				}
 				var childContent image.Image
+
 				childContent, _ = c.LayoutPass(width, image.ZR, &cdot, &lh)
 				c.ContentOverlay = childContent
 				box, contentbox := c.calcCSSBox(childContent.Bounds().Size())
@@ -925,7 +940,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 					for _, line := range e.lineBoxes {
 						// Check if the box overlaps with any line. If so, just
 						// move the float down, because there's definitely no room on
-						// this line because we're dealing with a right float.
+						// this line since we're dealing with a right float.
 						lineBounds := image.Rectangle{
 							line.origin,
 							line.origin.Add(line.Content.Bounds().Size()),
@@ -1111,7 +1126,6 @@ func (e *RenderableDomElement) DrawPass() image.Image {
 	}
 	for c := e.FirstChild; c != nil; c = c.NextSibling {
 		switch c.Type {
-
 		case html.TextNode:
 			for _, box := range e.lineBoxes {
 				sr := box.Content.Bounds()
@@ -1144,13 +1158,39 @@ func (e *RenderableDomElement) DrawPass() image.Image {
 
 				c.ContentOverlay = childContent
 				bounds := childContent.Bounds()
-				draw.Draw(
-					e.OverlayedContent,
-					image.Rectangle{image.ZP, bounds.Max},
-					c.ContentOverlay,
-					bounds.Min,
-					draw.Over,
-				)
+				if c.Data == "img" {
+					//sr := c.CSSOuterBox.Bounds()
+					if c.CSSOuterBox != nil {
+						sr := c.CSSOuterBox.Bounds()
+						draw.Draw(
+							e.OverlayedContent,
+							c.BoxDrawRectangle,
+							c.CSSOuterBox,
+							sr.Min,
+							draw.Over,
+						)
+					}
+					// now draw the content on top of the outer box
+					contentStart := c.BoxDrawRectangle.Min.Add(c.BoxContentRectangle.Min)
+					contentBounds := c.ContentOverlay.Bounds()
+					cr := image.Rectangle{contentStart, contentStart.Add(contentBounds.Size())}
+
+					draw.Draw(
+						e.OverlayedContent,
+						cr,
+						c.ContentOverlay,
+						bounds.Min,
+						draw.Over,
+					)
+				} else {
+					draw.Draw(
+						e.OverlayedContent,
+						image.Rectangle{image.ZP, bounds.Max},
+						c.ContentOverlay,
+						bounds.Min,
+						draw.Over,
+					)
+				}
 			case "block", "table", "table-inline", "list-item":
 				// draw the border, background, and CSS outer box.
 				childContent := c.DrawPass()
@@ -1206,7 +1246,6 @@ func (e *RenderableDomElement) DrawPass() image.Image {
 						draw.Over,
 					)
 				}
-
 			}
 		}
 	}
@@ -1240,6 +1279,7 @@ func (e *RenderableDomElement) drawBullet(dst draw.Image, drawRectangle, content
 	)
 	fntDrawer.DrawString(bullet)
 }
+
 func (e *RenderableDomElement) advanceLine(dot *image.Point) {
 	if len(e.curLine) >= 1 {
 		e.Styles = e.ConditionalStyles.Unconditional
@@ -1282,6 +1322,7 @@ func (e *RenderableDomElement) advanceLine(dot *image.Point) {
 	e.curLine = make([]*lineBox, 0)
 	//e.Styles = e.ConditionalStyles.FirstLine
 }
+
 func (e *RenderableDomElement) listIndent() int {
 	if e == nil {
 		return 0
@@ -1293,4 +1334,187 @@ func (e *RenderableDomElement) listIndent() int {
 		}
 	}
 	return i
+}
+
+// positions child c, which has the size size as a right floating element.
+// dot is used to get the starting height to position the float.
+func (e *RenderableDomElement) positionRightFloat(dot image.Point, size image.Point, c *RenderableDomElement, nextline *int) {
+	width := e.contentWidth
+
+	c.BoxDrawRectangle = image.Rectangle{
+		image.Point{
+			width - size.X,
+			dot.Y,
+		},
+		image.Point{
+			width,
+			dot.Y + size.Y,
+		},
+	}
+	for e.handleFloatOverlap(&dot, &c.BoxDrawRectangle, c, nextline, false) == false {
+		// we don't do anything, we just keep calling handleFloatOverlap until
+		// it's found a home.
+	}
+	e.rightFloats = append(e.rightFloats, c)
+}
+
+// positions child c, which has the size size as a left floating element.
+// dot is used to get the starting height to position the float.
+func (e *RenderableDomElement) positionLeftFloat(dot image.Point, size image.Point, c *RenderableDomElement, nextline *int) error {
+	// Default to floating at the leftmost side of the element.
+	c.BoxDrawRectangle = image.Rectangle{
+		image.Point{
+			0,
+			dot.Y,
+		},
+		image.Point{
+			size.X,
+			dot.Y + size.Y,
+		},
+	}
+
+	fdot := dot
+	for e.handleFloatOverlap(&fdot, &c.BoxDrawRectangle, c, nextline, true) == false {
+		// we don't do anything, we just keep calling handleFloatOverlap until
+		// it's found a home.
+	}
+	e.leftFloats = append(e.leftFloats, c)
+	return nil
+}
+
+// verifies that positioning a float as position r would not overlap anything.
+// if it does, move it to the next possible left float position if moveleft
+// is true, and right position if it's false.
+// returns true if it's found a home for r, and false if we
+func (e *RenderableDomElement) handleFloatOverlap(dot *image.Point, r *image.Rectangle, c *RenderableDomElement, nextline *int, moveleft bool) bool {
+	width := e.contentWidth
+	// Check if it overlaps anything and move it if necessary.
+	// (We pretend that it has an overlap at the start, so that we can be sure that the loop happens
+	// at least once to verify it.)
+
+	size := r.Size()
+
+	verifyAndMove := func(other *RenderableDomElement) bool {
+		lfWidth := e.leftFloats.WidthAt(*dot)
+		rfWidth := e.rightFloats.WidthAt(*dot)
+		if other.BoxDrawRectangle.Overlaps(*r) {
+			if width-rfWidth-lfWidth-size.X < 0 {
+				// No room on this line, with the floats, so move down past
+				// the first float and try again.
+				dot.Y += e.leftFloats.ClearFloats(*dot).NextFloatHeight()
+				if moveleft {
+					dot.X = 0
+				} else {
+					dot.X = width - rfWidth - size.X
+				}
+			} else {
+				// There's still room in width for this float, so move it just
+				// past the last float.
+				if moveleft {
+					dot.X = lfWidth
+				} else {
+					dot.X = width - rfWidth - size.X
+				}
+			}
+
+			r.Min = image.Point{
+				dot.X,
+				dot.Y,
+			}
+			r.Max = image.Point{
+				dot.X + size.X,
+				dot.Y + size.Y,
+			}
+			// We've moved it, but haven't verified the new location, so tell
+			// the caller that it still needs to be verified
+			return false
+		}
+		return true
+	}
+	// Check if it overlaps left floats
+	for _, f := range e.leftFloats {
+		if verifyAndMove(f) == false {
+			return false
+		}
+	}
+	// Check if it overlaps any right floats
+	for _, f := range e.rightFloats {
+		if verifyAndMove(f) == false {
+			return false
+		}
+	}
+	// FIXME: Check if it overlaps any text
+	for _, line := range e.lineBoxes {
+		// Check if the box overlaps with any line. If so, just
+		// move the float down, because there's definitely no room on
+		// this line since we're dealing with a right float.
+		lineBounds := image.Rectangle{
+			line.origin,
+			line.origin.Add(line.Content.Bounds().Size()),
+		}
+		if r.Overlaps(lineBounds) {
+			if moveleft {
+				canMoveText := true
+				for _, line := range e.lineBoxes {
+					lineBounds := image.Rectangle{
+						line.origin,
+						line.origin.Add(line.Content.Bounds().Size()),
+					}
+					lsize := lineBounds.Size()
+					o := line.origin
+					if r.Max.X+lsize.X+e.rightFloats.WidthAt(o) >= width {
+						canMoveText = false
+						break
+					}
+				}
+
+				if canMoveText {
+					nd := r.Max.X
+					for i, line := range e.lineBoxes {
+						lineBounds := image.Rectangle{
+							line.origin,
+							line.origin.Add(line.Content.Bounds().Size()),
+						}
+						if r.Overlaps(lineBounds) {
+							line.origin.X = nd
+							e.lineBoxes[i] = line
+						}
+					}
+					// We were able to just move all the text on the line, there's
+					// no reason to verify the box again.
+					return true
+				} else {
+					dot.Y += *nextline
+					*nextline = c.GetLineHeight()
+					dot.X = 0
+					r.Min = image.Point{
+						dot.X,
+						dot.Y,
+					}
+					r.Max = image.Point{
+						dot.X + size.X,
+						dot.Y + size.Y,
+					}
+				}
+				return false
+			} else {
+				// There's definitely no space to move the text on this
+				// line because we're dealing with a right float, so
+				// just move the float down one line.
+				dot.Y += *nextline
+				*nextline = c.GetLineHeight()
+				dot.X = 0
+				r.Min = image.Point{
+					dot.X,
+					dot.Y,
+				}
+				r.Max = image.Point{
+					dot.X + size.X,
+					dot.Y + size.Y,
+				}
+			}
+			return false
+		}
+	}
+	return true
 }

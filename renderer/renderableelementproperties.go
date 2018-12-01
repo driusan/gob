@@ -181,7 +181,6 @@ func (e RenderableDomElement) GetDisplayProp() string {
 			case "list-item":
 				return "list-item"
 			default:
-
 				return cssVal
 
 			}
