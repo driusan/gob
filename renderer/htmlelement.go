@@ -804,10 +804,11 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 					dot.X += c.GetTextIndent(width)
 					firstLine = false
 				}
+				dot.X += c.GetMarginLeftSize()
+
 				if c.GetFloat() == "none" {
 					c.leftFloats = e.leftFloats
 					c.rightFloats = e.rightFloats
-					dot.Y += c.GetMarginTopSize()
 				}
 
 				childContent, newDot := c.LayoutPass(width, image.ZR, &image.Point{dot.X, dot.Y}, nextline)
@@ -840,7 +841,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				}
 
 				if c.GetFloat() == "none" {
-					dot.X = newDot.X
+					dot.X = newDot.X + c.GetBorderRightWidth() + c.GetPaddingRight() + c.GetMarginRightSize()
 					dot.Y = newDot.Y
 				}
 			case "block", "inline-block", "table", "table-inline", "list-item":
