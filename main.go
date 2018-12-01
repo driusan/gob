@@ -67,7 +67,7 @@ type Viewport struct {
 	// and displayed in the viewport according to the Size and Cursor
 	Content image.Image
 
-	// The location of the image to be displayed into the viewpart.
+	// The location of the image to be displayed into the viewport.
 	Cursor image.Point
 }
 
@@ -134,7 +134,7 @@ func main() {
 			case key.Event:
 				switch e.Code {
 				case key.CodeEscape:
-					fmt.Println("URL was: ", page.URL)
+					fmt.Println("Restart: Gob ", page.URL)
 					return
 				case key.CodeLeftArrow:
 					if e.Direction == key.DirPress {
@@ -187,7 +187,7 @@ func main() {
 					css.PixelsPerPt = float64(e.PixelsPerPt)
 				}
 				page.Content.InvalidateLayout()
-				renderNewPageIntoViewport(s, w, &v, page)
+				renderNewPageIntoViewport(s, w, &v, page, false)
 			case touch.Event:
 				fmt.Printf("Touch event!")
 			case mouse.Event:
@@ -217,7 +217,7 @@ func main() {
 									p, err := loadNewPage(page.URL, el.GetAttribute("href"))
 									page = p
 									if err == nil {
-										renderNewPageIntoViewport(s, w, &v, p)
+										renderNewPageIntoViewport(s, w, &v, p, true)
 									}
 								}
 							case mouse.DirPress:
@@ -226,7 +226,7 @@ func main() {
 									page.ReapplyStyles()
 									page.Content.InvalidateLayout()
 									debugelement(el)
-									renderNewPageIntoViewport(s, w, &v, page)
+									renderNewPageIntoViewport(s, w, &v, page, false)
 								}
 							default:
 								if el.Type == html.ElementNode && el.Data == "a" {
@@ -273,7 +273,6 @@ func loadNewPage(context *url.URL, path string) (parser.Page, error) {
 
 	// Add a slash to ensure that relative URLs get parsed relative to the
 	// URL, not relative to
-	newURL.Path += "/"
 	p := parser.LoadPage(r, loader, newURL)
 	p.URL = newURL
 	p.Content.InvalidateLayout()
@@ -281,10 +280,13 @@ func loadNewPage(context *url.URL, path string) (parser.Page, error) {
 	return p, nil
 }
 
-func renderNewPageIntoViewport(s screen.Screen, w screen.Window, v *Viewport, page parser.Page) {
+func renderNewPageIntoViewport(s screen.Screen, w screen.Window, v *Viewport, page parser.Page, resetcursor bool) {
 	windowSize := v.Size.Size()
 
 	page.Content.ViewportHeight = v.Size.HeightPx
 	v.Content = page.Content.Render(windowSize.X)
+	if resetcursor {
+		v.Cursor = image.ZP
+	}
 	paintWindow(s, w, v, page)
 }
