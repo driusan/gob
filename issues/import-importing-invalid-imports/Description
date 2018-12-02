@@ -1,8 +1,0 @@
-When something other than an @import line exists in a stylesheet,
-the following imports should cease to be applied. Instead, they're
-being extracted and applied currently.
-
-ExtractStyles and ParseStylesheet probably need to be combined to
-fix this.
-
-(They probably should be anyways.)

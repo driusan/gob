@@ -62,6 +62,7 @@ type RenderableDomElement struct {
 	//BoxOrigin        image.Point
 	BoxDrawRectangle    image.Rectangle
 	BoxContentRectangle image.Rectangle
+	floatAdjusted       bool
 
 	ImageMap       ImageMap
 	PageLocation   *url.URL
@@ -1394,6 +1395,12 @@ func (e *RenderableDomElement) handleFloatOverlap(dot *image.Point, r *image.Rec
 func (e *RenderableDomElement) getAbsoluteDrawRectangle() image.Rectangle {
 	var adj image.Point
 	for p := e.Parent; p != nil; p = p.Parent {
+		if p.GetDisplayProp() == "inline" {
+			// BoxContentRectangle isn't meaningful for inline
+			// parents.
+			continue
+		}
+
 		adj = adj.Add(p.BoxDrawRectangle.Min).Add(p.BoxContentRectangle.Min)
 	}
 	return e.BoxDrawRectangle.Add(adj)
@@ -1411,24 +1418,6 @@ func (e *RenderableDomElement) drawInto(ctx context.Context, dst draw.Image, cur
 			absrect = e.getAbsoluteDrawRectangle()
 		} else {
 			absrect = c.getAbsoluteDrawRectangle()
-		}
-
-		// Cull elements that don't fit onto dst.
-		if absrect.Max.X < cursor.X {
-			// the box is to the left of the viewport, don't draw it.
-			continue
-		}
-		if absrect.Min.X > dstsize.X+cursor.X {
-			// to the right of the viewport
-			continue
-		}
-		if absrect.Max.Y < cursor.Y {
-			// on top of the viewport
-			continue
-		}
-		if absrect.Min.Y > dstsize.Y+cursor.Y {
-			// below the viewport.
-			continue
 		}
 
 		switch c.Type {
@@ -1476,13 +1465,39 @@ func (e *RenderableDomElement) drawInto(ctx context.Context, dst draw.Image, cur
 					return err
 				}
 			case "block", "table", "table-inline", "list-item":
+				// Cull elements that don't fit onto dst.
+				if absrect.Max.X < cursor.X {
+					// the box is to the left of the viewport, don't draw it.
+					continue
+				}
+				if absrect.Min.X > dstsize.X+cursor.X {
+					// to the right of the viewport
+					continue
+				}
+				if absrect.Max.Y < cursor.Y {
+					// on top of the viewport
+					continue
+				}
+				if absrect.Min.Y > dstsize.Y+cursor.Y {
+					// below the viewport.
+					continue
+				}
+
 				// when doing the layout the boxDrawRectangle was fudged
 				// for floats to make it easier to calculate intersections
 				// when doing the layout. Now we need to adjust.
+
 				switch c.GetFloat() {
 				case "left", "right":
-					absrect.Min.Y += c.GetMarginTopSize()
-					absrect.Max.Y -= c.GetMarginBottomSize()
+					if !c.floatAdjusted {
+						mt := c.GetMarginTopSize()
+						mb := c.GetMarginBottomSize()
+						absrect.Min.Y += mt
+						absrect.Max.Y -= mb
+						c.BoxDrawRectangle.Min.Y += mt
+						c.BoxDrawRectangle.Max.Y -= mb
+						c.floatAdjusted = true
+					}
 				}
 				if c.CSSOuterBox != nil {
 					sr := c.CSSOuterBox.Bounds()
@@ -1505,8 +1520,10 @@ func (e *RenderableDomElement) drawInto(ctx context.Context, dst draw.Image, cur
 			// accurately, has many...)
 			for _, box := range e.lineBoxes {
 				sr := box.Content.Bounds()
-				r := image.Rectangle{box.origin, box.origin.Add(sr.Size())}.Add(absrect.Min).Add(e.BoxContentRectangle.Min)
-				//	r = r.Add(e.BoxContentRectangle.Min)
+				r := image.Rectangle{box.origin, box.origin.Add(sr.Size())}.Add(absrect.Min)
+				if c.Parent.GetDisplayProp() != "inline" {
+					r = r.Add(e.BoxContentRectangle.Min)
+				}
 
 				if box.BorderImage != nil {
 					sr := box.BorderImage.Bounds()
