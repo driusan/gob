@@ -3,6 +3,8 @@ package main
 import (
 	"github.com/driusan/Gob/net"
 	"github.com/driusan/Gob/parser"
+
+	"context"
 	"image"
 	"strings"
 	"testing"
@@ -89,6 +91,15 @@ func BenchmarkParseAndRender(b *testing.B) {
 		f := strings.NewReader(content)
 		parsedhtml := parser.LoadPage(f, loader, nil)
 		parsedhtml.Content.Render(1024)
+	}
+}
+func BenchmarkParseAndRenderInto(b *testing.B) {
+	loader := net.DefaultReader{}
+	dst := image.NewRGBA(image.Rectangle{image.ZP, image.Point{1024, 768}})
+	for i := 0; i < b.N; i++ {
+		f := strings.NewReader(content)
+		parsedhtml := parser.LoadPage(f, loader, nil)
+		parsedhtml.Content.RenderInto(context.TODO(), dst)
 	}
 }
 

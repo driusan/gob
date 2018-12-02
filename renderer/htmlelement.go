@@ -1,7 +1,9 @@
 package renderer
 
 import (
+	"context"
 	"fmt"
+
 	"github.com/driusan/Gob/css"
 	"github.com/driusan/Gob/dom"
 	"github.com/driusan/Gob/net"
@@ -28,8 +30,12 @@ import (
 // A RenderableElement is something that can be rendered to
 // an image.
 type Renderer interface {
-	// Returns an image representing this element.
-	Render(containerWidth int) image.Image
+	// Lays out an element in preparation for rendering
+	Layout(ctx context.Context, viewportSize image.Point) error
+
+	// Draws the element into dst, scrolled so that the top left of the
+	// image is at cursor. Layout must be called before RenderInto.
+	RenderInto(ctx context.Context, dst draw.Image, cursor image.Point) error
 }
 
 type RenderableDomElement struct {
@@ -79,6 +85,10 @@ type RenderableDomElement struct {
 	numBullets int
 
 	State css.State
+
+	// Temporary hack while transitioning the API from Render() -> dst returning
+	// an image to RenderInto(dst) -> void
+	contentCache image.Image
 }
 
 func (e RenderableDomElement) String() string {
@@ -214,7 +224,6 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 		panic("This should never happen")
 	}
 	img = image.NewRGBA(image.Rectangle{image.ZP, image.Point{ssize, lineheight}})
-
 	baseline = fontFace.Metrics().Ascent.Floor()
 	fntDrawer.Dot = fixed.P(start, baseline)
 	fntDrawer.Dst = img
@@ -241,7 +250,6 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 			}
 		}
 	}()
-
 	if whitespace == "pre" {
 		fntDrawer.DrawString(lines[0])
 		consumed = lines[0]
@@ -271,6 +279,7 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 				wordSizeInPx = fntDrawer.MeasureString(pword[0]).Ceil()
 				if dot+wordSizeInPx <= remainingWidth {
 					fntDrawer.DrawString(pword[0])
+
 					unconsumed = strings.Join(words[i+1:], " ")
 					if len(unconsumed) > 0 {
 						unconsumed = pword[1] + " " + unconsumed
@@ -379,12 +388,36 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 	return
 }
 
-func (e *RenderableDomElement) Render(containerWidth int) image.Image {
+// Lays out the element into a viewport of size viewportSize.
+func (e *RenderableDomElement) Layout(ctx context.Context, viewportSize image.Point) error {
 	e.leftFloats = make(FloatStack, 0)
 	e.rightFloats = make(FloatStack, 0)
 	var lh int
-	e.LayoutPass(containerWidth, image.ZR, &image.Point{0, 0}, &lh)
-	return e.DrawPass()
+	e.layoutPass(ctx, viewportSize.X, image.ZR, &image.Point{0, 0}, &lh)
+	return nil
+}
+
+func (e *RenderableDomElement) RenderInto(ctx context.Context, dst draw.Image, cursor image.Point) error {
+	// This code is a temporary hack to change the API without changing the
+	// structure of the code. DrawPass still constructs the whole image,
+	// rather than just the part we care about.
+	if !e.layoutDone {
+		return fmt.Errorf("Element not yet laid out.")
+	}
+	var val image.Image
+	if e.contentCache == nil {
+		e.contentCache = e.DrawPass(ctx)
+	}
+	val = e.contentCache
+	vb := val.Bounds()
+	draw.Draw(
+		dst,
+		image.Rectangle{image.ZP, vb.Size()},
+		val,
+		vb.Min.Add(cursor),
+		draw.Over,
+	)
+	return nil
 }
 
 func (e *RenderableDomElement) InvalidateLayout() {
@@ -398,6 +431,7 @@ func (e *RenderableDomElement) InvalidateLayout() {
 	e.lineBoxes = nil
 	e.leftFloats = nil
 	e.rightFloats = nil
+	e.contentCache = nil
 
 	if e.FirstChild != nil {
 		e.FirstChild.InvalidateLayout()
@@ -407,18 +441,7 @@ func (e *RenderableDomElement) InvalidateLayout() {
 	}
 }
 
-// realRender either calculates the size of elements, or draws them, depending on if it's a layoutPass
-// or not. It's done in one method because the logic is largely the same.
-//
-// If it's a layout pass, it will return an empty image large enough to be passed to a render pass. If it's
-// a render pass, the final size, r, must be passed from the layout pass so that it can allocate an appropriately
-// sized image.
-//
-// dot is the starting location of dot (a moving cursor used for drawing elements, representing the top-left corner
-// to draw at.), and it returns both an image, and the final location of dot after drawing the element. This is
-// required because inline elements might render multiple line blocks, and the whole inline isn't necessarily
-// square, so you can't just take the bounds of the rendered image.
-func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle, dot *image.Point, nextline *int) (image.Image, image.Point) {
+func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth int, r image.Rectangle, dot *image.Point, nextline *int) (image.Image, image.Point) {
 	var overlayed *DynamicMemoryDrawer
 	if e.layoutDone {
 		return e.OverlayedContent, image.Point{}
@@ -580,6 +603,9 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 	// The bottom margin of the last child, used for collapsing margins (where applicable)
 	//bottommargin := 0
 	for c := e.FirstChild; c != nil; c = c.NextSibling {
+		if ctx.Err() != nil {
+			return nil, image.ZP
+		}
 		if fdot.Y < dot.Y {
 			fdot = *dot
 		}
@@ -811,7 +837,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 					c.rightFloats = e.rightFloats
 				}
 
-				childContent, newDot := c.LayoutPass(width, image.ZR, &image.Point{dot.X, dot.Y}, nextline)
+				childContent, newDot := c.layoutPass(ctx, width, image.ZR, &image.Point{dot.X, dot.Y}, nextline)
 
 				c.ContentOverlay = childContent
 				_, contentbox := c.calcCSSBox(childContent.Bounds().Size())
@@ -893,7 +919,7 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 				}
 				var childContent image.Image
 
-				childContent, _ = c.LayoutPass(width, image.ZR, &cdot, &lh)
+				childContent, _ = c.layoutPass(ctx, width, image.ZR, &cdot, &lh)
 				c.ContentOverlay = childContent
 				box, contentbox := c.calcCSSBox(childContent.Bounds().Size())
 				c.BoxContentRectangle = contentbox.Sub(image.Point{dot.X, 0})
@@ -928,7 +954,9 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 							fdot.Y += rfHeight
 							fdot.X = leftFloat.MaxX(fdot)
 						} else {
-							panic("Clearing floats didn't make any space.")
+							// panic("Clearing floats didn't make any space.")
+							fmt.Fprintf(os.Stderr, "Clearing floats didn't make any space. Skipping element.\n")
+							continue
 						}
 
 						rightFloatX = rightFloat.WidthAt(fdot)
@@ -975,7 +1003,10 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 							fdot.Y += rfHeight
 							fdot.X = e.leftFloats.MaxX(fdot)
 						} else {
-							panic("Clearing floats didn't make any space.")
+							// panic("Clearing floats didn't make any space.")
+							fmt.Fprintf(os.Stderr, "Clearing floats didn't make any space. Skipping element.\n")
+							continue
+
 						}
 
 						leftFloatX = e.leftFloats.MaxX(fdot)
@@ -1118,7 +1149,10 @@ func (e *RenderableDomElement) LayoutPass(containerWidth int, r image.Rectangle,
 // to draw at.), and it returns both an image, and the final location of dot after drawing the element. This is
 // required because inline elements might render multiple line blocks, and the whole inline isn't necessarily
 // square, so you can't just take the bounds of the rendered image.
-func (e *RenderableDomElement) DrawPass() image.Image {
+func (e *RenderableDomElement) DrawPass(ctx context.Context) (rv image.Image) {
+	defer func() {
+		e.contentCache = rv
+	}()
 	if e.Type == html.ElementNode {
 		switch strings.ToLower(e.Data) {
 		case "img":
@@ -1126,6 +1160,9 @@ func (e *RenderableDomElement) DrawPass() image.Image {
 		}
 	}
 	for c := e.FirstChild; c != nil; c = c.NextSibling {
+		if ctx.Err() != nil {
+			return nil
+		}
 		switch c.Type {
 		case html.TextNode:
 			for _, box := range e.lineBoxes {
@@ -1155,7 +1192,7 @@ func (e *RenderableDomElement) DrawPass() image.Image {
 			default:
 				fallthrough
 			case "inline", "inline-block":
-				childContent := c.DrawPass()
+				childContent := c.DrawPass(ctx)
 
 				c.ContentOverlay = childContent
 				bounds := childContent.Bounds()
@@ -1194,7 +1231,7 @@ func (e *RenderableDomElement) DrawPass() image.Image {
 				}
 			case "block", "table", "table-inline", "list-item":
 				// draw the border, background, and CSS outer box.
-				childContent := c.DrawPass()
+				childContent := c.DrawPass(ctx)
 				c.ContentOverlay = childContent
 				//var drawMask image.Image
 				//maskP := image.ZP

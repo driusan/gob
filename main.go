@@ -18,12 +18,13 @@ import (
 	"golang.org/x/mobile/event/touch"
 	"golang.org/x/net/html"
 
+	"context"
 	"image"
 	"image/color"
 	"image/draw"
 	"net/url"
 	"os"
-	//"runtime/pprof"
+	// "runtime/pprof"
 )
 
 var (
@@ -66,34 +67,39 @@ type Viewport struct {
 
 	// The whole, source image to be displayed in the viewport. It will be clipped
 	// and displayed in the viewport according to the Size and Cursor
-	Content image.Image
+	//	Content image.Image
 
 	// The location of the image to be displayed into the viewport.
 	Cursor image.Point
+
+	buffer screen.Buffer
 }
 
+var renderCtx context.Context
+var cancelRender context.CancelFunc
+
+func newContext() {
+	if cancelRender != nil {
+		cancelRender()
+	}
+	renderCtx, cancelRender = context.WithCancel(context.Background())
+}
 func paintWindow(s screen.Screen, w screen.Window, v *Viewport, page parser.Page) {
-	if v.Content == nil {
+	if v.buffer == nil {
 		return
 	}
-	viewport := v.Size.Bounds()
 
-	b, err := s.NewBuffer(v.Size.Size())
-	dst := b.RGBA()
+	viewport := v.Size.Bounds()
 
 	// Fill the buffer with the window background colour before
 	// drawing the web page on top of it.
+	dst := v.buffer.RGBA()
 	draw.Draw(dst, dst.Bounds(), &image.Uniform{background}, image.ZP, draw.Src)
 
-	// Draw the clipped portion of the page that is within view
-	draw.Draw(dst, viewport, v.Content, v.Cursor, draw.Over)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "%s", err)
-		return
+	if err := page.Content.RenderInto(renderCtx, dst, v.Cursor); err != nil {
+		panic(err)
 	}
-	defer b.Release()
-	draw.Draw(dst, viewport, v.Content, v.Cursor, draw.Over)
-	w.Upload(image.Point{0, 0}, b, viewport)
+	w.Upload(image.Point{0, 0}, v.buffer, viewport)
 	w.Publish()
 }
 
@@ -141,36 +147,44 @@ func main() {
 					if e.Direction == key.DirPress {
 						scrollSize := 50
 						v.Cursor.X -= scrollSize
-						if v.Cursor.X > v.Content.Bounds().Max.X {
-							v.Cursor.X = v.Content.Bounds().Max.X - 10
-						}
+						/*
+							if v.Cursor.X > v.Content.Bounds().Max.X {
+								v.Cursor.X = v.Content.Bounds().Max.X - 10
+							}
+						*/
 						paintWindow(s, w, &v, page)
 					}
 				case key.CodeRightArrow:
 					if e.Direction == key.DirPress {
 						scrollSize := 50
 						v.Cursor.X += scrollSize
-						if v.Cursor.X > v.Content.Bounds().Max.X {
-							v.Cursor.X = v.Content.Bounds().Max.X - 10
-						}
+						/*
+							if v.Cursor.X > v.Content.Bounds().Max.X {
+								v.Cursor.X = v.Content.Bounds().Max.X - 10
+							}
+						*/
 						paintWindow(s, w, &v, page)
 					}
 				case key.CodeDownArrow:
 					if e.Direction == key.DirPress {
 						scrollSize := v.Size.Size().Y / 2
 						v.Cursor.Y += scrollSize
-						if v.Cursor.Y > v.Content.Bounds().Max.Y {
-							v.Cursor.Y = v.Content.Bounds().Max.Y - 10
-						}
+						/*
+							if v.Cursor.Y > v.Content.Bounds().Max.Y {
+								v.Cursor.Y = v.Content.Bounds().Max.Y - 10
+							}
+						*/
 						paintWindow(s, w, &v, page)
 					}
 				case key.CodeUpArrow:
 					if e.Direction == key.DirPress {
 						scrollSize := v.Size.Size().Y / 2
 						v.Cursor.Y -= scrollSize
-						if v.Cursor.Y < 0 {
-							v.Cursor.Y = 0
-						}
+						/*
+							if v.Cursor.Y < 0 {
+								v.Cursor.Y = 0
+							}
+						*/
 						paintWindow(s, w, &v, page)
 					}
 				case key.CodeP:
@@ -187,7 +201,18 @@ func main() {
 				if e.PixelsPerPt != 0 {
 					css.PixelsPerPt = float64(e.PixelsPerPt)
 				}
+				if v.buffer != nil {
+					v.buffer.Release()
+				}
+				v.buffer, err = s.NewBuffer(v.Size.Size())
+				if err != nil {
+					// If we couldn't get a buffer, there's
+					// not much we can do..
+					panic(err)
+				}
+				newContext()
 				page.Content.InvalidateLayout()
+				page.Content.Layout(renderCtx, v.Size.Size())
 				renderNewPageIntoViewport(s, w, &v, page, false)
 			case touch.Event:
 				fmt.Printf("Touch event!")
@@ -215,16 +240,21 @@ func main() {
 							case mouse.DirRelease:
 								el.OnClick()
 								if el.Type == html.ElementNode && el.Data == "a" {
+									newContext()
+
 									p, err := loadNewPage(page.URL, el.GetAttribute("href"))
 									page = p
 									if err == nil {
+										page.Content.Layout(renderCtx, v.Size.Size())
 										renderNewPageIntoViewport(s, w, &v, p, true)
 									}
 								} else if activeEl != nil {
 									activeEl.State.Active = false
 									activeEl = nil
 									page.ReapplyStyles()
+									newContext()
 									page.Content.InvalidateLayout()
+									page.Content.Layout(context.TODO(), v.Size.Size())
 									renderNewPageIntoViewport(s, w, &v, page, false)
 
 								}
@@ -233,7 +263,9 @@ func main() {
 									activeEl = el
 									el.State.Active = true
 									page.ReapplyStyles()
+									newContext()
 									page.Content.InvalidateLayout()
+									page.Content.Layout(context.TODO(), v.Size.Size())
 									renderNewPageIntoViewport(s, w, &v, page, false)
 								}
 							default:
@@ -288,13 +320,12 @@ func loadNewPage(context *url.URL, path string) (parser.Page, error) {
 	return p, nil
 }
 
-func renderNewPageIntoViewport(s screen.Screen, w screen.Window, v *Viewport, page parser.Page, resetcursor bool) {
-	windowSize := v.Size.Size()
-
+func renderNewPageIntoViewport(s screen.Screen, w screen.Window, v *Viewport, page parser.Page, newpage bool) {
 	page.Content.ViewportHeight = v.Size.HeightPx
-	v.Content = page.Content.Render(windowSize.X)
-	if resetcursor {
+	if newpage {
+		newContext()
 		v.Cursor = image.ZP
+		page.Content.Layout(renderCtx, v.Size.Size())
 	}
 	paintWindow(s, w, v, page)
 }
