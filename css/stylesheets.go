@@ -118,6 +118,7 @@ func ParseStylesheet(val string, src StyleSource, importLoader net.URLReader, ur
 	var importURL *url.URL
 	scn := scanner.New(val)
 	invalidSelector := false
+	skipblocks := 0
 	for {
 		token := scn.Next()
 		if token.Type == scanner.TokenEOF {
@@ -125,6 +126,11 @@ func ParseStylesheet(val string, src StyleSource, importLoader net.URLReader, ur
 		}
 		if invalidSelector {
 			if token.Value == "}" {
+				skipblocks--
+			} else if token.Value == "{" {
+				skipblocks++
+			}
+			if skipblocks == 0 && (token.Value == "}" || token.Value == ";") {
 				invalidSelector = false
 			}
 			curSelector = CSSSelector{}
@@ -216,7 +222,8 @@ func ParseStylesheet(val string, src StyleSource, importLoader net.URLReader, ur
 				case ";":
 					continue
 				default:
-					panic(fmt.Sprintf("Unhandled character %v in context %v", token.Value, context))
+					//panic(fmt.Sprintf("Unhandled character %v in context %v", token.Value, context))
+					invalidSelector = true
 				}
 			case matchingAttribute:
 				switch token.Value {
