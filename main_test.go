@@ -88,9 +88,11 @@ a:hover {
 func BenchmarkParseAndRender(b *testing.B) {
 	loader := net.DefaultReader{}
 	for i := 0; i < b.N; i++ {
+		dst := image.NewRGBA(image.Rectangle{image.ZP, image.Point{1024, 768}})
 		f := strings.NewReader(content)
 		parsedhtml := parser.LoadPage(f, loader, nil)
-		parsedhtml.Content.Render(1024)
+		parsedhtml.Content.RenderInto(context.TODO(), dst, image.ZP)
+
 	}
 }
 func BenchmarkParseAndRenderInto(b *testing.B) {
@@ -99,7 +101,7 @@ func BenchmarkParseAndRenderInto(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		f := strings.NewReader(content)
 		parsedhtml := parser.LoadPage(f, loader, nil)
-		parsedhtml.Content.RenderInto(context.TODO(), dst)
+		parsedhtml.Content.RenderInto(context.TODO(), dst, image.ZP)
 	}
 }
 
@@ -114,9 +116,10 @@ func BenchmarkRenderOnly(b *testing.B) {
 	loader := net.DefaultReader{}
 	f := strings.NewReader(content)
 	parsedhtml := parser.LoadPage(f, loader, nil)
+	dst := image.NewRGBA(image.Rectangle{image.ZP, image.Point{1024, 768}})
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		parsedhtml.Content.Render(1024)
+		parsedhtml.Content.RenderInto(context.TODO(), dst, image.ZP)
 	}
 }
 
@@ -126,18 +129,21 @@ func BenchmarkRenderLayoutOnly(b *testing.B) {
 	parsedhtml := parser.LoadPage(f, loader, nil)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		var lh int
-		parsedhtml.Content.LayoutPass(1024, image.ZR, &image.Point{0, 0}, &lh)
+		parsedhtml.Content.InvalidateLayout()
+		parsedhtml.Content.Layout(context.TODO(), image.Point{1024, 768})
 	}
 }
+
+/*
 func BenchmarkRenderDrawOnly(b *testing.B) {
 	loader := net.DefaultReader{}
 	f := strings.NewReader(content)
 	parsedhtml := parser.LoadPage(f, loader, nil)
 	var lh int
-	parsedhtml.Content.LayoutPass(1024, image.ZR, &image.Point{0, 0}, &lh)
+	parsedhtml.Content.Layout(context.TODO(), image.Point{1024, 768})
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		parsedhtml.Content.DrawPass()
 	}
 }
+*/
