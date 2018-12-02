@@ -1389,277 +1389,106 @@ func (e *RenderableDomElement) handleFloatOverlap(dot *image.Point, r *image.Rec
 	return true
 }
 
-/*
-func (e *RenderableDomElement) DrawPass(ctx context.Context) (rv image.Image) {
-	defer func() {
-		e.contentCache = rv
-	}()
-	if e.Type == html.ElementNode {
-		switch strings.ToLower(e.Data) {
-		case "img":
-			return e.ContentOverlay
-		}
+// Get the BoxDrawRectangle for this element, translated from the parent's
+// coordinate system to the absolute coordinate system.
+func (e *RenderableDomElement) getAbsoluteDrawRectangle() image.Rectangle {
+	var adj image.Point
+	for p := e.Parent; p != nil; p = p.Parent {
+		adj = adj.Add(p.BoxDrawRectangle.Min).Add(p.BoxContentRectangle.Min)
 	}
+	return e.BoxDrawRectangle.Add(adj)
+}
+func (e *RenderableDomElement) drawInto(ctx context.Context, dst draw.Image, cursor image.Point) error {
+	dstsize := dst.Bounds().Size()
+
 	for c := e.FirstChild; c != nil; c = c.NextSibling {
 		if ctx.Err() != nil {
 			return nil
 		}
+
+		var absrect image.Rectangle
+		if c.Type == html.TextNode {
+			absrect = e.getAbsoluteDrawRectangle()
+		} else {
+			absrect = c.getAbsoluteDrawRectangle()
+		}
+
+		// Cull elements that don't fit onto dst.
+		if absrect.Max.X < cursor.X {
+			// the box is to the left of the viewport, don't draw it.
+			continue
+		}
+		if absrect.Min.X > dstsize.X+cursor.X {
+			// to the right of the viewport
+			continue
+		}
+		if absrect.Max.Y < cursor.Y {
+			// on top of the viewport
+			continue
+		}
+		if absrect.Min.Y > dstsize.Y+cursor.Y {
+			// below the viewport.
+			continue
+		}
+
 		switch c.Type {
-		case html.TextNode:
-			for _, box := range e.lineBoxes {
-				sr := box.Content.Bounds()
-				r := image.Rectangle{box.origin, box.origin.Add(sr.Size())}
-				if box.BorderImage != nil {
-					sr := box.BorderImage.Bounds()
-					ro := box.origin.Sub(box.borigin)
-					r := image.Rectangle{ro, ro.Add(sr.Size())}
-					draw.Draw(
-						e.OverlayedContent,
-						r,
-						box.BorderImage,
-						sr.Min,
-						draw.Over,
-					)
-				}
-				draw.Draw(e.OverlayedContent, r, box.Content, sr.Min, draw.Over)
-			}
 		case html.ElementNode:
-			if c.Data == "br" {
+			// Some special cases for replaced elements.
+			switch c.Data {
+			case "br":
 				continue
-			}
-			switch display := c.GetDisplayProp(); display {
-			case "none":
-				continue
-			default:
-				fallthrough
-			case "inline", "inline-block":
-				childContent := c.DrawPass(ctx)
-
-				c.ContentOverlay = childContent
-				bounds := childContent.Bounds()
-				if c.Data == "img" {
-					//sr := c.CSSOuterBox.Bounds()
-					if c.CSSOuterBox != nil {
-						sr := c.CSSOuterBox.Bounds()
-						draw.Draw(
-							e.OverlayedContent,
-							c.BoxDrawRectangle,
-							c.CSSOuterBox,
-							sr.Min,
-							draw.Over,
-						)
-					}
-					// now draw the content on top of the outer box
-					contentStart := c.BoxDrawRectangle.Min.Add(c.BoxContentRectangle.Min)
-					contentBounds := c.ContentOverlay.Bounds()
-					cr := image.Rectangle{contentStart, contentStart.Add(contentBounds.Size())}
-
-					draw.Draw(
-						e.OverlayedContent,
-						cr,
-						c.ContentOverlay,
-						bounds.Min,
-						draw.Over,
-					)
-				} else {
-					draw.Draw(
-						e.OverlayedContent,
-						image.Rectangle{image.ZP, bounds.Max},
-						c.ContentOverlay,
-						bounds.Min,
-						draw.Over,
-					)
-				}
-			case "block", "table", "table-inline", "list-item":
-				// draw the border, background, and CSS outer box.
-				childContent := c.DrawPass(ctx)
-				c.ContentOverlay = childContent
-				//var drawMask image.Image
-				//maskP := image.ZP
-
-				// when doing the layout the boxDrawRectangle was fudged
-				// for floats to make it easier to calculate intersections
-				// when doing the layout. Now we need to adjust.
-				switch c.GetFloat() {
-				case "left", "right":
-					c.BoxDrawRectangle.Min.Y += c.GetMarginTopSize()
-					c.BoxDrawRectangle.Max.Y -= c.GetMarginBottomSize()
-				}
+			case "img":
 				if c.CSSOuterBox != nil {
 					sr := c.CSSOuterBox.Bounds()
 					draw.Draw(
-						e.OverlayedContent,
-						c.BoxDrawRectangle,
+						dst,
+						absrect.Sub(cursor),
 						c.CSSOuterBox,
 						sr.Min,
 						draw.Over,
 					)
 				}
 				// now draw the content on top of the outer box
-				contentStart := c.BoxDrawRectangle.Min.Add(c.BoxContentRectangle.Min)
+				contentStart := absrect.Min.Add(c.BoxContentRectangle.Min)
 				contentBounds := c.ContentOverlay.Bounds()
 				cr := image.Rectangle{contentStart, contentStart.Add(contentBounds.Size())}
-				switch c.GetOverflow() {
-				default:
-					fallthrough
-				case "visible":
-					draw.Draw(
-						e.OverlayedContent,
-						cr,
-						c.ContentOverlay,
-						contentBounds.Min,
-						draw.Over,
-					)
-					if display == "list-item" {
-						e.numBullets++
-						c.drawBullet(e.OverlayedContent, c.BoxDrawRectangle.Min, c.BoxContentRectangle.Min, e.numBullets)
-					}
-				case "hidden":
-					draw.DrawMask(
-						e.OverlayedContent,
-						cr,
-						c.ContentOverlay,
-						contentBounds.Min,
-						c.BoxContentRectangle,
-						c.BoxContentRectangle.Min,
-						draw.Over,
-					)
-				}
-			}
-		}
-	}
-	return e.OverlayedContent
-}
-*/
-func (e *RenderableDomElement) drawInto(ctx context.Context, dst draw.Image, cursor image.Point) error {
-	if e.Type == html.ElementNode {
-		switch strings.ToLower(e.Data) {
-		case "img":
-			// FIXME: Draw images.
-			return nil
-		}
-	}
 
-	dstsize := dst.Bounds().Size()
-	for c := e.FirstChild; c != nil; c = c.NextSibling {
-		if ctx.Err() != nil {
-			return nil
-		}
-
-		if c.BoxDrawRectangle.Max.X < cursor.X {
-			// the box is to the left of the viewport, don't draw it.
-			continue
-		}
-		if c.BoxDrawRectangle.Min.X > dstsize.X+cursor.X {
-			// to the right of the viewport
-			continue
-		}
-		if c.BoxDrawRectangle.Max.Y < cursor.Y {
-			// on top of the viewport
-			continue
-		}
-		if c.BoxDrawRectangle.Min.Y > dstsize.Y+cursor.Y {
-			// below the viewport.
-			continue
-		}
-
-		switch c.Type {
-		case html.TextNode:
-			/*
-				for _, box := range e.lineBoxes {
-					sr := box.Content.Bounds()
-					r := image.Rectangle{box.origin, box.origin.Add(sr.Size())}
-					if box.BorderImage != nil {
-						sr := box.BorderImage.Bounds()
-						ro := box.origin.Sub(box.borigin)
-						r := image.Rectangle{ro, ro.Add(sr.Size())}
-						draw.Draw(
-							e.OverlayedContent,
-							r,
-							box.BorderImage,
-							sr.Min,
-							draw.Over,
-						)
-					}
-					draw.Draw(e.OverlayedContent, r, box.Content, sr.Min, draw.Over)
-				}
-			*/
-		case html.ElementNode:
-			if c.Data == "br" {
+				bounds := c.ContentOverlay.Bounds()
+				draw.Draw(
+					dst,
+					cr.Sub(cursor),
+					c.ContentOverlay,
+					bounds.Min,
+					draw.Over,
+				)
 				continue
 			}
+
 			switch display := c.GetDisplayProp(); display {
 			case "none":
 				continue
 			default:
 				fallthrough
 			case "inline", "inline-block":
-				/*
-					childContent := c.DrawPass(ctx)
-
-					c.ContentOverlay = childContent
-					bounds := childContent.Bounds()
-				*/
-				if c.Data == "img" {
-					//sr := c.CSSOuterBox.Bounds()
-					if c.CSSOuterBox != nil {
-						sr := c.CSSOuterBox.Bounds()
-						draw.Draw(
-							dst,
-							c.BoxDrawRectangle,
-							c.CSSOuterBox,
-							sr.Min,
-							draw.Over,
-						)
-					}
-					// now draw the content on top of the outer box
-					contentStart := c.BoxDrawRectangle.Min.Add(c.BoxContentRectangle.Min)
-					contentBounds := c.ContentOverlay.Bounds()
-					cr := image.Rectangle{contentStart, contentStart.Add(contentBounds.Size())}
-
-					bounds := c.ContentOverlay.Bounds()
-					draw.Draw(
-						dst,
-						cr.Sub(cursor),
-						//c.BoxDrawRectangle.Sub(cursor),
-						c.ContentOverlay,
-						bounds.Min,
-						draw.Over,
-					)
-				} else {
-					/*
-						println("Drawing inline")
-						draw.Draw(
-							dst,
-							image.Rectangle{image.ZP, bounds.Max},
-							c.ContentOverlay,
-							bounds.Min,
-							draw.Over,
-						)
-					*/
+				// The text nodes is where most of the magic happens
+				// for inlines.
+				if err := c.drawInto(ctx, dst, cursor); err != nil {
+					return err
 				}
 			case "block", "table", "table-inline", "list-item":
-				// draw the border, background, and CSS outer box.
-				/*
-					childContent := c.DrawPass(ctx)
-					c.ContentOverlay = childContent
-					//var drawMask image.Image
-					//maskP := image.ZP
-
-				*/
 				// when doing the layout the boxDrawRectangle was fudged
 				// for floats to make it easier to calculate intersections
 				// when doing the layout. Now we need to adjust.
 				switch c.GetFloat() {
 				case "left", "right":
-					c.BoxDrawRectangle.Min.Y += c.GetMarginTopSize()
-					c.BoxDrawRectangle.Max.Y -= c.GetMarginBottomSize()
+					absrect.Min.Y += c.GetMarginTopSize()
+					absrect.Max.Y -= c.GetMarginBottomSize()
 				}
 				if c.CSSOuterBox != nil {
 					sr := c.CSSOuterBox.Bounds()
 					draw.Draw(
 						dst,
-						c.BoxDrawRectangle.Sub(cursor),
+						absrect.Sub(cursor),
 						c.CSSOuterBox,
 						sr.Min,
 						draw.Over,
@@ -1668,40 +1497,35 @@ func (e *RenderableDomElement) drawInto(ctx context.Context, dst draw.Image, cur
 				if err := c.drawInto(ctx, dst, cursor); err != nil {
 					return err
 				}
-				/*
-					// now draw the content on top of the outer box
-					contentStart := c.BoxDrawRectangle.Min.Add(c.BoxContentRectangle.Min)
-					contentBounds := c.ContentOverlay.Bounds()
-					cr := image.Rectangle{contentStart, contentStart.Add(contentBounds.Size())}
-					switch c.GetOverflow() {
-					default:
-						fallthrough
-					case "visible":
-						println("Drawing visible box")
-						draw.Draw(
-							dst,
-							cr,
-							c.ContentOverlay,
-							contentBounds.Min,
-							draw.Over,
-						)
-						if display == "list-item" {
-							e.numBullets++
-							c.drawBullet(e.OverlayedContent, c.BoxDrawRectangle.Min, c.BoxContentRectangle.Min, e.numBullets)
-						}
-					case "hidden":
-						println("Drawin hidden overflow box")
-						draw.DrawMask(
-							e.OverlayedContent,
-							cr,
-							c.ContentOverlay,
-							contentBounds.Min,
-							c.BoxContentRectangle,
-							c.BoxContentRectangle.Min,
-							draw.Over,
-						)
-					}
-				*/
+			}
+
+		case html.TextNode:
+			// Use the drawing rectangle for the parent for a base
+			// since the textnode might not have one (or more
+			// accurately, has many...)
+			for _, box := range e.lineBoxes {
+				sr := box.Content.Bounds()
+				r := image.Rectangle{box.origin, box.origin.Add(sr.Size())}.Add(absrect.Min).Add(e.BoxContentRectangle.Min)
+				//	r = r.Add(e.BoxContentRectangle.Min)
+
+				if box.BorderImage != nil {
+					sr := box.BorderImage.Bounds()
+					ro := box.origin.Sub(box.borigin).Add(absrect.Min)
+					r := image.Rectangle{ro, ro.Add(sr.Size())}
+					draw.Draw(
+						dst,
+						r.Sub(cursor),
+						box.BorderImage,
+						sr.Min,
+						draw.Over,
+					)
+				}
+				draw.Draw(dst,
+					r.Sub(cursor),
+					box.Content,
+					sr.Min,
+					draw.Over,
+				)
 			}
 		}
 	}
