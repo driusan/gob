@@ -1,9 +1,6 @@
 package renderer
 
 import (
-	"context"
-	"fmt"
-
 	"github.com/driusan/gob/css"
 	"github.com/driusan/gob/dom"
 	"github.com/driusan/gob/net"
@@ -14,6 +11,8 @@ import (
 
 	"github.com/nfnt/resize"
 
+	"context"
+	"fmt"
 	"image"
 	"image/draw"
 	_ "image/gif"
@@ -24,6 +23,7 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 	//"strconv"
 )
 
@@ -265,8 +265,9 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 		wordSizeInPx := fntDrawer.MeasureString(word).Ceil()
 
 		if firstletter || smallcaps {
-			wordleft = word[1:]
-			word = string(word[0])
+			_, n := utf8.DecodeRune([]byte(word))
+			wordleft = word[n:]
+			word = string(word[0:n])
 		}
 	startword:
 		if dot+wordSizeInPx > remainingWidth && whitespace != "nowrap" {
@@ -382,7 +383,9 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 		}
 		fntDrawer.Dot.X = fixed.Int26_6(dot << 6)
 	}
+
 	if !firstletter {
+		// If we didn't fit in the line, we would have aborted earlier.
 		unconsumed = ""
 		consumed = textContent
 	}
