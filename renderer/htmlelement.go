@@ -54,9 +54,6 @@ type RenderableDomElement struct {
 	CSSOuterBox    image.Image
 	ContentOverlay image.Image
 
-	// The CSSOuterBox with the Content overlaid on top of it. Allocated
-	// during the layout phase, and drawn during the draw phase.
-	OverlayedContent draw.Image
 	// The location within the parent to draw the OverlayedContent
 	//DrawRectangle    image.Rectangle
 	//BoxOrigin        image.Point
@@ -413,8 +410,8 @@ func (e *RenderableDomElement) InvalidateLayout() {
 		return
 	}
 	e.layoutDone = false
-	e.OverlayedContent = nil
 	e.CSSOuterBox = nil
+
 	e.ContentOverlay = nil
 	e.lineBoxes = nil
 	e.leftFloats = nil
@@ -432,14 +429,9 @@ func (e *RenderableDomElement) InvalidateLayout() {
 func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth int, r image.Rectangle, dot *image.Point, nextline *int) (image.Image, image.Point) {
 	var overlayed *DynamicMemoryDrawer
 	if e.layoutDone {
-		return e.OverlayedContent, image.Point{}
+		return overlayed, image.Point{}
 	}
 	defer func() {
-		if overlayed != nil {
-			e.OverlayedContent = image.NewRGBA(overlayed.Bounds())
-		} else {
-			e.OverlayedContent = image.NewRGBA(image.ZR)
-		}
 		e.layoutDone = true
 	}()
 	e.RenderAbort = make(chan bool)
