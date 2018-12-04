@@ -3,9 +3,9 @@ package renderer
 import (
 	"strings"
 
-	"github.com/driusan/Gob/css"
-	"github.com/driusan/Gob/dom"
-	"github.com/driusan/Gob/net"
+	"github.com/driusan/gob/css"
+	"github.com/driusan/gob/dom"
+	"github.com/driusan/gob/net"
 	"golang.org/x/net/html"
 )
 

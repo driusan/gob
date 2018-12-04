@@ -2,10 +2,12 @@ package parser
 
 import (
 	//	"fmt"
-	"github.com/driusan/Gob/css"
-	"github.com/driusan/Gob/net"
-	"github.com/driusan/Gob/renderer"
+	"github.com/driusan/gob/css"
+	"github.com/driusan/gob/net"
+	"github.com/driusan/gob/renderer"
+
 	"golang.org/x/net/html"
+
 	"image/color"
 	"io"
 	"net/url"

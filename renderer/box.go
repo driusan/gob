@@ -10,7 +10,7 @@ import (
 
 	"golang.org/x/net/html"
 
-	"github.com/driusan/Gob/css"
+	"github.com/driusan/gob/css"
 	//"github.com/driusan/Gob/net"
 )
 

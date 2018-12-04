@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/driusan/Gob/net"
+	"github.com/driusan/gob/net"
 	"github.com/gorilla/css/scanner"
 	"golang.org/x/net/html"
 )

@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/driusan/Gob/css"
-	"github.com/driusan/Gob/dom"
-	"github.com/driusan/Gob/net"
+	"github.com/driusan/gob/css"
+	"github.com/driusan/gob/dom"
+	"github.com/driusan/gob/net"
 
 	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"

@@ -4,7 +4,7 @@ import (
 	"io/ioutil"
 	"net/url"
 
-	"github.com/driusan/Gob/net"
+	"github.com/driusan/gob/net"
 	"golang.org/x/net/html"
 )
 

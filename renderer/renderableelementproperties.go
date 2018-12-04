@@ -2,7 +2,7 @@ package renderer
 
 import (
 	"fmt"
-	"github.com/driusan/Gob/css"
+	"github.com/driusan/gob/css"
 	"golang.org/x/image/font"
 	"golang.org/x/net/html"
 	"image/color"

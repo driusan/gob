@@ -1,8 +1,8 @@
 package parser
 
 import (
-	"github.com/driusan/Gob/css"
-	"github.com/driusan/Gob/renderer"
+	"github.com/driusan/gob/css"
+	"github.com/driusan/gob/renderer"
 
 	"image/color"
 	"net/url"

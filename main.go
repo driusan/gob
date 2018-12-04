@@ -2,11 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/driusan/Gob/css"
-	"github.com/driusan/Gob/dom"
-	"github.com/driusan/Gob/net"
-	"github.com/driusan/Gob/parser"
-	"github.com/driusan/Gob/renderer"
+	"github.com/driusan/gob/css"
+	"github.com/driusan/gob/dom"
+	"github.com/driusan/gob/net"
+	"github.com/driusan/gob/parser"
+	"github.com/driusan/gob/renderer"
 
 	"golang.org/x/exp/shiny/driver"
 	"golang.org/x/exp/shiny/screen"
