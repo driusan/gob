@@ -70,8 +70,11 @@ type RenderableDomElement struct {
 	containerWidth  int
 	containerHeight int
 
-	curLine   []*lineBox
-	lineBoxes []*lineBox
+	// Used to determine if the left border should be drawn
+	// when inlines span multiple lines.
+	inlineStart bool
+	curLine     []*lineBox
+	lineBoxes   []*lineBox
 
 	resolver   net.URLReader
 	layoutDone bool
@@ -540,7 +543,7 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 			overlayed = NewDynamicMemoryDrawer(image.Rectangle{image.ZP, image.Point{iwidth, iheight}})
 			if loadedImage {
 				e.contentWidth = iwidth
-				box, contentbox := e.calcCSSBox(e.ContentOverlay.Bounds().Size())
+				box, contentbox := e.calcCSSBox(e.ContentOverlay.Bounds().Size(), false, false)
 				e.BoxContentRectangle = contentbox
 				overlayed.GrowBounds(contentbox)
 
@@ -718,9 +721,7 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 				firstletter = false
 
 				size := childImage.Bounds().Size()
-				// The border goes around the text + padding, not around the line height.
-				//size.Y = (metrics.Ascent + metrics.Descent).Ceil()
-				borderImage, cr := c.calcCSSBox(size)
+				borderImage, cr := c.calcCSSBox(size, !e.inlineStart, strings.TrimSpace(rt) != "")
 
 				// We only grow the bounds by the amount that
 				// doesn't have the border drawn, so this uses
@@ -765,6 +766,7 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 
 				// Nothing overlapped, so use this line box.
 				remainingTextContent = rt
+				e.inlineStart = false
 
 				//overlayed.GrowBounds(r)
 				overlayed.GrowBounds(r)
@@ -844,10 +846,11 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 					c.rightFloats = e.rightFloats
 				}
 
+				c.inlineStart = true
 				childContent, newDot := c.layoutPass(ctx, width, image.ZR, &image.Point{dot.X, dot.Y}, nextline)
 
 				c.ContentOverlay = childContent
-				_, contentbox := c.calcCSSBox(childContent.Bounds().Size())
+				_, contentbox := c.calcCSSBox(childContent.Bounds().Size(), false, false)
 				if c.GetFloat() == "none" {
 					dot.Y += c.GetMarginBottomSize()
 				}
@@ -928,7 +931,7 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 
 				childContent, _ = c.layoutPass(ctx, width, image.ZR, &cdot, &lh)
 				c.ContentOverlay = childContent
-				box, contentbox := c.calcCSSBox(childContent.Bounds().Size())
+				box, contentbox := c.calcCSSBox(childContent.Bounds().Size(), false, false)
 				c.BoxContentRectangle = contentbox.Sub(image.Point{dot.X, 0})
 				sr := box.Bounds()
 

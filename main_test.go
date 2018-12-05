@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/driusan/Gob/net"
-	"github.com/driusan/Gob/parser"
+	"github.com/driusan/gob/net"
+	"github.com/driusan/gob/parser"
 
 	"context"
 	"image"

@@ -91,7 +91,7 @@ func (b *outerBoxDrawer) Bounds() image.Rectangle {
 	return r
 }
 
-func (b *outerBoxDrawer) RGBA() *image.RGBA {
+func (b *outerBoxDrawer) RGBA(hideleft, hideright bool) *image.RGBA {
 	bounds := b.Bounds()
 	size := image.Rectangle{image.ZP, image.Point{bounds.Dx(), bounds.Dy()}}
 	//fmt.Println(size)
@@ -131,40 +131,44 @@ func (b *outerBoxDrawer) RGBA() *image.RGBA {
 		image.ZP,
 		draw.Src,
 	)
-	// draw the left border
-	draw.Draw(
-		ri,
-		image.Rectangle{
-			Min: image.Point{
-				X: b.Margin.Left.Width,
-				Y: b.Margin.Top.Width,
+	if !hideleft {
+		// draw the left border
+		draw.Draw(
+			ri,
+			image.Rectangle{
+				Min: image.Point{
+					X: b.Margin.Left.Width,
+					Y: b.Margin.Top.Width,
+				},
+				Max: image.Point{
+					X: b.Margin.Left.Width + b.Border.Left.Width,
+					Y: bounds.Max.Y - b.Margin.Bottom.Width,
+				},
 			},
-			Max: image.Point{
-				X: b.Margin.Left.Width + b.Border.Left.Width,
-				Y: bounds.Max.Y - b.Margin.Bottom.Width,
+			&image.Uniform{b.Border.Left.Color},
+			image.ZP,
+			draw.Src,
+		)
+	}
+	if !hideright {
+		// draw the right border
+		draw.Draw(
+			ri,
+			image.Rectangle{
+				Min: image.Point{
+					X: bounds.Max.X - b.Margin.Right.Width - b.Border.Left.Width,
+					Y: b.Margin.Top.Width,
+				},
+				Max: image.Point{
+					X: bounds.Max.X - b.Margin.Right.Width,
+					Y: bounds.Max.Y - b.Border.Bottom.Width,
+				},
 			},
-		},
-		&image.Uniform{b.Border.Left.Color},
-		image.ZP,
-		draw.Src,
-	)
-	// draw the right border
-	draw.Draw(
-		ri,
-		image.Rectangle{
-			Min: image.Point{
-				X: bounds.Max.X - b.Margin.Right.Width - b.Border.Left.Width,
-				Y: b.Margin.Top.Width,
-			},
-			Max: image.Point{
-				X: bounds.Max.X - b.Margin.Right.Width,
-				Y: bounds.Max.Y - b.Border.Bottom.Width,
-			},
-		},
-		&image.Uniform{b.Border.Right.Color},
-		image.ZP,
-		draw.Src,
-	)
+			&image.Uniform{b.Border.Right.Color},
+			image.ZP,
+			draw.Src,
+		)
+	}
 	// draw the bottom border
 	draw.Draw(
 		ri,
@@ -669,7 +673,7 @@ func (e *RenderableDomElement) GetBackgroundImage() image.Image {
 // image which should be used to overlay content.
 // The returned image does *not* have the content overlayed, it only
 // has the margin/background/borders drawn on it.
-func (e *RenderableDomElement) calcCSSBox(contentSize image.Point) (image.Image, image.Rectangle) {
+func (e *RenderableDomElement) calcCSSBox(contentSize image.Point, hideleftborder, hiderightborder bool) (image.Image, image.Rectangle) {
 	// calculate the size of the box.
 	size := contentSize
 	if e.Type != html.TextNode {
@@ -692,8 +696,11 @@ func (e *RenderableDomElement) calcCSSBox(contentSize image.Point) (image.Image,
 		if maxwidth := e.GetMaxWidth(); maxwidth >= 0 && size.X > maxwidth {
 			size.X = maxwidth
 		}
-	} else {
 	}
+
+	borderleft := e.GetBorderLeftWidth()
+	borderright := e.GetBorderRightWidth()
+
 	// calculate the background image for the content box.
 	bgi := e.GetBackgroundImage()
 	if bgi == nil {
@@ -711,7 +718,7 @@ func (e *RenderableDomElement) calcCSSBox(contentSize image.Point) (image.Image,
 		bgCanvas := image.NewRGBA(image.Rectangle{
 			image.ZP,
 			image.Point{
-				csize.X + e.GetPaddingLeft() + e.GetPaddingRight() + e.GetBorderLeftWidth() + e.GetBorderRightWidth(),
+				csize.X + e.GetPaddingLeft() + e.GetPaddingRight() + borderleft + borderright,
 				csize.Y + e.GetPaddingTop() + e.GetPaddingBottom() + e.GetBorderTopWidth() + e.GetBorderBottomWidth(),
 			}})
 
@@ -808,8 +815,8 @@ func (e *RenderableDomElement) calcCSSBox(contentSize image.Point) (image.Image,
 		},
 		Border: BoxBorders{
 			Top:    BoxBorder{BoxOffset: BoxOffset{Width: e.GetBorderTopWidth()}, Color: e.GetBorderTopColor(), Style: e.GetBorderTopStyle()},
-			Left:   BoxBorder{BoxOffset: BoxOffset{Width: e.GetBorderLeftWidth()}, Color: e.GetBorderLeftColor(), Style: e.GetBorderLeftStyle()},
-			Right:  BoxBorder{BoxOffset: BoxOffset{Width: e.GetBorderRightWidth()}, Color: e.GetBorderRightColor(), Style: e.GetBorderRightStyle()},
+			Left:   BoxBorder{BoxOffset: BoxOffset{Width: borderleft}, Color: e.GetBorderLeftColor(), Style: e.GetBorderLeftStyle()},
+			Right:  BoxBorder{BoxOffset: BoxOffset{Width: borderright}, Color: e.GetBorderRightColor(), Style: e.GetBorderRightStyle()},
 			Bottom: BoxBorder{BoxOffset: BoxOffset{Width: e.GetBorderBottomWidth()}, Color: e.GetBorderBottomColor(), Style: e.GetBorderBottomStyle()},
 		},
 		Padding: BoxPaddings{
@@ -821,7 +828,12 @@ func (e *RenderableDomElement) calcCSSBox(contentSize image.Point) (image.Image,
 		contentSize: size,
 		background:  bgi,
 	}
-	e.CSSOuterBox = box.RGBA()
+
+	// Drawing RGBA images with image.Draw is faster than drawing custom
+	// images, but sometimes it's helpful to use the more accurate
+	// image.Image interface for debugging.
+	// 	e.CSSOuterBox = box
+	e.CSSOuterBox = box.RGBA(hideleftborder, hiderightborder)
 	corigin := box.GetContentOrigin()
 	return e.CSSOuterBox, image.Rectangle{
 		Min: corigin,
