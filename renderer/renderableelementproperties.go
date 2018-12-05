@@ -12,7 +12,8 @@ import (
 
 func getFontHeight(face font.Face) int {
 	metrics := face.Metrics()
-	return (metrics.Ascent + metrics.Descent).Ceil()
+	return (metrics.Height).Ceil()
+	//return (metrics.Ascent + metrics.Descent).Ceil()
 }
 func stringSize(fntDrawer font.Drawer, textContent string) (int, error) {
 

@@ -96,15 +96,6 @@ func (b *outerBoxDrawer) RGBA() *image.RGBA {
 	size := image.Rectangle{image.ZP, image.Point{bounds.Dx(), bounds.Dy()}}
 	//fmt.Println(size)
 	ri := image.NewRGBA(size)
-	/* the zero colour is transparent, this isn't necessary
-	draw.Draw(
-		ri,
-		b.Bounds(),
-		&image.Uniform{color.Transparent},
-		image.ZP,
-		draw.Src,
-
-	*/
 
 	// draw the background first, bounded by the margins
 	draw.Draw(
@@ -680,27 +671,29 @@ func (e *RenderableDomElement) GetBackgroundImage() image.Image {
 // has the margin/background/borders drawn on it.
 func (e *RenderableDomElement) calcCSSBox(contentSize image.Point) (image.Image, image.Rectangle) {
 	// calculate the size of the box.
-	size := contentSize //content.Bounds().Size()
-	if width := e.GetWidth(); width >= 0 {
-		size.X = width
-	}
-	if height := e.GetHeight(); height >= 0 {
-		size.Y = height
-	}
+	size := contentSize
+	if e.Type != html.TextNode {
+		if width := e.GetWidth(); width >= 0 {
+			size.X = width
+		}
+		if height := e.GetHeight(); height >= 0 {
+			size.Y = height
+		}
 
-	if minheight := e.GetMinHeight(); size.Y < minheight {
-		size.Y = minheight
+		if minheight := e.GetMinHeight(); size.Y < minheight {
+			size.Y = minheight
+		}
+		if minwidth := e.GetMinWidth(); size.X < minwidth {
+			size.X = minwidth
+		}
+		if maxheight := e.GetMaxHeight(); maxheight >= 0 && size.Y > maxheight {
+			size.Y = maxheight
+		}
+		if maxwidth := e.GetMaxWidth(); maxwidth >= 0 && size.X > maxwidth {
+			size.X = maxwidth
+		}
+	} else {
 	}
-	if minwidth := e.GetMinWidth(); size.X < minwidth {
-		size.X = minwidth
-	}
-	if maxheight := e.GetMaxHeight(); maxheight >= 0 && size.Y > maxheight {
-		size.Y = maxheight
-	}
-	if maxwidth := e.GetMaxWidth(); maxwidth >= 0 && size.X > maxwidth {
-		size.X = maxwidth
-	}
-
 	// calculate the background image for the content box.
 	bgi := e.GetBackgroundImage()
 	if bgi == nil {

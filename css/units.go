@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"image/color"
+	"math"
 	"strconv"
 	"strings"
 )
@@ -42,7 +43,7 @@ func ConvertUnitToPx(fontsize int, percentbasis int, cssString string) (int, err
 	if val[len(val)-1] == '%' {
 		f, err := strconv.ParseFloat(string(val[0:len(val)-1]), 64)
 		if err == nil {
-			size := int(f * float64(percentbasis) / 100.0)
+			size := int(math.Round(f * float64(percentbasis) / 100.0))
 			return size, nil
 		}
 		return fontsize, fmt.Errorf("Invalid CSS Unit or value: %v", cssString)
@@ -73,7 +74,7 @@ func ConvertUnitToPx(fontsize int, percentbasis int, cssString string) (int, err
 		// used a decimal.
 		f, err := strconv.ParseFloat(string(val[0:len(val)-2]), 64)
 		if err == nil {
-			return int(f * PixelsPerPt * 0.75), nil
+			return int(math.Round(f * PixelsPerPt * 0.75)), nil
 		}
 		return fontsize, fmt.Errorf("Invalid CSS Unit or value: %v", cssString)
 	case "in":
@@ -97,7 +98,7 @@ func ConvertUnitToPx(fontsize int, percentbasis int, cssString string) (int, err
 	case "pt":
 		f, err := strconv.ParseFloat(string(val[0:len(val)-2]), 64)
 		if err == nil {
-			return int(f * PixelsPerPt), nil
+			return int(math.Round(f * PixelsPerPt)), nil
 		}
 		return int(fontsize), fmt.Errorf("Invalid CSS Unit or value: %v", cssString)
 	case "pc":

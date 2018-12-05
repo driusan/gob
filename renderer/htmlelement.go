@@ -130,7 +130,7 @@ func (e *RenderableDomElement) Walk(callback func(*RenderableDomElement)) {
 	}
 }
 
-func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent string, force bool, inlinesibling bool, firstletter bool) (img *image.RGBA, consumed, unconsumed string, baseline int) {
+func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent string, force bool, inlinesibling bool, firstletter bool) (img *image.RGBA, consumed, unconsumed string, baseline int, metrics font.Metrics) {
 	if remainingWidth < 0 {
 		panic("No room to render text")
 	}
@@ -150,6 +150,8 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 
 	fSize := e.GetFontSize()
 	fontFace := e.GetFontFace(fSize)
+	metrics = fontFace.Metrics()
+
 	var dot int
 	clr := e.GetColor()
 	fntDrawer := font.Drawer{
@@ -188,7 +190,7 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 		words = strings.Fields(textContent)
 		ssize, _ = stringSize(fntDrawer, strings.TrimSpace(textContent))
 	}
-	lineheight := e.GetLineHeight()
+	//lineheight := e.GetLineHeight()
 	start := 0
 	if unicode.IsSpace(rune(textContent[0])) {
 		start = (fSize / 3)
@@ -221,8 +223,8 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 	if ssize < 0 {
 		panic("This should never happen")
 	}
-	img = image.NewRGBA(image.Rectangle{image.ZP, image.Point{ssize, lineheight}})
-	baseline = fontFace.Metrics().Ascent.Floor()
+	img = image.NewRGBA(image.Rectangle{image.ZP, image.Point{ssize, (metrics.Ascent + metrics.Descent).Ceil()}})
+	baseline = metrics.Ascent.Floor()
 	fntDrawer.Dot = fixed.P(start, baseline)
 	fntDrawer.Dst = img
 
@@ -608,7 +610,8 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 			c.ConditionalStyles = e.ConditionalStyles
 
 			// Exception: Inline element borders get applied to each line, but
-			// if the parent is a block we shouldn't inherit the block border properties.
+			// if the parent is a block we shouldn't inherit the block border properties,
+			// because there's an anonymous inline with no border properties around it.
 			if c.Parent.GetDisplayProp() != "inline" {
 				// FIXME: Move these into the GetX functions instead of doing so much
 				// memory copying.
@@ -683,14 +686,21 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 					continue
 				}
 
+				// dot works differently for line boxes than for
+				// blocks. For a block, dot represents the top left
+				// corner of the border box. For a linebox, it represents
+				// the top left corner of the text and the border
+				// is drawn at an offset back from that, so we
+				// need to add the padding and border to dot.X.
+				dot.X += c.GetPaddingLeft() + c.GetBorderLeftWidth()
 				var childImage image.Image
-				childImage, consumed, rt, baseline := c.renderLineBox(width-dot.X-rfWidth, remainingTextContent, false, c.NextSibling != nil && c.NextSibling.GetDisplayProp() == "inline", firstletter)
+				childImage, consumed, rt, baseline, _ := c.renderLineBox(width-dot.X-rfWidth, remainingTextContent, false, c.NextSibling != nil && c.NextSibling.GetDisplayProp() == "inline", firstletter)
 				if consumed == "" {
 					if dot.X == 0 {
 						// Nothing was consumed, and we're at the start of the line, so just
 						// force at least one word to be drawn.
 
-						childImage, consumed, rt, baseline = c.renderLineBox(width-dot.X-rfWidth, remainingTextContent, true, c.NextSibling != nil && c.NextSibling.GetDisplayProp() == "inline", firstletter)
+						childImage, consumed, rt, baseline, _ = c.renderLineBox(width-dot.X-rfWidth, remainingTextContent, true, c.NextSibling != nil && c.NextSibling.GetDisplayProp() == "inline", firstletter)
 					} else {
 						// Go to the next line.
 						dot.Y += *nextline
@@ -708,10 +718,18 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 				firstletter = false
 
 				size := childImage.Bounds().Size()
-				size.Y = c.GetLineHeight() - c.GetBorderBottomWidth() - c.GetBorderTopWidth()
+				// The border goes around the text + padding, not around the line height.
+				//size.Y = (metrics.Ascent + metrics.Descent).Ceil()
 				borderImage, cr := c.calcCSSBox(size)
-				sr := childImage.Bounds()
-				r = image.Rectangle{*dot, dot.Add(sr.Size())}
+
+				// We only grow the bounds by the amount that
+				// doesn't have the border drawn, so this uses
+				// size and not borderImage size.
+				bz := childImage.Bounds().Size()
+				bz.Y = c.GetLineHeight()
+				start := dot.Add(image.Point{0, c.GetMarginTopSize()})
+				//r = image.Rectangle{*dot, dot.Add(bz)}
+				r = image.Rectangle{start, start.Add(bz)}
 
 				// dot is a point, but the font drawer uses it as the baseline,
 				// not the corner to draw at, so WidthAt can be a little unreliable.
@@ -748,9 +766,18 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 				// Nothing overlapped, so use this line box.
 				remainingTextContent = rt
 
+				//overlayed.GrowBounds(r)
 				overlayed.GrowBounds(r)
 
-				lb := lineBox{childImage, borderImage, *dot, cr.Min, baseline, consumed, c}
+				lb := lineBox{
+					Content:     childImage,
+					BorderImage: borderImage,
+					origin:      *dot,
+					borigin:     cr.Min,
+					baseline:    baseline,
+					content:     consumed,
+					el:          c,
+				}
 				e.lineBoxes = append(e.lineBoxes, &lb)
 				e.curLine = append(e.curLine, &lb)
 				e.Styles = e.ConditionalStyles.Unconditional
@@ -1522,6 +1549,7 @@ func (e *RenderableDomElement) drawInto(ctx context.Context, dst draw.Image, cur
 
 				if box.BorderImage != nil {
 					sr := box.BorderImage.Bounds()
+					// ro := box.origin.Add(box.borigin).Add(absrect.Min)
 					ro := box.origin.Sub(box.borigin).Add(absrect.Min)
 					r := image.Rectangle{ro, ro.Add(sr.Size())}
 					draw.Draw(
