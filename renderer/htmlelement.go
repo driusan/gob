@@ -538,22 +538,30 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 				case "left":
 					e.Parent.positionLeftFloat(*dot, box.Bounds().Size(), e, nextline)
 				default:
+					sz := box.Bounds().Size()
+					iheight = sz.Y + e.GetMarginTopSize() + e.GetMarginBottomSize()
+
 					switch e.GetDisplayProp() {
 					case "block":
-						dot.Y += box.Bounds().Size().Y
+						dot.Y += sz.Y
 						dot.X = 0
 					default:
 						fallthrough
 					case "inline", "inline-block":
-						iheight += e.GetMarginTopSize() + e.GetMarginBottomSize()
-						lb := lineBox{e.ContentOverlay, box, *dot, contentbox.Min, iheight, "[img]", e}
+						lb := lineBox{
+							e.ContentOverlay,
+							box,
+							*dot,
+							contentbox.Min,
+							iheight,
+							"[img]",
+							e,
+						}
 						e.Parent.lineBoxes = append(e.Parent.lineBoxes, &lb)
 						e.Parent.curLine = append(e.Parent.curLine, &lb)
 					}
+					dot.X += sz.X
 
-					//e.BoxDrawRectangle = image.Rectangle{*dot, dot.Add(box.Bounds().Size())}
-
-					dot.X += box.Bounds().Size().X
 					if iheight > *nextline {
 						*nextline = iheight
 					}
@@ -834,6 +842,7 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 
 				var contentbox image.Rectangle
 				if c.Data == "img" {
+					e.ContentOverlay = c.ContentOverlay
 					contentbox = c.BoxDrawRectangle
 				} else {
 					c.ContentOverlay = childContent
@@ -1171,7 +1180,17 @@ func (e *RenderableDomElement) advanceLine(dot *image.Point) {
 		// the CSS spec.
 		// Step 1. Figure out how big the line really is and where the baseline is.
 		for _, l := range e.curLine {
-			if height := l.Content.Bounds().Size().Y; height > maxsize {
+			var height int
+			if l.BorderImage != nil {
+				height = l.BorderImage.Bounds().Size().Y
+			} else {
+				height = l.Content.Bounds().Size().Y
+			}
+			/*	if l.el.Type == html.ElementNode && strings.ToLower(l.el.Data) == "img" {
+					height += e.GetMarginTopSize() + e.GetMarginBottomSize()
+				}
+			*/
+			if height > maxsize {
 				maxsize = height
 			}
 			if l.content != "[img]" && l.baseline > baseline {
@@ -1181,22 +1200,31 @@ func (e *RenderableDomElement) advanceLine(dot *image.Point) {
 
 		// Step 2: Adjust the image origins with respect to the baseline.
 		for _, l := range e.curLine {
+			var height int
+			var i image.Image
+			if l.BorderImage != nil {
+				i = l.BorderImage
+			} else {
+				i = l.Content
+			}
+			height = i.Bounds().Size().Y
 			switch align := l.el.GetVerticalAlign(); align {
 			case "text-bottom":
-				l.origin.Y += maxsize - l.Content.Bounds().Size().Y
+				l.origin.Y += maxsize - height
 			case "text-top":
 				l.origin.Y += maxsize - baseline
 			case "middle":
 				l.origin.Y += (maxsize / 2)
 			default:
-				l.origin.Y += maxsize - l.Content.Bounds().Size().Y
+				l.origin.Y += maxsize - height
+
 			}
-			if s := l.Content.Bounds().Size().Y; l.origin.Y+s > dot.Y {
+
+			if end := i.Bounds().Size().Y + l.origin.Y + l.el.GetMarginTopSize() + l.el.GetMarginBottomSize(); end > dot.Y {
 				// Nothing, it was already aligned to the top
-				dot.Y = l.origin.Y + s
+				dot.Y = end
 			}
 		}
-
 	}
 	e.curLine = make([]*lineBox, 0)
 	//e.Styles = e.ConditionalStyles.FirstLine
@@ -1416,6 +1444,47 @@ func (e *RenderableDomElement) getAbsoluteDrawRectangle() image.Rectangle {
 func (e *RenderableDomElement) drawInto(ctx context.Context, dst draw.Image, cursor image.Point) error {
 	dstsize := dst.Bounds().Size()
 
+	if e.Type == html.ElementNode && strings.ToLower(e.Data) == "img" {
+		if e.GetDisplayProp() == "block" {
+			// Inlines are drawn as part of a lineBox, while blocks expected
+			// drawInto to have drawn the image (but did the border itself).
+			absrect := e.getAbsoluteDrawRectangle()
+
+			// now draw the content on top of the outer box
+			contentStart := absrect.Min.Add(e.BoxContentRectangle.Min)
+			contentBounds := e.ContentOverlay.Bounds()
+			cr := image.Rectangle{contentStart, contentStart.Add(contentBounds.Size())}
+			draw.Draw(
+				dst,
+				cr.Sub(cursor),
+				e.ContentOverlay,
+				contentBounds.Min,
+				draw.Over,
+			)
+		} else if e.GetDisplayProp() == "inline" && e.GetFloat() != "none" {
+			// Floated images also need to get drawn, even if they're inlines.
+			absrect := e.getAbsoluteDrawRectangle()
+
+			// now draw the content on top of the outer box
+			contentStart := absrect.Min.Add(
+				image.Point{
+					e.GetMarginTopSize() + e.GetPaddingTop() + e.GetBorderTopWidth(),
+					e.GetMarginLeftSize() + e.GetPaddingLeft() + e.GetBorderLeftWidth(),
+				},
+			)
+
+			contentBounds := e.ContentOverlay.Bounds()
+			cr := image.Rectangle{contentStart, contentStart.Add(contentBounds.Size())}
+			draw.Draw(
+				dst,
+				cr.Sub(cursor),
+				e.ContentOverlay,
+				contentBounds.Min,
+				draw.Over,
+			)
+		}
+		return nil
+	}
 	for c := e.FirstChild; c != nil; c = c.NextSibling {
 		if ctx.Err() != nil {
 			return nil
@@ -1426,39 +1495,8 @@ func (e *RenderableDomElement) drawInto(ctx context.Context, dst draw.Image, cur
 		switch c.Type {
 		case html.ElementNode:
 			// Some special cases for replaced elements.
-			switch c.Data {
+			switch strings.ToLower(c.Data) {
 			case "br":
-				continue
-			case "img":
-				if c.GetDisplayProp() == "inline" {
-					// If it's inline, it gets drawn as
-					// part of a linebox.
-					continue
-				}
-
-				if c.CSSOuterBox != nil {
-					sr := c.CSSOuterBox.Bounds()
-					draw.Draw(
-						dst,
-						absrect.Sub(cursor),
-						c.CSSOuterBox,
-						sr.Min,
-						draw.Over,
-					)
-				}
-				// now draw the content on top of the outer box
-				contentStart := absrect.Min.Add(c.BoxContentRectangle.Min)
-				contentBounds := c.ContentOverlay.Bounds()
-				cr := image.Rectangle{contentStart, contentStart.Add(contentBounds.Size())}
-
-				bounds := c.ContentOverlay.Bounds()
-				draw.Draw(
-					dst,
-					cr.Sub(cursor),
-					c.ContentOverlay,
-					bounds.Min,
-					draw.Over,
-				)
 				continue
 			}
 
@@ -1466,39 +1504,6 @@ func (e *RenderableDomElement) drawInto(ctx context.Context, dst draw.Image, cur
 			case "none":
 				continue
 			default:
-				fallthrough
-			case "inline", "inline-block":
-				// The text nodes is where most of the magic happens
-				// for inlines.
-				if err := c.drawInto(ctx, dst, cursor); err != nil {
-					return err
-				}
-				for _, box := range c.lineBoxes {
-					sr := box.Content.Bounds()
-					r := image.Rectangle{box.origin, box.origin.Add(sr.Size())}.Add(absrect.Min)
-
-					if box.BorderImage != nil {
-						sr := box.BorderImage.Bounds()
-						// ro := box.origin.Add(box.borigin).Add(absrect.Min)
-						ro := box.origin.Sub(box.borigin).Add(absrect.Min)
-						r := image.Rectangle{ro, ro.Add(sr.Size())}
-						draw.Draw(
-							dst,
-							r.Sub(cursor),
-							box.BorderImage,
-							sr.Min,
-							draw.Over,
-						)
-					}
-					draw.Draw(dst,
-						r.Sub(cursor),
-						box.Content,
-						sr.Min,
-						draw.Over,
-					)
-				}
-
-			case "block", "table", "table-inline", "list-item":
 				// Cull elements that don't fit onto dst.
 				if absrect.Max.X < cursor.X {
 					// the box is to the left of the viewport, don't draw it.
@@ -1531,6 +1536,7 @@ func (e *RenderableDomElement) drawInto(ctx context.Context, dst draw.Image, cur
 						c.BoxDrawRectangle.Max.Y -= mb
 						c.floatAdjusted = true
 					}
+				default:
 				}
 				if c.CSSOuterBox != nil {
 					sr := c.CSSOuterBox.Bounds()
@@ -1547,7 +1553,7 @@ func (e *RenderableDomElement) drawInto(ctx context.Context, dst draw.Image, cur
 				}
 				for _, box := range c.lineBoxes {
 					sr := box.Content.Bounds()
-					r := image.Rectangle{box.origin, box.origin.Add(sr.Size())}.Add(absrect.Min)
+					r := image.Rectangle{box.origin, box.origin.Add(sr.Size())}.Add(absrect.Min).Add(c.BoxContentRectangle.Min)
 
 					if box.BorderImage != nil {
 						sr := box.BorderImage.Bounds()

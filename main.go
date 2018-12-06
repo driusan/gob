@@ -153,7 +153,7 @@ func main() {
 						v.Cursor.X -= scrollSize
 
 						if v.Cursor.X < 0 {
-							v.Cursor.X = 0
+							//	v.Cursor.X = 0
 						}
 						paintWindow(s, w, &v, page)
 					}
@@ -195,7 +195,7 @@ func main() {
 						}
 						v.Cursor.Y -= scrollSize
 						if v.Cursor.Y < 0 {
-							v.Cursor.Y = 0
+							//	v.Cursor.Y = 0
 						}
 						paintWindow(s, w, &v, page)
 					}

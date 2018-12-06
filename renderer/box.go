@@ -112,7 +112,7 @@ func (b *outerBoxDrawer) RGBA(hideleft, hideright bool) *image.RGBA {
 		},
 		b.background,
 		image.ZP,
-		draw.Src,
+		draw.Over,
 	)
 	// draw the top border
 	draw.Draw(
@@ -129,7 +129,7 @@ func (b *outerBoxDrawer) RGBA(hideleft, hideright bool) *image.RGBA {
 		},
 		&image.Uniform{b.Border.Top.Color},
 		image.ZP,
-		draw.Src,
+		draw.Over,
 	)
 	if !hideleft {
 		// draw the left border
@@ -147,7 +147,7 @@ func (b *outerBoxDrawer) RGBA(hideleft, hideright bool) *image.RGBA {
 			},
 			&image.Uniform{b.Border.Left.Color},
 			image.ZP,
-			draw.Src,
+			draw.Over,
 		)
 	}
 	if !hideright {
@@ -166,7 +166,7 @@ func (b *outerBoxDrawer) RGBA(hideleft, hideright bool) *image.RGBA {
 			},
 			&image.Uniform{b.Border.Right.Color},
 			image.ZP,
-			draw.Src,
+			draw.Over,
 		)
 	}
 	// draw the bottom border
