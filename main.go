@@ -146,18 +146,24 @@ func main() {
 				case key.CodeLeftArrow:
 					if e.Direction == key.DirPress {
 						scrollSize := 50
+						if e.Modifiers&key.ModControl == key.ModControl {
+							scrollSize = 10
+						}
 						v.Cursor.X -= scrollSize
-						/*
-							if v.Cursor.X > v.Content.Bounds().Max.X {
-								v.Cursor.X = v.Content.Bounds().Max.X - 10
-							}
-						*/
+
+						if v.Cursor.X < 0 {
+							v.Cursor.X = 0
+						}
 						paintWindow(s, w, &v, page)
 					}
 				case key.CodeRightArrow:
 					if e.Direction == key.DirPress {
 						scrollSize := 50
+						if e.Modifiers&key.ModControl == key.ModControl {
+							scrollSize = 10
+						}
 						v.Cursor.X += scrollSize
+
 						/*
 							if v.Cursor.X > v.Content.Bounds().Max.X {
 								v.Cursor.X = v.Content.Bounds().Max.X - 10
@@ -168,6 +174,10 @@ func main() {
 				case key.CodeDownArrow:
 					if e.Direction == key.DirPress {
 						scrollSize := v.Size.Size().Y / 2
+						if e.Modifiers&key.ModControl == key.ModControl {
+							scrollSize = 10
+						}
+
 						v.Cursor.Y += scrollSize
 						/*
 							if v.Cursor.Y > v.Content.Bounds().Max.Y {
@@ -179,12 +189,13 @@ func main() {
 				case key.CodeUpArrow:
 					if e.Direction == key.DirPress {
 						scrollSize := v.Size.Size().Y / 2
+						if e.Modifiers&key.ModControl == key.ModControl {
+							scrollSize = 10
+						}
 						v.Cursor.Y -= scrollSize
-						/*
-							if v.Cursor.Y < 0 {
-								v.Cursor.Y = 0
-							}
-						*/
+						if v.Cursor.Y < 0 {
+							v.Cursor.Y = 0
+						}
 						paintWindow(s, w, &v, page)
 					}
 				case key.CodeP:
@@ -192,7 +203,7 @@ func main() {
 						debugelement(hover)
 					}
 				default:
-					fmt.Printf("Unknown key: %s", e.Code)
+					// fmt.Printf("Unknown key: %s", e.Code)
 				}
 			case paint.Event:
 				paintWindow(s, w, &v, page)
@@ -217,7 +228,6 @@ func main() {
 			case touch.Event:
 				fmt.Printf("Touch event!")
 			case mouse.Event:
-				//fmt.Printf("Mouse event at %d, %d! %e", e.X, e.Y, e)
 				switch e.Button {
 				case mouse.ButtonWheelDown:
 					v.Cursor.Y += 10
