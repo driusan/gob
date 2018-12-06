@@ -1,12 +1,16 @@
 package net
 
 import (
+	"encoding/base64"
+	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
 	"os/user"
 	"path/filepath"
+	"strings"
 )
 
 var client http.Client
@@ -47,6 +51,19 @@ func (d DefaultReader) GetURL(u *url.URL) (body io.ReadCloser, statuscode int, e
 		}
 		f, err := os.Open(u.Opaque)
 		return f, 200, err
+	case "data":
+		// See RFC 2397
+		pieces := strings.SplitN(u.Opaque, ",", 2)
+		media := pieces[0]
+		if !strings.HasSuffix(media, ";base64") {
+			return nil, 500, fmt.Errorf("Only base64 currently supported")
+		}
+		datareader := strings.NewReader(pieces[1])
+		return ioutil.NopCloser(
+				base64.NewDecoder(base64.StdEncoding, datareader),
+			),
+			200,
+			nil
 	default:
 		if cached := getCacheReader(u); cached != nil {
 			return cached, 200, nil
