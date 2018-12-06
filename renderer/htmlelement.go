@@ -63,7 +63,6 @@ type RenderableDomElement struct {
 
 	ImageMap       ImageMap
 	PageLocation   *url.URL
-	RenderAbort    chan bool
 	ViewportHeight int
 	contentWidth   int
 
@@ -86,10 +85,6 @@ type RenderableDomElement struct {
 	numBullets int
 
 	State css.State
-
-	// Temporary hack while transitioning the API from Render() -> dst returning
-	// an image to RenderInto(dst) -> void
-	contentCache image.Image
 }
 
 func (e RenderableDomElement) String() string {
@@ -421,7 +416,6 @@ func (e *RenderableDomElement) InvalidateLayout() {
 	e.lineBoxes = nil
 	e.leftFloats = nil
 	e.rightFloats = nil
-	e.contentCache = nil
 	e.curLine = nil
 	e.lineBoxes = nil
 
@@ -441,7 +435,6 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 	defer func() {
 		e.layoutDone = true
 	}()
-	e.RenderAbort = make(chan bool)
 
 	width := e.GetContainerWidth(containerWidth)
 	e.contentWidth = width
