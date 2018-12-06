@@ -1422,12 +1422,7 @@ func (e *RenderableDomElement) drawInto(ctx context.Context, dst draw.Image, cur
 			return nil
 		}
 
-		var absrect image.Rectangle
-		if c.Type == html.TextNode {
-			absrect = e.getAbsoluteDrawRectangle()
-		} else {
-			absrect = c.getAbsoluteDrawRectangle()
-		}
+		absrect := c.getAbsoluteDrawRectangle()
 
 		switch c.Type {
 		case html.ElementNode:
