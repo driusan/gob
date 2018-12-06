@@ -545,10 +545,12 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 					default:
 						fallthrough
 					case "inline", "inline-block":
+						iheight += e.GetMarginTopSize() + e.GetMarginBottomSize()
+						lb := lineBox{e.ContentOverlay, box, *dot, contentbox.Min, iheight, "[img]", e}
+						e.Parent.lineBoxes = append(e.Parent.lineBoxes, &lb)
+						e.Parent.curLine = append(e.Parent.curLine, &lb)
 					}
-					lb := lineBox{e.ContentOverlay, nil, *dot, *dot, iheight, "[img]", e}
-					e.Parent.lineBoxes = append(e.Parent.lineBoxes, &lb)
-					e.Parent.curLine = append(e.Parent.curLine, &lb)
+
 					//e.BoxDrawRectangle = image.Rectangle{*dot, dot.Add(box.Bounds().Size())}
 
 					dot.X += box.Bounds().Size().X
@@ -830,9 +832,13 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 				c.inlineStart = true
 				childContent, newDot := c.layoutPass(ctx, width, image.ZR, &image.Point{dot.X, dot.Y}, nextline)
 
-				c.ContentOverlay = childContent
-				_, contentbox := c.calcCSSBox(childContent.Bounds().Size(), false, false)
-
+				var contentbox image.Rectangle
+				if c.Data == "img" {
+					contentbox = c.BoxDrawRectangle
+				} else {
+					c.ContentOverlay = childContent
+					_, contentbox = c.calcCSSBox(childContent.Bounds().Size(), false, false)
+				}
 				c.BoxContentRectangle = contentbox
 				overlayed.GrowBounds(contentbox)
 				// Populate this image map. This is an inline, so we actually only care
@@ -1424,6 +1430,12 @@ func (e *RenderableDomElement) drawInto(ctx context.Context, dst draw.Image, cur
 			case "br":
 				continue
 			case "img":
+				if c.GetDisplayProp() == "inline" {
+					// If it's inline, it gets drawn as
+					// part of a linebox.
+					continue
+				}
+
 				if c.CSSOuterBox != nil {
 					sr := c.CSSOuterBox.Bounds()
 					draw.Draw(
@@ -1460,6 +1472,30 @@ func (e *RenderableDomElement) drawInto(ctx context.Context, dst draw.Image, cur
 				// for inlines.
 				if err := c.drawInto(ctx, dst, cursor); err != nil {
 					return err
+				}
+				for _, box := range c.lineBoxes {
+					sr := box.Content.Bounds()
+					r := image.Rectangle{box.origin, box.origin.Add(sr.Size())}.Add(absrect.Min)
+
+					if box.BorderImage != nil {
+						sr := box.BorderImage.Bounds()
+						// ro := box.origin.Add(box.borigin).Add(absrect.Min)
+						ro := box.origin.Sub(box.borigin).Add(absrect.Min)
+						r := image.Rectangle{ro, ro.Add(sr.Size())}
+						draw.Draw(
+							dst,
+							r.Sub(cursor),
+							box.BorderImage,
+							sr.Min,
+							draw.Over,
+						)
+					}
+					draw.Draw(dst,
+						r.Sub(cursor),
+						box.Content,
+						sr.Min,
+						draw.Over,
+					)
 				}
 
 			case "block", "table", "table-inline", "list-item":
@@ -1509,42 +1545,38 @@ func (e *RenderableDomElement) drawInto(ctx context.Context, dst draw.Image, cur
 				if err := c.drawInto(ctx, dst, cursor); err != nil {
 					return err
 				}
-			}
+				for _, box := range c.lineBoxes {
+					sr := box.Content.Bounds()
+					r := image.Rectangle{box.origin, box.origin.Add(sr.Size())}.Add(absrect.Min)
 
-		case html.TextNode:
-			// Use the drawing rectangle for the parent for a base
-			// since the textnode might not have one (or more
-			// accurately, has many...)
-			for _, box := range e.lineBoxes {
-				if box.el.Type == html.ElementNode && box.el.Data == "img" {
-					// Handled at the ElementNode level, this was just in
-					// the lineboxes to help align the height.
-					continue
-				}
-				sr := box.Content.Bounds()
-				r := image.Rectangle{box.origin, box.origin.Add(sr.Size())}.Add(absrect.Min)
-
-				if box.BorderImage != nil {
-					sr := box.BorderImage.Bounds()
-					// ro := box.origin.Add(box.borigin).Add(absrect.Min)
-					ro := box.origin.Sub(box.borigin).Add(absrect.Min)
-					r := image.Rectangle{ro, ro.Add(sr.Size())}
-					draw.Draw(
-						dst,
+					if box.BorderImage != nil {
+						sr := box.BorderImage.Bounds()
+						// ro := box.origin.Add(box.borigin).Add(absrect.Min)
+						ro := box.origin.Sub(box.borigin).Add(absrect.Min)
+						r := image.Rectangle{ro, ro.Add(sr.Size())}
+						draw.Draw(
+							dst,
+							r.Sub(cursor),
+							box.BorderImage,
+							sr.Min,
+							draw.Over,
+						)
+					}
+					draw.Draw(dst,
 						r.Sub(cursor),
-						box.BorderImage,
+						box.Content,
 						sr.Min,
 						draw.Over,
 					)
 				}
-				draw.Draw(dst,
-					r.Sub(cursor),
-					box.Content,
-					sr.Min,
-					draw.Over,
-				)
+
 			}
 
+		case html.TextNode:
+			// The parent contained the line boxes for the textnode
+			// (and possibly other inline things on the same line)
+			// so this was rendered by the parent.
+			continue
 		}
 	}
 	return nil

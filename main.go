@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+
 	"github.com/driusan/gob/css"
 	"github.com/driusan/gob/dom"
 	"github.com/driusan/gob/net"
@@ -141,7 +142,7 @@ func main() {
 			case key.Event:
 				switch e.Code {
 				case key.CodeEscape:
-					fmt.Println("Restart: Gob ", page.URL)
+					fmt.Println("Restart: ", os.Args[0], page.URL)
 					return
 				case key.CodeLeftArrow:
 					if e.Direction == key.DirPress {

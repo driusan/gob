@@ -807,8 +807,8 @@ func (e *RenderableDomElement) calcCSSBox(contentSize image.Point, hideleftborde
 	box := &outerBoxDrawer{
 		Margin: BoxMargins{
 			// Do not include top or bottom margins in the image to make collapsing easier.
-			Top:    BoxMargin{Width: 0}, // e.GetMarginTopSize()},
-			Bottom: BoxMargin{Width: 0}, //
+			Top:    BoxMargin{Width: 0},
+			Bottom: BoxMargin{Width: 0},
 
 			Left:  BoxMargin{Width: e.GetMarginLeftSize()},
 			Right: BoxMargin{Width: e.GetMarginRightSize()},
