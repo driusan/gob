@@ -1544,18 +1544,19 @@ func (e *RenderableDomElement) drawInto(ctx context.Context, dst draw.Image, cur
 					}
 				default:
 				}
-				if c.CSSOuterBox != nil {
-					sr := c.CSSOuterBox.Bounds()
-					draw.Draw(
-						dst,
-						absrect.Sub(cursor),
-						c.CSSOuterBox,
-						sr.Min,
-						draw.Over,
-					)
-				}
-
 				if !(c.Type == html.ElementNode && c.Data == "img" && c.GetDisplayProp() == "inline" && c.GetFloat() == "none") {
+
+					if c.CSSOuterBox != nil {
+						sr := c.CSSOuterBox.Bounds()
+						draw.Draw(
+							dst,
+							absrect.Sub(cursor),
+							c.CSSOuterBox,
+							sr.Min,
+							draw.Over,
+						)
+					}
+
 					// Inline images get drawn as part of a lineBox.
 					if err := c.drawInto(ctx, dst, cursor); err != nil {
 						return err
@@ -1563,8 +1564,10 @@ func (e *RenderableDomElement) drawInto(ctx context.Context, dst draw.Image, cur
 				}
 				for _, box := range c.lineBoxes {
 					sr := box.Content.Bounds()
-					r := image.Rectangle{box.origin, box.origin.Add(sr.Size())}.Add(absrect.Min).Add(c.BoxContentRectangle.Min)
-
+					r := image.Rectangle{box.origin, box.origin.Add(sr.Size())}.Add(absrect.Min)
+					if c.GetDisplayProp() != "inline" {
+						r = r.Add(c.BoxContentRectangle.Min)
+					}
 					if box.BorderImage != nil {
 						sr := box.BorderImage.Bounds()
 						// ro := box.origin.Add(box.borigin).Add(absrect.Min)
