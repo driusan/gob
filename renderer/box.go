@@ -225,7 +225,6 @@ func (b *outerBoxDrawer) At(x, y int) color.Color {
 	return b.background.At(x, y)
 }
 
-var dfltBorder *color.RGBA = &color.RGBA{255, 128, 128, 0}
 var dfltBackground *color.RGBA = &color.RGBA{255, 128, 128, 255}
 
 func (e RenderableDomElement) GetBorderBottomWidth() int {
@@ -251,23 +250,23 @@ func (e RenderableDomElement) GetBorderBottomWidth() int {
 	}
 	return val
 }
-func (e RenderableDomElement) GetBorderBottomColor() *color.RGBA {
+func (e RenderableDomElement) GetBorderBottomColor() color.Color {
 	if e.Styles == nil {
-		return dfltBorder
+		return e.GetColor()
 	}
 	value := e.Styles.BorderBottomColor.Value
 	if value == "" {
-		return dfltBorder
+		return e.GetColor()
 	}
 	if value == "inherit" {
 		if e.Parent == nil {
-			return dfltBorder
+			return e.GetColor()
 		}
 		return e.Parent.GetBorderBottomColor()
 	}
 	c, err := css.ConvertColorToRGBA(value)
 	if err != nil {
-		return dfltBorder
+		return e.GetColor()
 	}
 	return c
 }
@@ -294,23 +293,23 @@ func (e RenderableDomElement) GetBorderTopWidth() int {
 	}
 	return val
 }
-func (e RenderableDomElement) GetBorderTopColor() *color.RGBA {
+func (e RenderableDomElement) GetBorderTopColor() color.Color {
 	if e.Styles == nil {
-		return dfltBorder
+		return e.GetColor()
 	}
 	value := e.Styles.BorderTopColor.Value
 	if value == "" {
-		return dfltBorder
+		return e.GetColor()
 	}
 	if value == "inherit" {
 		if e.Parent == nil {
-			return dfltBorder
+			return e.GetColor()
 		}
 		return e.Parent.GetBorderTopColor()
 	}
 	c, err := css.ConvertColorToRGBA(value)
 	if err != nil {
-		return dfltBorder
+		return e.GetColor()
 	}
 	return c
 }
@@ -338,23 +337,23 @@ func (e RenderableDomElement) GetBorderLeftWidth() int {
 	}
 	return val
 }
-func (e RenderableDomElement) GetBorderLeftColor() *color.RGBA {
+func (e RenderableDomElement) GetBorderLeftColor() color.Color {
 	if e.Styles == nil {
-		return dfltBorder
+		return e.GetColor()
 	}
 	value := e.Styles.BorderLeftColor.Value
 	if value == "" {
-		return dfltBorder
+		return e.GetColor()
 	}
 	if value == "inherit" {
 		if e.Parent == nil {
-			return dfltBorder
+			return e.GetColor()
 		}
 		return e.Parent.GetBorderLeftColor()
 	}
 	c, err := css.ConvertColorToRGBA(value)
 	if err != nil {
-		return dfltBorder
+		return e.GetColor()
 	}
 	return c
 }
@@ -382,23 +381,23 @@ func (e RenderableDomElement) GetBorderRightWidth() int {
 	}
 	return val
 }
-func (e RenderableDomElement) GetBorderRightColor() *color.RGBA {
+func (e RenderableDomElement) GetBorderRightColor() color.Color {
 	if e.Styles == nil {
-		return dfltBorder
+		return e.GetColor()
 	}
 	value := e.Styles.BorderRightColor.Value
 	if value == "" {
-		return dfltBorder
+		return e.GetColor()
 	}
 	if value == "inherit" {
 		if e.Parent == nil {
-			return dfltBorder
+			return e.GetColor()
 		}
 		return e.Parent.GetBorderRightColor()
 	}
 	c, err := css.ConvertColorToRGBA(value)
 	if err != nil {
-		return dfltBorder
+		return e.GetColor()
 	}
 	return c
 }
