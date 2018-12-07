@@ -651,7 +651,7 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 
 			}
 
-			lfWidth := e.leftFloats.MaxX(*dot)
+			lfWidth := e.leftFloats.WidthAt(*dot)
 			rfWidth := e.rightFloats.WidthAt(*dot)
 			if dot.X < lfWidth {
 				dot.X = lfWidth
@@ -672,8 +672,8 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 						dot.Y += *nextline
 						*nextline = c.GetLineHeight()
 
-						lfWidth = e.leftFloats.MaxX(*dot)
-						rfWidth = e.rightFloats.ClearFloats(*dot).WidthAt(*dot)
+						lfWidth = e.leftFloats.WidthAt(*dot)
+						rfWidth = e.rightFloats.WidthAt(*dot)
 
 						dot.X = e.leftFloats.MaxX(*dot)
 						e.advanceLine(dot)
@@ -705,7 +705,7 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 						dot.Y += *nextline
 						*nextline = c.GetLineHeight()
 
-						lfWidth = e.leftFloats.MaxX(*dot)
+						lfWidth = e.leftFloats.WidthAt(*dot)
 						rfWidth = e.rightFloats.WidthAt(*dot)
 
 						dot.X = e.leftFloats.MaxX(*dot)
@@ -737,7 +737,7 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 						dot.Y += *nextline
 						*nextline = c.GetLineHeight()
 
-						lfWidth = e.leftFloats.MaxX(*dot)
+						lfWidth = e.leftFloats.WidthAt(*dot)
 						rfWidth = e.rightFloats.WidthAt(*dot)
 
 						dot.X = e.leftFloats.MaxX(*dot)
@@ -751,7 +751,7 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 						dot.Y += *nextline
 						*nextline = c.GetLineHeight()
 
-						lfWidth = e.leftFloats.MaxX(*dot)
+						lfWidth = e.leftFloats.WidthAt(*dot)
 						rfWidth = e.rightFloats.WidthAt(*dot)
 
 						dot.X = e.leftFloats.MaxX(*dot)
@@ -795,7 +795,7 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 						dot.Y += *nextline
 						*nextline = c.GetLineHeight()
 
-						lfWidth = e.leftFloats.MaxX(*dot)
+						lfWidth = e.leftFloats.WidthAt(*dot)
 						rfWidth = e.rightFloats.WidthAt(*dot)
 
 						dot.X = lfWidth
@@ -914,15 +914,19 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 					// Floats don't inherit the other floats, because the parent
 					// will make them collide and move them appropriately, they
 					// don't take up line space from each other internally.
-					c.leftFloats = make(FloatStack, len(e.leftFloats))
+					c.leftFloats = make(FloatStack, 0, len(e.leftFloats))
 					c.rightFloats = make(FloatStack, len(e.rightFloats))
-					for i, lf := range e.leftFloats {
-						c.leftFloats[i] = new(RenderableDomElement)
-						c.leftFloats[i].BoxDrawRectangle = lf.BoxDrawRectangle.Sub(image.Point{0, dot.Y})
+					for _, lf := range e.leftFloats {
+						float := new(RenderableDomElement)
+						float.BoxDrawRectangle = lf.BoxDrawRectangle.Sub(image.Point{dot.X, dot.Y})
+						if float.BoxDrawRectangle.Max.Y > 0 {
+							//if float.BoxDrawRectangle.Max.X > 0 && float.BoxDrawRectangle.Max.Y > 0 {
+							c.leftFloats = append(c.leftFloats, float)
+						}
 					}
-					for i, lf := range e.rightFloats {
+					for i, rf := range e.rightFloats {
 						c.rightFloats[i] = new(RenderableDomElement)
-						c.rightFloats[i].BoxDrawRectangle = lf.BoxDrawRectangle.Sub(image.Point{0, dot.Y})
+						c.rightFloats[i].BoxDrawRectangle = rf.BoxDrawRectangle.Sub(image.Point{dot.X, dot.Y})
 					}
 				}
 				var childContent image.Image
