@@ -563,8 +563,8 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 						}
 						e.Parent.lineBoxes = append(e.Parent.lineBoxes, &lb)
 						e.Parent.curLine = append(e.Parent.curLine, &lb)
+						dot.X += sz.X
 					}
-					dot.X += sz.X
 
 					if iheight > *nextline {
 						*nextline = iheight
@@ -1187,15 +1187,7 @@ func (e *RenderableDomElement) advanceLine(dot *image.Point) {
 		// Step 1. Figure out how big the line really is and where the baseline is.
 		for _, l := range e.curLine {
 			var height int
-			if l.BorderImage != nil {
-				height = l.BorderImage.Bounds().Size().Y
-			} else {
-				height = l.Content.Bounds().Size().Y
-			}
-			/*	if l.el.Type == html.ElementNode && strings.ToLower(l.el.Data) == "img" {
-					height += e.GetMarginTopSize() + e.GetMarginBottomSize()
-				}
-			*/
+			height = l.Content.Bounds().Size().Y
 			if height > maxsize {
 				maxsize = height
 			}
@@ -1208,11 +1200,7 @@ func (e *RenderableDomElement) advanceLine(dot *image.Point) {
 		for _, l := range e.curLine {
 			var height int
 			var i image.Image
-			if l.BorderImage != nil {
-				i = l.BorderImage
-			} else {
-				i = l.Content
-			}
+			i = l.Content
 			height = i.Bounds().Size().Y
 			switch align := l.el.GetVerticalAlign(); align {
 			case "text-bottom":
@@ -1226,7 +1214,7 @@ func (e *RenderableDomElement) advanceLine(dot *image.Point) {
 
 			}
 
-			if end := i.Bounds().Size().Y + l.origin.Y + l.el.GetMarginTopSize() + l.el.GetMarginBottomSize(); end > dot.Y {
+			if end := i.Bounds().Size().Y + l.origin.Y; end > dot.Y {
 				// Nothing, it was already aligned to the top
 				dot.Y = end
 			}
