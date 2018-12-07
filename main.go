@@ -131,6 +131,11 @@ func main() {
 		defer w.Release()
 
 		var v Viewport
+		defer func() {
+			if v.buffer != nil {
+				v.buffer.Release()
+			}
+		}()
 		// there will be a size event immediately after creating
 		// the window which will trigger this.
 		for {
