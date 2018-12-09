@@ -22,8 +22,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"unicode"
-	"unicode/utf8"
+	// "unicode"
+	// "unicode/utf8"
 	//"strconv"
 )
 
@@ -102,12 +102,93 @@ type lineBox struct {
 	Content     image.Image
 	BorderImage image.Image
 
-	origin   image.Point
-	borigin  image.Point
-	baseline int
+	origin  image.Point
+	borigin image.Point
+	metrics *font.Metrics
 
-	content string // for debugging, may be removed
+	content string
 	el      *RenderableDomElement
+}
+
+func (lb lineBox) IsImage() bool {
+	return lb.metrics == nil
+}
+
+func (lb lineBox) Baseline() int {
+	if lb.metrics != nil {
+		return lb.metrics.Ascent.Ceil()
+	}
+	// It's an image, the height is the baseline.
+	if lb.BorderImage != nil {
+		return lb.BorderImage.Bounds().Size().Y
+	}
+	return lb.Content.Bounds().Size().Y
+}
+
+func (lb lineBox) drawAt(ctx context.Context, dst draw.Image, dot image.Point) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	/*
+		// FIXME: Add first-letter styling
+		if firstletter {
+			e.Styles = e.ConditionalStyles.FirstLetter
+		}
+	*/
+
+	/*
+		// It was already transformed during layout, we don't need
+		// to do this
+		switch lb.el.GetTextTransform() {
+		case "capitalize":
+			textContent = strings.Title(textContent)
+		case "uppercase":
+			textContent = strings.ToUpper(textContent)
+		case "lowercase":
+			textContent = strings.ToLower(textContent)
+		}
+	*/
+
+	// smallcaps := e.FontVariant() == "small-caps"
+
+	fSize := lb.el.GetFontSize()
+	fontFace := lb.el.GetFontFace(fSize)
+
+	fntDrawer := font.Drawer{
+		Dst:  dst,
+		Src:  &image.Uniform{lb.el.GetColor()},
+		Face: fontFace,
+		Dot:  fixed.P(dot.X, dot.Y+lb.metrics.Ascent.Ceil()),
+	}
+
+	switch whitespace := lb.el.GetWhiteSpace(); whitespace {
+	case "pre-wrap", "no-wrap", "pre-line":
+		panic(whitespace + " not implemented")
+	case "pre":
+		fntDrawer.DrawString(lb.content)
+	case "normal":
+		words := strings.Fields(lb.content)
+		// layout ensured that it fit and did any necessary text
+		// transformations, so we just need to make sure we handle
+		// whitespace in the same way and don't check anything else
+		for _, word := range words {
+			fntDrawer.DrawString(word)
+			// Add a three per em between words, an em-space after a period, and
+			// an en-space after any other punctuation.
+			switch word[len(word)-1] {
+			case ',', ';', ':', '!', '?':
+				fntDrawer.Dot.X += fixed.Int26_6(fSize/2) << 6
+			case '.':
+				fntDrawer.Dot.X += fixed.Int26_6(fSize) << 6
+			default:
+				fntDrawer.Dot.X += fixed.Int26_6(fSize/3) << 6
+			}
+		}
+		fallthrough
+	default:
+	}
+	return nil
 }
 
 func (e *RenderableDomElement) Walk(callback func(*RenderableDomElement)) {
@@ -128,7 +209,7 @@ func (e *RenderableDomElement) Walk(callback func(*RenderableDomElement)) {
 	}
 }
 
-func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent string, force bool, inlinesibling bool, firstletter bool) (img *image.RGBA, consumed, unconsumed string, baseline int, metrics font.Metrics) {
+func (e RenderableDomElement) layoutLineBox(remainingWidth int, textContent string, force bool, inlinesibling bool, firstletter bool) (size image.Point, consumed, unconsumed string, metrics font.Metrics) {
 	if remainingWidth < 0 {
 		panic("No room to render text")
 	}
@@ -144,249 +225,69 @@ func (e RenderableDomElement) renderLineBox(remainingWidth int, textContent stri
 		textContent = strings.ToLower(textContent)
 	}
 
-	smallcaps := e.FontVariant() == "small-caps"
+	// smallcaps := e.FontVariant() == "small-caps"
 
 	fSize := e.GetFontSize()
 	fontFace := e.GetFontFace(fSize)
 	metrics = fontFace.Metrics()
 
-	var dot int
-	clr := e.GetColor()
 	fntDrawer := font.Drawer{
 		Dst:  nil,
-		Src:  &image.Uniform{clr},
+		Src:  nil,
 		Face: fontFace,
 	}
 
-	var ssize int
-
-	// words are used for normal, nowrap,
-	var words []string
-	// lines are used for pre, pre-wrap, and pre-line
-	var lines []string
-	whitespace := e.GetWhiteSpace()
-	switch whitespace {
+	switch whitespace := e.GetWhiteSpace(); whitespace {
+	case "pre-wrap", "no-wrap", "pre-line":
+		panic(whitespace + " not implemented")
 	case "pre":
-		lines = strings.Split(textContent, "\n")
-		ssize = fntDrawer.MeasureString(lines[0]).Ceil()
+		lines := strings.Split(textContent, "\n")
+		consumed = lines[0]
 		unconsumed = strings.Join(lines[1:], "\n")
-	case "pre-wrap":
-		panic("pre-wrap not yet implemented")
-		lines = strings.Split(textContent, "\n")
-		words = strings.Fields(lines[0])
-		ssize = fntDrawer.MeasureString(lines[0]).Ceil()
-	case "nowrap":
-		// same as normal, but don't cap the size
-		// at remaining width
-		words = strings.Fields(textContent)
-		ssize, _ = stringSize(fntDrawer, textContent)
-	case "pre-line":
-		panic("pre-line not yet implemented")
+		size = image.Point{
+			fntDrawer.MeasureString(consumed).Ceil(),
+			(metrics.Ascent + metrics.Descent).Ceil(),
+		}
+		return
 	case "normal":
 		fallthrough
 	default:
-		words = strings.Fields(textContent)
-		ssize, _ = stringSize(fntDrawer, strings.TrimSpace(textContent))
-	}
-	//lineheight := e.GetLineHeight()
-	start := 0
-	if unicode.IsSpace(rune(textContent[0])) {
-		start = (fSize / 3)
-		ssize += start
-	}
-	if unicode.IsSpace(rune(textContent[len(textContent)-1])) {
-		ssize += (fSize / 3)
-	}
-	if ssize > remainingWidth {
-		if force != true && len(words) > 0 {
-			// If it's not being forced, check if at least one word
-			// fits
-			psize, _ := stringSize(fntDrawer, words[0])
-			if psize < remainingWidth {
-				// A word fits, so just keep going
-				ssize = remainingWidth
-			} else {
-				// Nothing fits, so don't consume anything
-				// since it's not being forced.
-				consumed = ""
-				unconsumed = textContent
-				return
-			}
-		} else {
-			// force is true, so just make it take up all the remaining width
-			ssize = remainingWidth
-		}
-	}
-
-	if ssize < 0 {
-		panic("This should never happen")
-	}
-	img = image.NewRGBA(image.Rectangle{image.ZP, image.Point{ssize, (metrics.Ascent + metrics.Descent).Ceil()}})
-	baseline = metrics.Ascent.Floor()
-	fntDrawer.Dot = fixed.P(start, baseline)
-	fntDrawer.Dst = img
-
-	defer func() {
-		if decoration := e.GetTextDecoration(); decoration != "" && decoration != "none" && decoration != "blink" {
-			if strings.Contains(decoration, "underline") {
-				y := fntDrawer.Dot.Y.Floor() + 1
-				for px := 0; px < ssize; px++ {
-					img.Set(px, y, clr)
-				}
-			}
-			if strings.Contains(decoration, "overline") {
-				y := fntDrawer.Dot.Y.Floor() - fontFace.Metrics().Ascent.Floor()
-				for px := 0; px < ssize; px++ {
-					img.Set(px, y, clr)
-				}
-			}
-			if strings.Contains(decoration, "line-through") {
-				y := fntDrawer.Dot.Y.Floor() - (fontFace.Metrics().Ascent.Floor() / 2)
-				for px := 0; px < ssize; px++ {
-					img.Set(px, y, clr)
-				}
-			}
-		}
-	}()
-	if whitespace == "pre" {
-		fntDrawer.DrawString(lines[0])
-		consumed = lines[0]
-		return
-	}
-	if whitespace == "nowrap" {
-		//fmt.Printf("No wrap! %s", words)
-	}
-
-	for i, word := range words {
-		var wordleft string
-		wordSizeInPx := fntDrawer.MeasureString(word).Ceil()
-
-		if firstletter || smallcaps {
-			_, n := utf8.DecodeRune([]byte(word))
-			wordleft = word[n:]
-			word = string(word[0:n])
-		}
-	startword:
-		if dot+wordSizeInPx > remainingWidth && whitespace != "nowrap" {
-			// The word doesn't fit on this line.
-			if strings.Index(word, "-") >= 0 {
-				// This isn't required, but including partial words that have a hyphen
-				// on a line is what Chrome and Firefox do, and makes it easier to
-				// compare test cases.
-				pword := strings.SplitN(word, "-", 2)
-				pword[0] = pword[0] + "-"
-				wordSizeInPx = fntDrawer.MeasureString(pword[0]).Ceil()
-				if dot+wordSizeInPx <= remainingWidth {
-					fntDrawer.DrawString(pword[0])
-
-					unconsumed = strings.Join(words[i+1:], " ")
-					if len(unconsumed) > 0 {
-						unconsumed = pword[1] + " " + unconsumed
-					} else {
-						unconsumed = pword[1]
-					}
-					consumed = strings.Join(words[:i], " ")
-					if len(consumed) > 0 {
-						consumed = consumed + " " + pword[0]
-					} else {
-						consumed = pword[0]
-					}
+		var sz fixed.Int26_6
+		words := strings.Fields(textContent)
+		for i, word := range words {
+			wsize := fntDrawer.MeasureString(word)
+			if (wsize + sz).Ceil() > remainingWidth {
+				if i == 0 && force {
+					return image.Point{wsize.Ceil(), (metrics.Ascent + metrics.Descent).Ceil()}, word, strings.Join(words[1:], " "), metrics
+				} else {
+					unconsumed = strings.Join(words[i:], " ")
+					size = image.Point{sz.Ceil(), (metrics.Ascent + metrics.Descent).Ceil()}
 					return
 				}
-				// falthrough to normal exit, we couldn't fit a partial word
 			}
-			if i == 0 && force {
-				// make sure at least one word gets consumed to avoid an infinite loop.
-				// this isn't ideal, since some words will disappear, but if we reach this
-				// point we're already in a pretty bad state..
-				unconsumed = strings.Join(words[i+1:], " ")
-				consumed = words[0]
-			} else {
-				unconsumed = strings.Join(words[i:], " ")
-				consumed = strings.Join(words[:i], " ")
-			}
-			return
-		}
-
-		if smallcaps {
-			if len(word) > 0 {
-				if unicode.IsLower(rune(word[0])) {
-					fontFace = e.GetFontFace(fSize * 8 / 10)
-					fntDrawer.Face = fontFace
-				} else {
-					fontFace = e.GetFontFace(fSize)
-					fntDrawer.Face = fontFace
-				}
-			}
-			word = strings.ToUpper(word)
-		}
-
-		fntDrawer.DrawString(word)
-
-		if firstletter || smallcaps {
-			if len(word) > 0 {
-				if unicode.IsLetter(rune(word[0])) {
-					e.Styles = e.ConditionalStyles.FirstLine
-					firstletter = false
-					fSize = e.GetFontSize()
-					fontFace = e.GetFontFace(fSize)
-					clr = e.GetColor()
-
-					fntDrawer.Src = &image.Uniform{clr}
-					fntDrawer.Face = fontFace
-				}
+			// FIXME: Replace with string builder
+			consumed += word + " "
+			sz += wsize
+			if i == len(words)-1 {
+				break
 			}
 
-			if len(wordleft) > 0 {
-				if !smallcaps {
-					if firstletter {
-						// The letter printed was not a letter, so keep going
-						// character by character until we get to the first letter
-						word = string(wordleft[0])
-					} else {
-						// A letter was printed, so print the remaining part
-						// of the word.
-						word = wordleft
-					}
-					wordleft = wordleft[1:]
-				} else {
-					word = string(wordleft[0])
-					wordleft = wordleft[1:]
-				}
-				goto startword
-			} else {
-				firstletter = false
+			// Add a three per em between words, an em-space after a period, and
+			// an en-space after any other punctuation.
+			switch word[len(word)-1] {
+			case ',', ';', ':', '!', '?':
+				sz += fixed.Int26_6(fSize/2) << 6
+			case '.':
+				sz += fixed.Int26_6(fSize) << 6
+			default:
+				sz += fixed.Int26_6(fSize/3) << 6
 			}
-		}
 
-		if i == len(words)-1 {
-			if !inlinesibling {
-				ssize = int(fntDrawer.Dot.X) >> 6
-			}
-			break
 		}
-		// Add a three per em space between words, an em-quad after a period,
-		// and an en-quad after other punctuation
-		switch word[len(word)-1] {
-		case ',', ';', ':', '!', '?':
-			dot = (int(fntDrawer.Dot.X) >> 6) + (fSize / 2)
-		case '.':
-			dot = (int(fntDrawer.Dot.X) >> 6) + fSize
-		default:
-			dot = (int(fntDrawer.Dot.X) >> 6) + (fSize / 3)
-		}
-		if !inlinesibling {
-			ssize = int(fntDrawer.Dot.X) >> 6
-		}
-		fntDrawer.Dot.X = fixed.Int26_6(dot << 6)
+		size = image.Point{sz.Ceil(), (metrics.Ascent + metrics.Descent).Ceil()}
+		return
 	}
-
-	if !firstletter {
-		// If we didn't fit in the line, we would have aborted earlier.
-		unconsumed = ""
-		consumed = textContent
-	}
-	return
+	panic("Unhandled whitespace property")
 }
 
 // Lays out the element into a viewport of size viewportSize.
@@ -557,7 +458,7 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 							box,
 							*dot,
 							contentbox.Min,
-							iheight,
+							nil,
 							"[img]",
 							e,
 						}
@@ -693,15 +594,14 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 				// need to add the padding and border to dot.X.
 				dot.X += c.GetPaddingLeft() + c.GetBorderLeftWidth()
 				var childImage image.Image
-				childImage, consumed, rt, baseline, _ := c.renderLineBox(width-dot.X-rfWidth, remainingTextContent, false, c.NextSibling != nil && c.NextSibling.GetDisplayProp() == "inline", firstletter)
+				size, consumed, rt, metrics := c.layoutLineBox(width-dot.X-rfWidth, remainingTextContent, false, c.NextSibling != nil && c.NextSibling.GetDisplayProp() == "inline", firstletter)
 				if consumed == "" {
 					if dot.X == 0 {
-						// Nothing was consumed, and we're at the start of the line, so just
-						// force at least one word to be drawn.
-
-						childImage, consumed, rt, baseline, _ = c.renderLineBox(width-dot.X-rfWidth, remainingTextContent, true, c.NextSibling != nil && c.NextSibling.GetDisplayProp() == "inline", firstletter)
+						// Nothing was consumed and we're
+						// at the start of the line, so force a word.
+						size, consumed, rt, metrics = c.layoutLineBox(width-dot.X-rfWidth, remainingTextContent, true, c.NextSibling != nil && c.NextSibling.GetDisplayProp() == "inline", firstletter)
 					} else {
-						// Go to the next line.
+						// Advance a line and try again.
 						dot.Y += *nextline
 						*nextline = c.GetLineHeight()
 
@@ -709,20 +609,21 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 						rfWidth = e.rightFloats.WidthAt(*dot)
 
 						dot.X = e.leftFloats.MaxX(*dot)
-						e.advanceLine(dot)
-						dot.X += c.listIndent()
-						goto textdraw
+						continue textdraw
 					}
+				}
+				childImage = image.Rectangle{*dot, dot.Add(size)}
+				if consumed == "" {
+					panic("This should be impossible.")
 				}
 				firstletter = false
 
-				size := childImage.Bounds().Size()
 				borderImage, cr := c.calcCSSBox(size, !e.inlineStart, strings.TrimSpace(rt) != "")
 
 				// We only grow the bounds by the amount that
 				// doesn't have the border drawn, so this uses
 				// size and not borderImage size.
-				bz := childImage.Bounds().Size()
+				bz := size
 				bz.Y = c.GetLineHeight()
 				start := dot.Add(image.Point{0, c.GetMarginTopSize()})
 				//r = image.Rectangle{*dot, dot.Add(bz)}
@@ -772,7 +673,7 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 					BorderImage: borderImage,
 					origin:      *dot,
 					borigin:     cr.Min,
-					baseline:    baseline,
+					metrics:     &metrics,
 					content:     consumed,
 					el:          c,
 				}
@@ -1195,8 +1096,9 @@ func (e *RenderableDomElement) advanceLine(dot *image.Point) {
 			if height > maxsize {
 				maxsize = height
 			}
-			if l.content != "[img]" && l.baseline > baseline {
-				baseline = l.baseline
+			//if bl := l.Baseline(); !l.IsImage() && bl > baseline {
+			if bl := l.Baseline(); bl > baseline {
+				baseline = bl
 			}
 		}
 
@@ -1537,7 +1439,7 @@ func (e *RenderableDomElement) drawInto(ctx context.Context, dst draw.Image, cur
 				default:
 				}
 				if !(c.Type == html.ElementNode && c.Data == "img" && c.GetDisplayProp() == "inline" && c.GetFloat() == "none") {
-
+					// Inline images get drawn as part of a lineBox
 					if c.CSSOuterBox != nil {
 						sr := c.CSSOuterBox.Bounds()
 						draw.Draw(
@@ -1549,7 +1451,6 @@ func (e *RenderableDomElement) drawInto(ctx context.Context, dst draw.Image, cur
 						)
 					}
 
-					// Inline images get drawn as part of a lineBox.
 					if err := c.drawInto(ctx, dst, cursor); err != nil {
 						return err
 					}
@@ -1573,12 +1474,20 @@ func (e *RenderableDomElement) drawInto(ctx context.Context, dst draw.Image, cur
 							draw.Over,
 						)
 					}
-					draw.Draw(dst,
-						r.Sub(cursor),
-						box.Content,
-						sr.Min,
-						draw.Over,
-					)
+					if box.IsImage() {
+						// It was an inline image
+						draw.Draw(dst,
+							r.Sub(cursor),
+							box.Content,
+							sr.Min,
+							draw.Over,
+						)
+					} else {
+						// It was inline text that still needs to be drawn.
+						if err := box.drawAt(ctx, dst, r.Sub(cursor).Min); err != nil {
+							return err
+						}
+					}
 				}
 
 			}
