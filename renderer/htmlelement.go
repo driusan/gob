@@ -565,27 +565,23 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 			}
 
 			remainingTextContent := c.Data
-			whitespace := e.GetWhiteSpace()
+			// whitespace := e.GetWhiteSpace()
+			forcenext := false
 		textdraw:
 			for strings.TrimSpace(remainingTextContent) != "" {
-				if whitespace == "normal" {
-					if width-dot.X-rfWidth <= 0 {
-						dot.Y += *nextline
-						*nextline = c.GetLineHeight()
-
-						lfWidth = e.leftFloats.WidthAt(*dot)
-						rfWidth = e.rightFloats.WidthAt(*dot)
-
-						dot.X = e.leftFloats.MaxX(*dot)
-						e.advanceLine(dot)
+				if width-dot.X-rfWidth <= 0 && !forcenext {
+					dot.Y += *nextline
+					*nextline = c.GetLineHeight()
+					lfWidth = e.leftFloats.WidthAt(*dot)
+					rfWidth = e.rightFloats.WidthAt(*dot)
+					dot.X = e.leftFloats.MaxX(*dot)
+					if lfWidth == 0 && rfWidth == 0 {
+						forcenext = true
 						continue
 					}
 				}
 
-				if width-dot.X-rfWidth <= 0 {
-					continue
-				}
-
+				forcenext = false
 				// dot works differently for line boxes than for
 				// blocks. For a block, dot represents the top left
 				// corner of the border box. For a linebox, it represents
