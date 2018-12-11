@@ -102,6 +102,7 @@ type lineBox struct {
 	Content     image.Image
 	BorderImage image.Image
 
+	styles  *css.StyledElement
 	origin  image.Point
 	borigin image.Point
 	metrics *font.Metrics
@@ -136,28 +137,17 @@ func (lb lineBox) drawAt(ctx context.Context, dst draw.Image, dot image.Point) e
 			e.Styles = e.ConditionalStyles.FirstLetter
 		}
 	*/
-
-	/*
-		// It was already transformed during layout, we don't need
-		// to do this
-		switch lb.el.GetTextTransform() {
-		case "capitalize":
-			textContent = strings.Title(textContent)
-		case "uppercase":
-			textContent = strings.ToUpper(textContent)
-		case "lowercase":
-			textContent = strings.ToLower(textContent)
-		}
-	*/
-
+	// Reapply the styles that were in effect when this was being laid out.
+	lb.el.Styles = lb.styles
 	// smallcaps := e.FontVariant() == "small-caps"
 
 	fSize := lb.el.GetFontSize()
 	fontFace := lb.el.GetFontFace(fSize)
 
+	clr := lb.el.GetColor()
 	fntDrawer := font.Drawer{
 		Dst:  dst,
-		Src:  &image.Uniform{lb.el.GetColor()},
+		Src:  &image.Uniform{clr},
 		Face: fontFace,
 		Dot:  fixed.P(dot.X, dot.Y+lb.metrics.Ascent.Ceil()),
 	}
@@ -172,8 +162,11 @@ func (lb lineBox) drawAt(ctx context.Context, dst draw.Image, dot image.Point) e
 		// layout ensured that it fit and did any necessary text
 		// transformations, so we just need to make sure we handle
 		// whitespace in the same way and don't check anything else
-		for _, word := range words {
+		for i, word := range words {
 			fntDrawer.DrawString(word)
+			if i == len(words)-1 {
+				break
+			}
 			// Add a three per em between words, an em-space after a period, and
 			// an en-space after any other punctuation.
 			switch word[len(word)-1] {
@@ -188,6 +181,27 @@ func (lb lineBox) drawAt(ctx context.Context, dst draw.Image, dot image.Point) e
 		fallthrough
 	default:
 	}
+	if decoration := lb.el.GetTextDecoration(); decoration != "" && decoration != "none" && decoration != "blink" {
+		if strings.Contains(decoration, "underline") {
+			y := fntDrawer.Dot.Y.Floor() + 1
+			for px := dot.X; px < fntDrawer.Dot.X.Ceil(); px++ {
+				dst.Set(px, y, clr)
+			}
+		}
+		if strings.Contains(decoration, "overline") {
+			y := dot.Y
+			for px := dot.X; px < fntDrawer.Dot.X.Ceil(); px++ {
+				dst.Set(px, y, clr)
+			}
+		}
+		if strings.Contains(decoration, "line-through") {
+			y := dot.Y + lb.metrics.Ascent.Floor()/2
+			for px := dot.X; px < fntDrawer.Dot.X.Ceil(); px++ {
+				dst.Set(px, y, clr)
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -456,6 +470,7 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 						lb := lineBox{
 							e.ContentOverlay,
 							box,
+							e.Styles,
 							*dot,
 							contentbox.Min,
 							nil,
@@ -575,7 +590,7 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 					lfWidth = e.leftFloats.WidthAt(*dot)
 					rfWidth = e.rightFloats.WidthAt(*dot)
 					dot.X = e.leftFloats.MaxX(*dot)
-					if lfWidth == 0 && rfWidth == 0 {
+					if dot.X == 0 && lfWidth == 0 && rfWidth == 0 {
 						forcenext = true
 						continue
 					}
@@ -667,6 +682,7 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 				lb := lineBox{
 					Content:     childImage,
 					BorderImage: borderImage,
+					styles:      c.Styles,
 					origin:      *dot,
 					borigin:     cr.Min,
 					metrics:     &metrics,
