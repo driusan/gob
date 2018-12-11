@@ -22,8 +22,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	// "unicode"
-	// "unicode/utf8"
+	"unicode"
+	"unicode/utf8"
 	//"strconv"
 )
 
@@ -131,18 +131,13 @@ func (lb lineBox) drawAt(ctx context.Context, dst draw.Image, dot image.Point) e
 		return err
 	}
 
-	/*
-		// FIXME: Add first-letter styling
-		if firstletter {
-			e.Styles = e.ConditionalStyles.FirstLetter
-		}
-	*/
 	// Reapply the styles that were in effect when this was being laid out.
 	lb.el.Styles = lb.styles
-	// smallcaps := e.FontVariant() == "small-caps"
+	smallcaps := lb.el.FontVariant() == "small-caps"
 
 	fSize := lb.el.GetFontSize()
 	fontFace := lb.el.GetFontFace(fSize)
+	defer fontFace.Close()
 
 	clr := lb.el.GetColor()
 	fntDrawer := font.Drawer{
@@ -150,6 +145,12 @@ func (lb lineBox) drawAt(ctx context.Context, dst draw.Image, dot image.Point) e
 		Src:  &image.Uniform{clr},
 		Face: fontFace,
 		Dot:  fixed.P(dot.X, dot.Y+lb.metrics.Ascent.Ceil()),
+	}
+	var smallFace font.Face
+	if smallcaps {
+		smallFace = lb.el.GetFontFace(fSize * 8 / 10)
+
+		defer smallFace.Close()
 	}
 
 	switch whitespace := lb.el.GetWhiteSpace(); whitespace {
@@ -159,11 +160,28 @@ func (lb lineBox) drawAt(ctx context.Context, dst draw.Image, dot image.Point) e
 		fntDrawer.DrawString(lb.content)
 	case "normal":
 		words := strings.Fields(lb.content)
-		// layout ensured that it fit and did any necessary text
+		// layout ensured that it fit and did most necessary text
 		// transformations, so we just need to make sure we handle
 		// whitespace in the same way and don't check anything else
 		for i, word := range words {
-			fntDrawer.DrawString(word)
+			if smallcaps {
+				var wordleft string = word
+				for wordleft != "" {
+					r, n := utf8.DecodeRune([]byte(wordleft))
+					chr := wordleft[:n]
+					wordleft = wordleft[n:]
+					if unicode.IsLower(r) {
+						fntDrawer.Face = smallFace
+					} else {
+						fntDrawer.Face = fontFace
+					}
+					chr = strings.ToUpper(chr)
+					fntDrawer.DrawString(chr)
+
+				}
+			} else {
+				fntDrawer.DrawString(word)
+			}
 			if i == len(words)-1 {
 				break
 			}
@@ -239,11 +257,19 @@ func (e RenderableDomElement) layoutLineBox(remainingWidth int, textContent stri
 		textContent = strings.ToLower(textContent)
 	}
 
-	// smallcaps := e.FontVariant() == "small-caps"
+	smallcaps := e.FontVariant() == "small-caps"
 
 	fSize := e.GetFontSize()
 	fontFace := e.GetFontFace(fSize)
+	defer fontFace.Close()
 	metrics = fontFace.Metrics()
+
+	var smallFace font.Face
+	if smallcaps {
+		smallFace = e.GetFontFace(fSize * 8 / 10)
+
+		defer smallFace.Close()
+	}
 
 	fntDrawer := font.Drawer{
 		Dst:  nil,
@@ -269,7 +295,32 @@ func (e RenderableDomElement) layoutLineBox(remainingWidth int, textContent stri
 		var sz fixed.Int26_6
 		words := strings.Fields(textContent)
 		for i, word := range words {
-			wsize := fntDrawer.MeasureString(word)
+			var wsize fixed.Int26_6
+			if smallcaps {
+				// Handle the word size letter by letter for smallcaps
+				var wordleft = word
+				var face font.Face
+				for wordleft != "" {
+					r, n := utf8.DecodeRune([]byte(wordleft))
+					wordleft = wordleft[n:]
+					if unicode.IsLower(r) {
+						face = smallFace
+					} else {
+						face = fontFace
+					}
+					r = unicode.ToUpper(r)
+
+					// FIXME: This should also take kerning into account
+					lsize, ok := face.GlyphAdvance(r)
+					if !ok {
+						// FIXME: Have a better fallback.
+						panic("No glyph for rune in font")
+					}
+					wsize += lsize
+				}
+			} else {
+				wsize = fntDrawer.MeasureString(word)
+			}
 			if (wsize + sz).Ceil() > remainingWidth {
 				if i == 0 && force {
 					return image.Point{wsize.Ceil(), (metrics.Ascent + metrics.Descent).Ceil()}, word, strings.Join(words[1:], " "), metrics
