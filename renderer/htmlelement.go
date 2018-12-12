@@ -241,7 +241,7 @@ func (e *RenderableDomElement) Walk(callback func(*RenderableDomElement)) {
 	}
 }
 
-func (e RenderableDomElement) layoutLineBox(remainingWidth int, textContent string, force bool, inlinesibling bool, firstletter bool) (size image.Point, consumed, unconsumed string, metrics font.Metrics) {
+func (e RenderableDomElement) layoutLineBox(remainingWidth int, textContent string, force bool, inlinesibling bool, firstletter bool) (size image.Point, consumed, unconsumed string, metrics font.Metrics, forcenewline bool) {
 	if remainingWidth < 0 {
 		panic("No room to render text")
 	}
@@ -295,47 +295,65 @@ func (e RenderableDomElement) layoutLineBox(remainingWidth int, textContent stri
 		var sz fixed.Int26_6
 		words := strings.Fields(textContent)
 		for i, word := range words {
-			var wsize fixed.Int26_6
-			if smallcaps {
-				// Handle the word size letter by letter for smallcaps
-				var wordleft = word
-				var face font.Face
-				for wordleft != "" {
-					r, n := utf8.DecodeRune([]byte(wordleft))
-					wordleft = wordleft[n:]
-					if unicode.IsLower(r) {
-						face = smallFace
-					} else {
-						face = fontFace
-					}
-					r = unicode.ToUpper(r)
+			pieces := strings.Split(word, "-")
+			var face font.Face = fontFace
+			for pi, piece := range pieces {
+				var wsize fixed.Int26_6
+				if smallcaps {
+					// Handle the word size letter by letter for smallcaps
+					var wordleft = piece
+					for wordleft != "" {
+						r, n := utf8.DecodeRune([]byte(wordleft))
+						wordleft = wordleft[n:]
+						if unicode.IsLower(r) {
+							face = smallFace
+						} else {
+							face = fontFace
+						}
+						r = unicode.ToUpper(r)
 
-					// FIXME: This should also take kerning into account
-					lsize, ok := face.GlyphAdvance(r)
-					if !ok {
-						// FIXME: Have a better fallback.
-						panic("No glyph for rune in font")
+						// FIXME: This should also take kerning into account
+						lsize, ok := face.GlyphAdvance(r)
+						if !ok {
+							// FIXME: Have a better fallback.
+							panic("No glyph for rune in font")
+						}
+						wsize += lsize
 					}
-					wsize += lsize
-				}
-			} else {
-				wsize = fntDrawer.MeasureString(word)
-			}
-			if (wsize + sz).Ceil() > remainingWidth {
-				if i == 0 && force {
-					return image.Point{wsize.Ceil(), (metrics.Ascent + metrics.Descent).Ceil()}, word, strings.Join(words[1:], " "), metrics
 				} else {
-					unconsumed = strings.Join(words[i:], " ")
-					size = image.Point{sz.Ceil(), (metrics.Ascent + metrics.Descent).Ceil()}
-					return
+					wsize = fntDrawer.MeasureString(piece)
 				}
+				if pi != len(pieces)-1 && len(pieces) > 1 {
+					dsize, ok := face.GlyphAdvance('-')
+					if !ok {
+						panic("Font face does not have glyph for -")
+					}
+					wsize += dsize
+				}
+
+				if (wsize + sz).Ceil() > remainingWidth {
+					unconsumed = strings.Join(pieces[pi:], "-")
+					unconsumed += " " + strings.Join(words[i+1:], " ")
+					if i == 0 && force {
+						return image.Point{wsize.Ceil(), (metrics.Ascent + metrics.Descent).Ceil()}, consumed, unconsumed, metrics, true
+					} else {
+						forcenewline = true
+						size = image.Point{sz.Ceil(), (metrics.Ascent + metrics.Descent).Ceil()}
+						return
+					}
+				}
+				// FIXME: Replace with string builder
+				consumed += piece
+				if pi != len(pieces)-1 && len(pieces) > 1 {
+					consumed += "-"
+				}
+				sz += wsize
+
 			}
-			// FIXME: Replace with string builder
-			consumed += word + " "
-			sz += wsize
 			if i == len(words)-1 {
 				break
 			}
+			consumed += " "
 
 			// Add a three per em between words, an em-space after a period, and
 			// an en-space after any other punctuation.
@@ -349,6 +367,7 @@ func (e RenderableDomElement) layoutLineBox(remainingWidth int, textContent stri
 			}
 
 		}
+		forcenewline = false
 		size = image.Point{sz.Ceil(), (metrics.Ascent + metrics.Descent).Ceil()}
 		return
 	}
@@ -626,6 +645,7 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 
 			dot.X += c.listIndent()
 			if firstLine == true {
+				c.Styles = c.ConditionalStyles.FirstLine
 				dot.X += c.GetTextIndent(width)
 				firstLine = false
 			}
@@ -656,12 +676,12 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 				// need to add the padding and border to dot.X.
 				dot.X += c.GetPaddingLeft() + c.GetBorderLeftWidth()
 				var childImage image.Image
-				size, consumed, rt, metrics := c.layoutLineBox(width-dot.X-rfWidth, remainingTextContent, false, c.NextSibling != nil && c.NextSibling.GetDisplayProp() == "inline", firstletter)
+				size, consumed, rt, metrics, forcenewline := c.layoutLineBox(width-dot.X-rfWidth, remainingTextContent, false, c.NextSibling != nil && c.NextSibling.GetDisplayProp() == "inline", firstletter)
 				if consumed == "" {
 					if dot.X == 0 {
 						// Nothing was consumed and we're
 						// at the start of the line, so force a word.
-						size, consumed, rt, metrics = c.layoutLineBox(width-dot.X-rfWidth, remainingTextContent, true, c.NextSibling != nil && c.NextSibling.GetDisplayProp() == "inline", firstletter)
+						size, consumed, rt, metrics, forcenewline = c.layoutLineBox(width-dot.X-rfWidth, remainingTextContent, true, c.NextSibling != nil && c.NextSibling.GetDisplayProp() == "inline", firstletter)
 					} else {
 						// Advance a line and try again.
 						dot.Y += *nextline
@@ -754,7 +774,7 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 				case "normal":
 					fallthrough
 				default:
-					if r.Max.X >= width-rfWidth {
+					if r.Max.X >= width-rfWidth || forcenewline {
 						// there's no space left on this line, so advance dot to the next line.
 						dot.Y += *nextline
 						*nextline = c.GetLineHeight()
