@@ -299,19 +299,21 @@ func (e RenderableDomElement) layoutLineBox(remainingWidth int, textContent stri
 			var face font.Face = fontFace
 			for pi, piece := range pieces {
 				var wsize fixed.Int26_6
-				if smallcaps {
+				if smallcaps || firstletter {
 					// Handle the word size letter by letter for smallcaps
+					// or firstletter
 					var wordleft = piece
 					for wordleft != "" {
 						r, n := utf8.DecodeRune([]byte(wordleft))
 						wordleft = wordleft[n:]
-						if unicode.IsLower(r) {
-							face = smallFace
-						} else {
-							face = fontFace
+						if smallcaps {
+							if unicode.IsLower(r) {
+								face = smallFace
+							} else {
+								face = fontFace
+							}
+							r = unicode.ToUpper(r)
 						}
-						r = unicode.ToUpper(r)
-
 						// FIXME: This should also take kerning into account
 						lsize, ok := face.GlyphAdvance(r)
 						if !ok {
@@ -319,6 +321,15 @@ func (e RenderableDomElement) layoutLineBox(remainingWidth int, textContent stri
 							panic("No glyph for rune in font")
 						}
 						wsize += lsize
+						if firstletter {
+							consumed += fmt.Sprintf("%c", r)
+							if unicode.IsLetter(r) {
+								wl := strings.Join(append([]string{wordleft}, pieces[pi+1:]...), "-")
+								unconsumed = strings.Join(append([]string{wl}, words[i+1:]...), " ")
+								size = image.Point{(wsize + sz).Ceil(), (metrics.Ascent + metrics.Descent).Ceil()}
+								return
+							}
+						}
 					}
 				} else {
 					wsize = fntDrawer.MeasureString(piece)
@@ -334,7 +345,9 @@ func (e RenderableDomElement) layoutLineBox(remainingWidth int, textContent stri
 				if (wsize + sz).Ceil() > remainingWidth {
 					unconsumed = strings.Join(pieces[pi:], "-")
 					unconsumed += " " + strings.Join(words[i+1:], " ")
-					if i == 0 && force {
+					if i == 0 && pi == 0 && force {
+						consumed = words[0]
+						unconsumed = strings.Join(words[i:], " ")
 						return image.Point{wsize.Ceil(), (metrics.Ascent + metrics.Descent).Ceil()}, consumed, unconsumed, metrics, true
 					} else {
 						forcenewline = true
@@ -343,12 +356,13 @@ func (e RenderableDomElement) layoutLineBox(remainingWidth int, textContent stri
 					}
 				}
 				// FIXME: Replace with string builder
-				consumed += piece
+				if !firstletter {
+					consumed += piece
+				}
 				if pi != len(pieces)-1 && len(pieces) > 1 {
 					consumed += "-"
 				}
 				sz += wsize
-
 			}
 			if i == len(words)-1 {
 				break
@@ -444,7 +458,6 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 				switch attr.Key {
 				case "src":
 					// Seeing this print way too many times.. something's wrong.
-					//fmt.Printf("Should load: %s\n", attr.Val)
 					u, err := url.Parse(attr.Val)
 					if err != nil {
 						loadedImage = true
@@ -649,7 +662,9 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 				dot.X += c.GetTextIndent(width)
 				firstLine = false
 			}
-
+			if firstletter {
+				c.Styles = c.ConditionalStyles.FirstLetter
+			}
 			remainingTextContent := c.Data
 			// whitespace := e.GetWhiteSpace()
 			forcenext := false
@@ -698,7 +713,6 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 				if consumed == "" {
 					panic("This should be impossible.")
 				}
-				firstletter = false
 
 				borderImage, cr := c.calcCSSBox(size, !e.inlineStart, strings.TrimSpace(rt) != "")
 
@@ -762,13 +776,14 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 				}
 				e.lineBoxes = append(e.lineBoxes, &lb)
 				e.curLine = append(e.curLine, &lb)
-				e.Styles = e.ConditionalStyles.Unconditional
-				c.Styles = c.ConditionalStyles.Unconditional
+
 				switch e.GetWhiteSpace() {
 				case "pre":
 					dot.Y += *nextline
 					*nextline = c.GetLineHeight()
 					dot.X = lfWidth
+					e.Styles = e.ConditionalStyles.Unconditional
+					c.Styles = c.ConditionalStyles.Unconditional
 				case "nowrap":
 					fallthrough
 				case "normal":
@@ -788,12 +803,21 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 						// Leave space for the list marker. This is the same amount
 						// added by the stylesheet in Firefox
 						dot.X += c.listIndent()
+						e.Styles = e.ConditionalStyles.Unconditional
+						c.Styles = c.ConditionalStyles.Unconditional
 					} else {
 						// there's still space on this line, so move dot to the end
 						// of the rendered text.
 						dot.X = r.Max.X
+						if firstletter {
+							e.Styles = e.ConditionalStyles.FirstLine
+							c.Styles = c.ConditionalStyles.FirstLine
+
+						}
 					}
 				}
+				firstletter = false
+
 				// add this line box to the image map.
 				imageMap.Add(c, r)
 			}
