@@ -349,7 +349,6 @@ func (e RenderableDomElement) layoutLineBox(remainingWidth int, textContent stri
 					if i == 0 && pi == 0 && force {
 						consumed = words[0]
 						unconsumed = strings.Join(words[i:], " ")
-
 						return image.Point{wsize.Ceil(), (metrics.Ascent + metrics.Descent).Ceil()}, consumed, unconsumed, metrics, true
 					} else {
 						forcenewline = true
@@ -369,8 +368,8 @@ func (e RenderableDomElement) layoutLineBox(remainingWidth int, textContent stri
 			if i == len(words)-1 {
 				break
 			}
-			consumed += " "
 
+			osz := sz
 			// Add a three per em between words, an em-space after a period, and
 			// an en-space after any other punctuation.
 			switch word[len(word)-1] {
@@ -382,6 +381,17 @@ func (e RenderableDomElement) layoutLineBox(remainingWidth int, textContent stri
 				sz += fixed.Int26_6(fSize/3) << 6
 			}
 
+			// If the whitespace is going to put us over
+			// the line, don't add it because the line
+			// break acts as the whitespace and we don't
+			// want the whitespace to overlap with floats
+			if sz.Ceil() > remainingWidth {
+				sz = osz
+				unconsumed = strings.Join(words[i+1:], " ")
+
+				break
+			}
+			consumed += " "
 		}
 		forcenewline = false
 		size = image.Point{sz.Ceil(), (metrics.Ascent + metrics.Descent).Ceil()}
