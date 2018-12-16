@@ -670,7 +670,7 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 			forcenext := false
 		textdraw:
 			for strings.TrimSpace(remainingTextContent) != "" {
-				if width-dot.X-rfWidth <= 0 && !forcenext {
+				if width-dot.X-rfWidth <= 0 || forcenext {
 					dot.Y += *nextline
 					*nextline = c.GetLineHeight()
 					lfWidth = e.leftFloats.WidthAt(*dot)
@@ -792,7 +792,6 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 					if r.Max.X >= width-rfWidth || forcenewline {
 						// there's no space left on this line, so advance dot to the next line.
 						dot.Y += *nextline
-						*nextline = c.GetLineHeight()
 
 						lfWidth = e.leftFloats.WidthAt(*dot)
 						rfWidth = e.rightFloats.WidthAt(*dot)
@@ -802,9 +801,10 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 
 						// Leave space for the list marker. This is the same amount
 						// added by the stylesheet in Firefox
-						dot.X += c.listIndent()
 						e.Styles = e.ConditionalStyles.Unconditional
 						c.Styles = c.ConditionalStyles.Unconditional
+						dot.X += c.listIndent()
+						*nextline = c.GetLineHeight()
 					} else {
 						// there's still space on this line, so move dot to the end
 						// of the rendered text.
