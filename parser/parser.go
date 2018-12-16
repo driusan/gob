@@ -157,7 +157,10 @@ func (p *Page) ReapplyStyles() {
 		case "":
 			el.ConditionalStyles.FirstLetter.SetFontSize(base)
 		default:
-			base = fontSizeToPx(strVal, el.Parent)
+			// First-letter is relative to the first line, not relative
+			// to the parent.
+			el.Styles = el.ConditionalStyles.FirstLine
+			base = fontSizeToPx(strVal, el)
 			el.ConditionalStyles.FirstLetter.SetFontSize(base)
 		}
 

@@ -1224,7 +1224,11 @@ func (e *RenderableDomElement) advanceLine(dot *image.Point) {
 			case "middle":
 				l.origin.Y += (maxsize / 2)
 			default:
-				l.origin.Y += maxsize - height
+				if l.IsImage() {
+					l.origin.Y += maxsize - height
+				} else {
+					l.origin.Y += baseline - l.Baseline() //maxsize - height
+				}
 
 			}
 
