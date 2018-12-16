@@ -577,7 +577,7 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 	overlayed = NewDynamicMemoryDrawer(image.Rectangle{image.ZP, image.Point{width, height}})
 
 	firstLine := true
-	firstletter := true
+	firstletter := !e.inlineStart //true &&
 	imageMap := NewImageMap()
 
 	// The bottom margin of the last child, used for collapsing margins (where applicable)
@@ -780,10 +780,10 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 				switch e.GetWhiteSpace() {
 				case "pre":
 					dot.Y += *nextline
-					*nextline = c.GetLineHeight()
 					dot.X = lfWidth
 					e.Styles = e.ConditionalStyles.Unconditional
 					c.Styles = c.ConditionalStyles.Unconditional
+					*nextline = c.GetLineHeight()
 				case "nowrap":
 					fallthrough
 				case "normal":
@@ -797,13 +797,14 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 						rfWidth = e.rightFloats.WidthAt(*dot)
 
 						dot.X = lfWidth
+						dot.X += c.listIndent()
+
 						e.advanceLine(dot)
 
 						// Leave space for the list marker. This is the same amount
 						// added by the stylesheet in Firefox
 						e.Styles = e.ConditionalStyles.Unconditional
 						c.Styles = c.ConditionalStyles.Unconditional
-						dot.X += c.listIndent()
 						*nextline = c.GetLineHeight()
 					} else {
 						// there's still space on this line, so move dot to the end
