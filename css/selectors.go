@@ -110,9 +110,6 @@ func matchIDAndClassAndPseudoSelector(el *html.Node, s string, st State) bool {
 			return false
 		}
 	case "visited":
-		if st.Link == false {
-			return false
-		}
 		// If it's true, keep checking other remainingData criteria
 		if st.Visited == false {
 			return false
