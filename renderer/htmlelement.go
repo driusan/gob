@@ -323,10 +323,11 @@ func (e RenderableDomElement) layoutLineBox(remainingWidth int, textContent stri
 						wsize += lsize
 						if firstletter {
 							consumed += fmt.Sprintf("%c", r)
-							if unicode.IsLetter(r) {
+							if unicode.IsLetter(r) || force {
 								wl := strings.Join(append([]string{wordleft}, pieces[pi+1:]...), "-")
 								unconsumed = strings.Join(append([]string{wl}, words[i+1:]...), " ")
 								size = image.Point{(wsize + sz).Ceil(), (metrics.Ascent + metrics.Descent).Ceil()}
+
 								return
 							}
 						}
@@ -348,6 +349,7 @@ func (e RenderableDomElement) layoutLineBox(remainingWidth int, textContent stri
 					if i == 0 && pi == 0 && force {
 						consumed = words[0]
 						unconsumed = strings.Join(words[i:], " ")
+
 						return image.Point{wsize.Ceil(), (metrics.Ascent + metrics.Descent).Ceil()}, consumed, unconsumed, metrics, true
 					} else {
 						forcenewline = true
@@ -668,6 +670,7 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 			remainingTextContent := c.Data
 			// whitespace := e.GetWhiteSpace()
 			forcenext := false
+			ws := e.GetWhiteSpace()
 		textdraw:
 			for strings.TrimSpace(remainingTextContent) != "" {
 				if width-dot.X-rfWidth <= 0 || forcenext {
@@ -693,6 +696,18 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 				var childImage image.Image
 				size, consumed, rt, metrics, forcenewline := c.layoutLineBox(width-dot.X-rfWidth, remainingTextContent, false, c.NextSibling != nil && c.NextSibling.GetDisplayProp() == "inline", firstletter)
 				if consumed == "" {
+					if ws == "pre" {
+						// There was a blank pre-formatted line, so just consume it.
+						dot.Y += *nextline
+						dot.X = lfWidth
+						e.Styles = e.ConditionalStyles.Unconditional
+						c.Styles = c.ConditionalStyles.Unconditional
+						*nextline = c.GetLineHeight()
+						remainingTextContent = rt
+						e.inlineStart = false
+
+						continue
+					}
 					if dot.X == 0 {
 						// Nothing was consumed and we're
 						// at the start of the line, so force a word.
@@ -710,7 +725,7 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 					}
 				}
 				childImage = image.Rectangle{*dot, dot.Add(size)}
-				if consumed == "" {
+				if consumed == "" && ws != "pre" {
 					panic("This should be impossible.")
 				}
 
