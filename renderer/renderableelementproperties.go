@@ -12,8 +12,8 @@ import (
 
 func getFontHeight(face font.Face) int {
 	metrics := face.Metrics()
-	return (metrics.Height).Ceil()
-	//return (metrics.Ascent + metrics.Descent).Ceil()
+	//return (metrics.Height).Ceil()
+	return (metrics.Ascent + metrics.Descent).Ceil()
 }
 func stringSize(fntDrawer font.Drawer, textContent string) (int, error) {
 
@@ -107,7 +107,8 @@ func (e RenderableDomElement) GetBackgroundColor() color.Color {
 	switch bgc := e.Styles.BackgroundColor.Value; bgc {
 	case "inherit":
 		if e.Parent == nil {
-			return dfltBackground
+			// return dfltBackground
+			return color.Transparent
 		}
 		return e.Parent.GetBackgroundColor()
 	case "", "transparent":

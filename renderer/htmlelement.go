@@ -737,7 +737,6 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 				bz := size
 				bz.Y = c.GetLineHeight()
 				start := dot.Add(image.Point{0, c.GetMarginTopSize()})
-				//r = image.Rectangle{*dot, dot.Add(bz)}
 				r = image.Rectangle{start, start.Add(bz)}
 
 				// dot is a point, but the font drawer uses it as the baseline,

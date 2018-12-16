@@ -225,8 +225,6 @@ func (b *outerBoxDrawer) At(x, y int) color.Color {
 	return b.background.At(x, y)
 }
 
-var dfltBackground *color.RGBA = &color.RGBA{255, 128, 128, 255}
-
 func (e RenderableDomElement) GetBorderBottomWidth() int {
 	if e.Styles == nil {
 		return 0
@@ -854,7 +852,7 @@ func (e *RenderableDomElement) getLastChild() *RenderableDomElement {
 			return lastel
 		}
 	}
-	panic("Exited loop infinite loop")
+	panic("Exited infinite loop")
 }
 
 // Gets the size of the bottom margin, taking collapsing with the
