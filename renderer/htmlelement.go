@@ -119,11 +119,19 @@ func (lb lineBox) Baseline() int {
 	if lb.metrics != nil {
 		return lb.metrics.Ascent.Ceil()
 	}
-	// It's an image, the height is the baseline.
-	if lb.BorderImage != nil {
-		return lb.BorderImage.Bounds().Size().Y
+	// It's an image, the bottom is the baseline.
+	return lb.Height()
+}
+
+func (lb lineBox) Height() int {
+	if lb.IsImage() {
+		if lb.BorderImage != nil {
+			// The border image already includes padding and border
+			return lb.BorderImage.Bounds().Size().Y + lb.el.GetMarginTopSize() + lb.el.GetMarginBottomSize()
+		}
+		return lb.Content.Bounds().Size().Y + lb.el.GetMarginTopSize() + lb.el.GetMarginBottomSize()
 	}
-	return lb.Content.Bounds().Size().Y
+	return (lb.metrics.Ascent + lb.metrics.Descent).Ceil() + lb.el.GetMarginTopSize() + lb.el.GetMarginBottomSize()
 }
 
 func (lb lineBox) drawAt(ctx context.Context, dst draw.Image, dot image.Point) error {
@@ -348,7 +356,7 @@ func (e RenderableDomElement) layoutLineBox(remainingWidth int, textContent stri
 					unconsumed += " " + strings.Join(words[i+1:], " ")
 					if i == 0 && pi == 0 && force {
 						consumed = words[0]
-						unconsumed = strings.Join(words[i:], " ")
+						unconsumed = strings.Join(words[i+1:], " ")
 						return image.Point{wsize.Ceil(), (metrics.Ascent + metrics.Descent).Ceil()}, consumed, unconsumed, metrics, true
 					} else {
 						forcenewline = true
@@ -404,8 +412,7 @@ func (e RenderableDomElement) layoutLineBox(remainingWidth int, textContent stri
 func (e *RenderableDomElement) Layout(ctx context.Context, viewportSize image.Point) error {
 	e.leftFloats = make(FloatStack, 0)
 	e.rightFloats = make(FloatStack, 0)
-	var lh int
-	e.layoutPass(ctx, viewportSize.X, image.ZR, &image.Point{0, 0}, &lh)
+	e.layoutPass(ctx, viewportSize.X, image.ZR, &image.Point{0, 0})
 	return nil
 }
 
@@ -438,7 +445,7 @@ func (e *RenderableDomElement) InvalidateLayout() {
 	}
 }
 
-func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth int, r image.Rectangle, dot *image.Point, nextline *int) (image.Image, image.Point) {
+func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth int, r image.Rectangle, dot *image.Point) (image.Image, image.Point) {
 	var overlayed *DynamicMemoryDrawer
 	if e.layoutDone {
 		return overlayed, image.Point{}
@@ -453,9 +460,6 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 
 	fdot := image.Point{dot.X, dot.Y}
 	height := e.GetMinHeight()
-	if lh := e.GetLineHeight(); lh > *nextline {
-		*nextline = lh
-	}
 
 	e.curLine = make([]*lineBox, 0)
 	// special cases
@@ -548,9 +552,9 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 				}
 				switch e.GetFloat() {
 				case "right":
-					e.Parent.positionRightFloat(*dot, box.Bounds().Size(), e, nextline)
+					e.Parent.positionRightFloat(*dot, box.Bounds().Size(), e)
 				case "left":
-					e.Parent.positionLeftFloat(dot, box.Bounds().Size(), e, nextline)
+					e.Parent.positionLeftFloat(dot, box.Bounds().Size(), e)
 				default:
 					sz := box.Bounds().Size()
 					iheight = sz.Y + e.GetMarginTopSize() + e.GetMarginBottomSize()
@@ -562,6 +566,15 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 					default:
 						fallthrough
 					case "inline", "inline-block":
+						if len(e.Parent.curLine) > 0 && e.BoxDrawRectangle.Max.X > containerWidth {
+							e.Parent.advanceLine(dot)
+							dot.X = 0
+							e.BoxDrawRectangle = image.Rectangle{
+								*dot,
+								dot.Add(box.Bounds().Size()),
+							}
+
+						}
 						lb := lineBox{
 							e.ContentOverlay,
 							box,
@@ -575,10 +588,6 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 						e.Parent.lineBoxes = append(e.Parent.lineBoxes, &lb)
 						e.Parent.curLine = append(e.Parent.curLine, &lb)
 						dot.X += sz.X
-					}
-
-					if iheight > *nextline {
-						*nextline = iheight
 					}
 				}
 			}
@@ -684,8 +693,8 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 		textdraw:
 			for strings.TrimSpace(remainingTextContent) != "" {
 				for width-dot.X-rfWidth-c.GetPaddingLeft()-c.GetBorderLeftWidth() <= 0 {
-					dot.Y += *nextline
-					*nextline = c.GetLineHeight()
+					e.advanceLine(dot)
+
 					lfWidth = e.leftFloats.WidthAt(*dot)
 					rfWidth = e.rightFloats.WidthAt(*dot)
 					dot.X = e.leftFloats.MaxX(*dot)
@@ -710,14 +719,11 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 				if consumed == "" {
 					if ws == "pre" {
 						// There was a blank pre-formatted line, so just consume it.
-						dot.Y += *nextline
-						dot.X = lfWidth
+						e.advanceLine(dot)
 						e.Styles = e.ConditionalStyles.Unconditional
 						c.Styles = c.ConditionalStyles.Unconditional
-						*nextline = c.GetLineHeight()
 						remainingTextContent = rt
 						e.inlineStart = false
-
 						continue
 					}
 					if dot.X == 0 {
@@ -726,13 +732,13 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 						size, consumed, rt, metrics, forcenewline = c.layoutLineBox(width-dot.X-rfWidth, remainingTextContent, true, c.NextSibling != nil && c.NextSibling.GetDisplayProp() == "inline", firstletter)
 					} else {
 						// Advance a line and try again.
-						dot.Y += *nextline
-						*nextline = c.GetLineHeight()
+						e.advanceLine(dot)
 
 						lfWidth = e.leftFloats.WidthAt(*dot)
 						rfWidth = e.rightFloats.WidthAt(*dot)
 
 						dot.X = e.leftFloats.MaxX(*dot)
+
 						continue textdraw
 					}
 				}
@@ -757,28 +763,18 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 				// increase according to the box it's overlapping and try again.
 				for _, float := range e.leftFloats {
 					if r.Overlaps(float.BoxDrawRectangle) {
-						dot.Y += *nextline
-						*nextline = c.GetLineHeight()
-
-						lfWidth = e.leftFloats.WidthAt(*dot)
-						rfWidth = e.rightFloats.WidthAt(*dot)
-
-						dot.X = e.leftFloats.MaxX(*dot)
 						e.advanceLine(dot)
+						rfWidth = e.rightFloats.WidthAt(*dot)
+						lfWidth = e.leftFloats.WidthAt(*dot)
 						continue textdraw
 					}
 				}
 				// same for right floats
 				for _, float := range e.rightFloats {
 					if r.Overlaps(float.BoxDrawRectangle) {
-						dot.Y += *nextline
-						*nextline = c.GetLineHeight()
-
+						e.advanceLine(dot)
 						lfWidth = e.leftFloats.WidthAt(*dot)
 						rfWidth = e.rightFloats.WidthAt(*dot)
-
-						dot.X = e.leftFloats.MaxX(*dot)
-						e.advanceLine(dot)
 						continue textdraw
 					}
 				}
@@ -805,11 +801,9 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 
 				switch e.GetWhiteSpace() {
 				case "pre":
-					dot.Y += *nextline
-					dot.X = lfWidth
+					e.advanceLine(dot)
 					e.Styles = e.ConditionalStyles.Unconditional
 					c.Styles = c.ConditionalStyles.Unconditional
-					*nextline = c.GetLineHeight()
 				case "nowrap":
 					fallthrough
 				case "normal":
@@ -817,21 +811,13 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 				default:
 					if r.Max.X >= width-rfWidth || forcenewline {
 						// there's no space left on this line, so advance dot to the next line.
-						dot.Y += *nextline
+						e.advanceLine(dot)
 
 						lfWidth = e.leftFloats.WidthAt(*dot)
 						rfWidth = e.rightFloats.WidthAt(*dot)
 
-						dot.X = lfWidth
-						dot.X += c.listIndent()
-
-						e.advanceLine(dot)
-
-						// Leave space for the list marker. This is the same amount
-						// added by the stylesheet in Firefox
 						e.Styles = e.ConditionalStyles.Unconditional
 						c.Styles = c.ConditionalStyles.Unconditional
-						*nextline = c.GetLineHeight()
 					} else {
 						// there's still space on this line, so move dot to the end
 						// of the rendered text.
@@ -850,9 +836,6 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 			}
 		case html.ElementNode:
 			if c.Data == "br" {
-				dot.X = 0
-				dot.Y += *nextline
-				*nextline = c.GetLineHeight()
 				e.advanceLine(dot)
 				dot.Y += e.GetMarginBottomSize()
 				continue
@@ -877,7 +860,7 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 				}
 
 				c.inlineStart = true
-				childContent, newDot := c.layoutPass(ctx, width, image.ZR, &image.Point{dot.X, dot.Y}, nextline)
+				childContent, newDot := c.layoutPass(ctx, width, image.ZR, &image.Point{dot.X, dot.Y})
 
 				var contentbox image.Rectangle
 				if c.Data == "img" {
@@ -924,10 +907,8 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 					// as if there were an implicit box around it.
 					// floated elements don't affect dot, so only do this if it's not floated.
 					if float == "none" {
-						dot.X = 0
 						if c.PrevSibling != nil {
-							dot.Y += *nextline
-							*nextline = c.GetLineHeight()
+							e.advanceLine(dot)
 						}
 					}
 				}
@@ -940,7 +921,6 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 				}
 
 				// draw the border, background, and CSS outer box.
-				var lh int
 
 				cdot := image.Point{0, 0}
 
@@ -971,7 +951,7 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 				}
 				var childContent image.Image
 
-				childContent, _ = c.layoutPass(ctx, width, image.ZR, &cdot, &lh)
+				childContent, _ = c.layoutPass(ctx, width, image.ZR, &cdot)
 				c.ContentOverlay = childContent
 				box, contentbox := c.calcCSSBox(childContent.Bounds().Size(), false, false)
 				c.BoxContentRectangle = contentbox.Sub(image.Point{dot.X, 0})
@@ -986,7 +966,7 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 				case "right":
 					sz := box.Bounds().Size()
 					sz.Y += e.GetMarginTopSize() //+ e.GetMarginBottomSize()
-					e.positionRightFloat(*dot, sz, c, nextline)
+					e.positionRightFloat(*dot, sz, c)
 					r = c.BoxDrawRectangle
 					//r.Min.Y -= c.GetMarginTopSize()
 					r.Max.Y += c.GetMarginBottomSize()
@@ -994,7 +974,7 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 				case "left":
 					sz := box.Bounds().Size()
 					sz.Y += e.GetMarginTopSize() //+ e.GetMarginBottomSize()
-					e.positionLeftFloat(dot, sz, c, nextline)
+					e.positionLeftFloat(dot, sz, c)
 					r = c.BoxDrawRectangle
 					//r.Min.Y -= c.GetMarginTopSize()
 					r.Max.Y += c.GetMarginBottomSize()
@@ -1074,61 +1054,6 @@ func (e *RenderableDomElement) drawBullet(dst draw.Image, drawRectangle, content
 	fntDrawer.DrawString(bullet)
 }
 
-func (e *RenderableDomElement) advanceLine(dot *image.Point) {
-	if len(e.curLine) >= 1 {
-		e.Styles = e.ConditionalStyles.Unconditional
-		// If there was more than 1 element, re-adjust all their positions with respect to
-		// the vertical-align property.
-		baseline := 0
-		maxsize := 0
-
-		// FIXME: This is a hack. The baseline/lineheight should be calculated in accordance with
-		// the CSS spec.
-		// Step 1. Figure out how big the line really is and where the baseline is.
-		for _, l := range e.curLine {
-			var height int
-			height = l.Content.Bounds().Size().Y
-			if height > maxsize {
-				maxsize = height
-			}
-			//if bl := l.Baseline(); !l.IsImage() && bl > baseline {
-			if bl := l.Baseline(); bl > baseline {
-				baseline = bl
-			}
-		}
-
-		// Step 2: Adjust the image origins with respect to the baseline.
-		for _, l := range e.curLine {
-			var height int
-			var i image.Image
-			i = l.Content
-			height = i.Bounds().Size().Y
-			switch align := l.el.GetVerticalAlign(); align {
-			case "text-bottom":
-				l.origin.Y += maxsize - height
-			case "text-top":
-				l.origin.Y += maxsize - baseline
-			case "middle":
-				l.origin.Y += (maxsize / 2)
-			default:
-				if l.IsImage() {
-					l.origin.Y += maxsize - height
-				} else {
-					l.origin.Y += baseline - l.Baseline() //maxsize - height
-				}
-
-			}
-
-			if end := i.Bounds().Size().Y + l.origin.Y; end > dot.Y {
-				// Nothing, it was already aligned to the top
-				dot.Y = end
-			}
-		}
-	}
-	e.curLine = make([]*lineBox, 0)
-	//e.Styles = e.ConditionalStyles.FirstLine
-}
-
 func (e *RenderableDomElement) listIndent() int {
 	if e == nil {
 		return 0
@@ -1144,7 +1069,7 @@ func (e *RenderableDomElement) listIndent() int {
 
 // positions child c, which has the size size as a right floating element.
 // dot is used to get the starting height to position the float.
-func (e *RenderableDomElement) positionRightFloat(dot image.Point, size image.Point, c *RenderableDomElement, nextline *int) {
+func (e *RenderableDomElement) positionRightFloat(dot image.Point, size image.Point, c *RenderableDomElement) {
 	width := e.contentWidth
 
 	c.BoxDrawRectangle = image.Rectangle{
@@ -1158,7 +1083,7 @@ func (e *RenderableDomElement) positionRightFloat(dot image.Point, size image.Po
 		},
 	}
 	for {
-		foundhome, _ := e.handleFloatOverlap(&dot, &c.BoxDrawRectangle, c, nextline, false)
+		foundhome, _ := e.handleFloatOverlap(&dot, &c.BoxDrawRectangle, c, false)
 		if foundhome {
 			break
 		}
@@ -1170,7 +1095,7 @@ func (e *RenderableDomElement) positionRightFloat(dot image.Point, size image.Po
 // dot is used to get the starting height to position the float. If already
 // layed out text needs to be moved in order to place the float, it may also
 // adjust dot.
-func (e *RenderableDomElement) positionLeftFloat(dot *image.Point, size image.Point, c *RenderableDomElement, nextline *int) error {
+func (e *RenderableDomElement) positionLeftFloat(dot *image.Point, size image.Point, c *RenderableDomElement) error {
 	// Default to floating at the leftmost side of the element.
 	c.BoxDrawRectangle = image.Rectangle{
 		image.Point{
@@ -1185,7 +1110,7 @@ func (e *RenderableDomElement) positionLeftFloat(dot *image.Point, size image.Po
 
 	fdot := *dot
 	for {
-		foundhome, movedot := e.handleFloatOverlap(&fdot, &c.BoxDrawRectangle, c, nextline, true)
+		foundhome, movedot := e.handleFloatOverlap(&fdot, &c.BoxDrawRectangle, c, true)
 		if foundhome {
 			if movedot {
 				dot.X += c.BoxDrawRectangle.Size().X
@@ -1203,7 +1128,7 @@ func (e *RenderableDomElement) positionLeftFloat(dot *image.Point, size image.Po
 // returns true if it's found a home for r, and false if we haven't.
 // linesmoved returns true if line items were moved to position this float
 // and dot likely needs to be adjusted as a result.
-func (e *RenderableDomElement) handleFloatOverlap(dot *image.Point, r *image.Rectangle, c *RenderableDomElement, nextline *int, moveleft bool) (positioned, linesmoved bool) {
+func (e *RenderableDomElement) handleFloatOverlap(dot *image.Point, r *image.Rectangle, c *RenderableDomElement, moveleft bool) (positioned, linesmoved bool) {
 	width := e.contentWidth
 	// Check if it overlaps anything and move it if necessary.
 	// (We pretend that it has an overlap at the start, so that we can be sure that the loop happens
@@ -1305,9 +1230,7 @@ func (e *RenderableDomElement) handleFloatOverlap(dot *image.Point, r *image.Rec
 					// no reason to verify the box again.
 					return true, true
 				} else {
-					dot.Y += *nextline
-					*nextline = c.GetLineHeight()
-					dot.X = 0
+					e.advanceLine(dot)
 					r.Min = image.Point{
 						dot.X,
 						dot.Y,
@@ -1322,9 +1245,7 @@ func (e *RenderableDomElement) handleFloatOverlap(dot *image.Point, r *image.Rec
 				// There's definitely no space to move the text on this
 				// line because we're dealing with a right float, so
 				// just move the float down one line.
-				dot.Y += *nextline
-				*nextline = c.GetLineHeight()
-				dot.X = 0
+				e.advanceLine(dot)
 				r.Min = image.Point{
 					dot.X,
 					dot.Y,
@@ -1470,7 +1391,12 @@ func (e *RenderableDomElement) drawInto(ctx context.Context, dst draw.Image, cur
 					}
 				}
 				for _, box := range c.lineBoxes {
-					sr := box.Content.Bounds()
+					var sr image.Rectangle
+					if box.BorderImage != nil {
+						sr = box.BorderImage.Bounds()
+					} else {
+						sr = box.Content.Bounds()
+					}
 					r := image.Rectangle{box.origin, box.origin.Add(sr.Size())}.Add(absrect.Min)
 					if c.GetDisplayProp() != "inline" {
 						r = r.Add(c.BoxContentRectangle.Min)
@@ -1501,6 +1427,7 @@ func (e *RenderableDomElement) drawInto(ctx context.Context, dst draw.Image, cur
 						if err := box.drawAt(ctx, dst, r.Sub(cursor).Min); err != nil {
 							return err
 						}
+
 					}
 				}
 
@@ -1514,4 +1441,74 @@ func (e *RenderableDomElement) drawInto(ctx context.Context, dst draw.Image, cur
 		}
 	}
 	return nil
+}
+
+func (e *RenderableDomElement) advanceLine(dot *image.Point) {
+	e.Styles = e.ConditionalStyles.Unconditional
+	// If there was more than 1 element, re-adjust all their positions with respect to
+	// the vertical-align property.
+	baseline := 0
+	maxsize := 0
+	textbottom := 0
+	texttop := 0
+
+	nextline := e.GetLineHeight()
+	// FIXME: This is a hack. The baseline/lineheight should be calculated in accordance with
+	// the CSS spec.
+	// Step 1. Figure out how big the line really is and where the baseline is.
+	for _, l := range e.curLine {
+		height := l.Height()
+		if height > maxsize {
+			maxsize = height
+		}
+		bl := l.Baseline()
+		if !l.IsImage() {
+			if dsc := l.metrics.Descent.Ceil(); dsc > textbottom {
+				textbottom = dsc
+			}
+			if asc := l.metrics.Ascent.Ceil(); asc > texttop {
+				texttop = asc
+			}
+		} else {
+			switch align := l.el.GetVerticalAlign(); align {
+			case "text-top":
+				bl = 0
+			case "middle":
+				bl = height / 2
+			case "text-bottom":
+				bl = height
+			}
+		}
+		if bl > baseline {
+			baseline = bl
+		}
+	}
+
+	// Step 2: Adjust the image origins with respect to the baseline.
+	for _, l := range e.curLine {
+		height := l.Height()
+		switch align := l.el.GetVerticalAlign(); align {
+		case "text-bottom":
+			l.origin.Y += baseline - height + textbottom
+		case "text-top":
+			l.origin.Y += baseline - texttop
+		case "middle":
+			l.origin.Y += baseline - (height / 2)
+		default:
+			l.origin.Y += baseline - l.Baseline()
+
+		}
+		if l.IsImage() {
+			l.origin.Y += l.el.GetPaddingTop() + l.el.GetBorderTopWidth() + l.el.GetMarginTopSize()
+			l.origin.X += l.el.GetPaddingLeft() + l.el.GetBorderLeftWidth() + l.el.GetMarginLeftSize()
+
+			if end := height + l.origin.Y; end > dot.Y {
+				nextline = end - dot.Y
+			}
+		}
+	}
+	dot.Y += nextline
+	dot.X = e.leftFloats.MaxX(*dot)
+
+	e.curLine = make([]*lineBox, 0)
 }

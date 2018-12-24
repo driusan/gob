@@ -829,8 +829,8 @@ func (e *RenderableDomElement) calcCSSBox(contentSize image.Point, hideleftborde
 	// Drawing RGBA images with image.Draw is faster than drawing custom
 	// images, but sometimes it's helpful to use the more accurate
 	// image.Image interface for debugging.
-	// 	e.CSSOuterBox = box
-	e.CSSOuterBox = box.RGBA(hideleftborder, hiderightborder)
+	// e.CSSOuterBox = box.RGBA(hideleftborder, hiderightborder)
+	e.CSSOuterBox = box
 	corigin := box.GetContentOrigin()
 	return e.CSSOuterBox, image.Rectangle{
 		Min: corigin,
