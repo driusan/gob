@@ -160,21 +160,33 @@ func sHexToUint8(val byte) uint8 {
 }
 
 func ConvertColorToRGBA(cssString string) (*color.RGBA, error) {
-
 	black := &color.RGBA{0, 0, 0, 255}
-	if len(cssString) > 3 && cssString[0:3] == "rgb" {
+	if strings.HasPrefix(cssString, "rgba") {
+		tuple := cssString[5 : len(cssString)-1]
+		pieces := strings.Split(tuple, ",")
+		if len(pieces) != 4 {
+			return black, fmt.Errorf("Invalid colour: %v", cssString)
+		}
+
+		// FIXME: Handle 0-1 decimal or percentages here
+		rint, _ := strconv.Atoi(strings.TrimSpace(pieces[0]))
+		gint, _ := strconv.Atoi(strings.TrimSpace(pieces[1]))
+		bint, _ := strconv.Atoi(strings.TrimSpace(pieces[2]))
+		aint, _ := strconv.Atoi(strings.TrimSpace(pieces[3]))
+		return &color.RGBA{uint8(rint), uint8(gint), uint8(bint), uint8(aint)}, nil
+	} else if strings.HasPrefix(cssString, "rgb") {
 		tuple := cssString[4 : len(cssString)-1]
 		pieces := strings.Split(tuple, ",")
 		if len(pieces) != 3 {
 			return black, fmt.Errorf("Invalid colour: %v", cssString)
 		}
 
+		// FIXME: Handle 0-1 decimal or percentages here
 		rint, _ := strconv.Atoi(strings.TrimSpace(pieces[0]))
 		gint, _ := strconv.Atoi(strings.TrimSpace(pieces[1]))
 		bint, _ := strconv.Atoi(strings.TrimSpace(pieces[2]))
 		return &color.RGBA{uint8(rint), uint8(gint), uint8(bint), 255}, nil
-
-	} else if len(cssString) > 1 && cssString[0] == '#' {
+	} else if strings.HasPrefix(cssString, "#") {
 		switch len(cssString) {
 		case 7:
 			// #RRGGBB
@@ -236,6 +248,9 @@ func IsColor(c string) bool {
 		"black", "silver", "gray", "grey":
 		return true
 	}
+	if strings.HasPrefix(c, "rgb(") || strings.HasPrefix(c, "rgba(") {
+		return true
+	}
 	switch length := len(c); length {
 	case 0:
 		return false
@@ -252,9 +267,6 @@ func IsColor(c string) bool {
 		}
 		return false
 	default:
-		if length > 4 && c[0:4] == "rgb(" {
-			return true
-		}
 		return false
 	}
 }

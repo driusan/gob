@@ -463,7 +463,7 @@ func (e *StyledElement) expandBackgroundShorthand(s StyleRule) {
 			s.Name = "background-color"
 			s.Value.Value = val
 			e.rules = append(e.rules, s)
-			if string(val[0:4]) == "rgb(" {
+			if strings.HasPrefix(val, "rgb(") || strings.HasPrefix(val, "rgba(") {
 				buildColour = true
 			}
 		}

@@ -21,17 +21,20 @@ goodbye {
 `
 
 func assertSelector(t *testing.T, sty StyleRule, expected string) {
+	t.Helper()
 	if s := sty.Selector.Selector; s != expected {
 		t.Errorf("Incorrect selector for item. Got %v expected %v.", s, expected)
 	}
 }
 func assertName(t *testing.T, sty StyleRule, expected StyleAttribute) {
+	t.Helper()
 	if s := sty.Name; s != expected {
 		t.Errorf("Incorrect property name for item. Got %v expected %v.", s, expected)
 	}
 }
 
 func assertValue(t *testing.T, sty StyleRule, expected StyleValue) {
+	t.Helper()
 	if s := sty.Value; s != expected {
 		t.Errorf("Incorrect property value for item. Got %v expected %v.", s, expected)
 	}
@@ -113,13 +116,12 @@ E:only-of-type, E:empty, E:link, E:visited, E:active, E:hover, E:focus, /* 26 */
 E:target, E:lang(fr), E:enabled, E:disabled, E:checked, E:first-line, /* 32 */
 E::first-line, E:first-letter, E::first-letter, E:before, E::before, /* 37 */
 E:after,E::after, E.warning, .warning, E#myid, #myid, E:not(F), E	 F, /* 45 */
-E > F, E + F, E ~ F /* 48 */ {display: none}`,
+E > F, E + F, E ~ F /* 48 */ {display: none }`,
 		AuthorSrc,
 		noopURLer{},
 		nil,
 		0,
 	)
-
 	if len(sty) != 48 {
 		t.Fatalf("Incorrect number of elements. Expected 48 got %d", len(sty))
 	}
@@ -192,6 +194,7 @@ a {
 	multi: fff f		 fff;
 	c: rgb(255, 255, 255);
 	margin-bottom: -2cm;
+	alpha: rgba(0, 255, 255, 255);
 }`, AuthorSrc, noopURLer{}, nil, 0)
 	assertName(t, sty[0], "height")
 	assertName(t, sty[1], "width")
@@ -203,6 +206,7 @@ a {
 	assertName(t, sty[7], "multi")
 	assertName(t, sty[8], "c")
 	assertName(t, sty[9], "margin-bottom")
+	assertName(t, sty[10], "alpha")
 
 	assertValue(t, sty[0], StyleValue{"300px", false})
 	assertValue(t, sty[1], StyleValue{"5%", false})
@@ -214,13 +218,14 @@ a {
 	assertValue(t, sty[7], StyleValue{"fff f fff", false})
 	assertValue(t, sty[8], StyleValue{"rgb(255, 255, 255)", false})
 	assertValue(t, sty[9], StyleValue{"-2cm", false})
+	assertValue(t, sty[10], StyleValue{"rgba(0, 255, 255, 255)", false})
 }
 
 // Tests basic usage of CSS parser
 func TestMultpleSelectors(t *testing.T) {
 	sty, _ := ParseStylesheet(`em, ul li li { color: green }`, AuthorSrc, noopURLer{}, nil, 0)
 	assertSelector(t, sty[0], `em`)
-	// BUG(driusan): The final tie break is not implemente2
+	// BUG(driusan): The final tie break is not implemented
 	assertSelector(t, sty[1], `ul li li`)
 }
 
