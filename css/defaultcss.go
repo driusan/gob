@@ -77,4 +77,7 @@ body { margin: 8px; }
 :link { text-decoration: underline; color: blue; }
 :link:active	 { color: red; }
 noscript { display: block; }
-script, style { display: none; }`
+script, style { display: none; }
+input { width: 10em; background: grey; color: black; height: 1.2em; border: 1px black; 
+	padding-left: 1ex; padding-right: 1ex; }
+`

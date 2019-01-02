@@ -9,34 +9,67 @@ import (
 	"golang.org/x/net/html"
 )
 
-func ConvertNodeToRenderableElement(root *html.Node, loader net.URLReader) (*RenderableDomElement, error) {
+func ConvertNodeToRenderableElement(root *html.Node, parent *RenderableDomElement, loader net.URLReader) (*RenderableDomElement, error) {
 	if root == nil {
 		return nil, nil
 	}
 
 	element := &RenderableDomElement{
-		Element:  (*dom.Element)(root),
+		Element:  &dom.Element{Node: root},
 		Styles:   new(css.StyledElement),
 		resolver: loader,
 	}
-	if root.Type == html.ElementNode && strings.ToLower(root.Data) == "a" {
-		if href := element.GetAttribute("href"); href != "" {
-			if u, err := net.ParseURL(href); err == nil && loader.HasVisited(u) {
-				element.State.Visited = true
-			} else {
-				element.State.Link = true
+	if parent != nil {
+		element.setParent(parent)
+	}
+	if root.Type == html.ElementNode {
+		switch strings.ToLower(root.Data) {
+		case "a":
+			if href := element.GetAttribute("href"); href != "" {
+				if u, err := net.ParseURL(href); err == nil && loader.HasVisited(u) {
+					element.State.Visited = true
+				} else {
+					element.State.Link = true
+				}
 			}
+		case "input":
+			// Set the default value, it will change with user input
+			element.Value = element.GetAttribute("value")
 		}
 	}
 
-	element.FirstChild, _ = ConvertNodeToRenderableElement(root.FirstChild, loader)
-	element.NextSibling, _ = ConvertNodeToRenderableElement(root.NextSibling, loader)
+	fc, _ := ConvertNodeToRenderableElement(root.FirstChild, element, loader)
+	ns, _ := ConvertNodeToRenderableElement(root.NextSibling, parent, loader)
 
-	var prev *RenderableDomElement = nil
+	element.setFirstChild(fc)
+	element.setNextSibling(ns)
+
+	//	var prev *RenderableDomElement = nil
 	for c := element.FirstChild; c != nil; c = c.NextSibling {
-		c.PrevSibling = prev
-		c.Parent = element
-		prev = c
+		//c.PrevSibling.setNextSibling(prev)
+		c.setParent(element)
+		//	prev = c
 	}
 	return element, nil
+}
+
+func (c *RenderableDomElement) setParent(parent *RenderableDomElement) {
+	c.Parent = parent
+	c.Element.Parent = parent.Element
+}
+
+func (e *RenderableDomElement) setFirstChild(child *RenderableDomElement) {
+	if child == nil {
+		return
+	}
+	e.FirstChild = child
+	e.Element.FirstChild = child.Element
+}
+
+func (e *RenderableDomElement) setNextSibling(sibl *RenderableDomElement) {
+	if sibl == nil {
+		return
+	}
+	e.NextSibling = sibl
+	e.Element.NextSibling = sibl.Element
 }

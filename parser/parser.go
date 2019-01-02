@@ -41,7 +41,7 @@ func LoadPage(r io.Reader, loader net.URLReader, urlContext *url.URL) Page {
 		panic("Couldn't find body HTML element")
 	}
 
-	renderable, _ := renderer.ConvertNodeToRenderableElement(body, loader)
+	renderable, _ := renderer.ConvertNodeToRenderableElement(body, nil, loader)
 
 	userAgentStyles, cssOrder := css.ParseStylesheet(css.DefaultCSS, css.UserAgentSrc, loader, urlContext, cssOrder)
 
@@ -70,7 +70,7 @@ func (p *Page) ReapplyStyles() {
 		}
 		el.PageLocation = p.URL
 		for _, rule := range p.userAgentStyles {
-			if rule.Matches((*html.Node)(el.Element), el.State) {
+			if rule.Matches(el.Element.Node, el.State) {
 				if strings.Index(rule.Selector.Selector, "first-line") >= 0 {
 					el.ConditionalStyles.FirstLine.AddStyle(rule)
 				} else if strings.Index(rule.Selector.Selector, "first-letter") >= 0 {
@@ -82,7 +82,7 @@ func (p *Page) ReapplyStyles() {
 		}
 
 		for _, rule := range p.authorStyles {
-			if rule.Matches((*html.Node)(el.Element), el.State) {
+			if rule.Matches(el.Element.Node, el.State) {
 				if strings.Index(rule.Selector.Selector, "first-line") >= 0 {
 					el.ConditionalStyles.FirstLine.AddStyle(rule)
 				} else if strings.Index(rule.Selector.Selector, "first-letter") >= 0 {

@@ -1279,46 +1279,88 @@ func (e *RenderableDomElement) getAbsoluteDrawRectangle() image.Rectangle {
 func (e *RenderableDomElement) drawInto(ctx context.Context, dst draw.Image, cursor image.Point) error {
 	//dstsize := dst.Bounds().Size()
 
-	if e.Type == html.ElementNode && strings.ToLower(e.Data) == "img" {
-		if e.GetDisplayProp() == "block" {
-			// Inlines are drawn as part of a lineBox, while blocks expected
-			// drawInto to have drawn the image (but did the border itself).
-			absrect := e.getAbsoluteDrawRectangle()
+	if e.Type == html.ElementNode {
+		switch strings.ToLower(e.Data) {
+		case "img":
+			if e.GetDisplayProp() == "block" {
+				// Inlines are drawn as part of a lineBox, while blocks expected
+				// drawInto to have drawn the image (but did the border itself).
+				absrect := e.getAbsoluteDrawRectangle()
 
-			// now draw the content on top of the outer box
-			contentStart := absrect.Min.Add(e.BoxContentRectangle.Min)
-			contentBounds := e.ContentOverlay.Bounds()
-			cr := image.Rectangle{contentStart, contentStart.Add(contentBounds.Size())}
-			draw.Draw(
-				dst,
-				cr.Sub(cursor),
-				e.ContentOverlay,
-				contentBounds.Min,
-				draw.Over,
-			)
-		} else if e.GetDisplayProp() == "inline" && e.GetFloat() != "none" {
-			// Floated images also need to get drawn, even if they're inlines.
-			absrect := e.getAbsoluteDrawRectangle()
+				// now draw the content on top of the outer box
+				contentStart := absrect.Min.Add(e.BoxContentRectangle.Min)
+				contentBounds := e.ContentOverlay.Bounds()
+				cr := image.Rectangle{contentStart, contentStart.Add(contentBounds.Size())}
+				draw.Draw(
+					dst,
+					cr.Sub(cursor),
+					e.ContentOverlay,
+					contentBounds.Min,
+					draw.Over,
+				)
+			} else if e.GetDisplayProp() == "inline" && e.GetFloat() != "none" {
+				// Floated images also need to get drawn, even if they're inlines.
+				absrect := e.getAbsoluteDrawRectangle()
 
-			// now draw the content on top of the outer box
-			contentStart := absrect.Min.Add(
-				image.Point{
-					e.GetMarginTopSize() + e.GetPaddingTop() + e.GetBorderTopWidth(),
-					e.GetMarginLeftSize() + e.GetPaddingLeft() + e.GetBorderLeftWidth(),
-				},
-			)
+				// now draw the content on top of the outer box
+				contentStart := absrect.Min.Add(
+					image.Point{
+						e.GetMarginTopSize() + e.GetPaddingTop() + e.GetBorderTopWidth(),
+						e.GetMarginLeftSize() + e.GetPaddingLeft() + e.GetBorderLeftWidth(),
+					},
+				)
 
-			contentBounds := e.ContentOverlay.Bounds()
-			cr := image.Rectangle{contentStart, contentStart.Add(contentBounds.Size())}
-			draw.Draw(
-				dst,
-				cr.Sub(cursor),
-				e.ContentOverlay,
-				contentBounds.Min,
-				draw.Over,
-			)
+				contentBounds := e.ContentOverlay.Bounds()
+				cr := image.Rectangle{contentStart, contentStart.Add(contentBounds.Size())}
+				draw.Draw(
+					dst,
+					cr.Sub(cursor),
+					e.ContentOverlay,
+					contentBounds.Min,
+					draw.Over,
+				)
+			}
+			return nil
+		case "input":
+			var val string
+			if e.Value != "" {
+				val = e.Value
+			} else if placeholder := e.GetAttribute("placeholder"); placeholder != "" {
+				// FIXME: Add an alpha channel or otherwise lighten the
+				// text.
+				val = placeholder
+			} else {
+				// No content to overlay on the input element
+				return nil
+			}
+
+			// Fake a line box to draw the text so that all the
+			// appropriate CSS is applied.
+			// FIXME: Use the real font size.
+			fface := e.GetFontFace(16)
+			metrics := fface.Metrics()
+			fakelb := lineBox{
+				Content:     nil,
+				BorderImage: nil,
+				styles:      e.Styles,
+				origin:      image.ZP,
+				borigin:     image.ZP,
+				metrics:     &metrics,
+				el:          e,
+				content:     val,
+			}
+
+			// FIXME: Mask parts that don't fit inside the element.
+			r := e.getAbsoluteDrawRectangle()
+			r.Min.X += e.GetPaddingLeft()
+
+			if err := fakelb.drawAt(ctx, dst, r.Sub(cursor).Min); err != nil {
+				return err
+			}
+
+			return nil
 		}
-		return nil
+
 	}
 	for c := e.FirstChild; c != nil; c = c.NextSibling {
 		if ctx.Err() != nil {

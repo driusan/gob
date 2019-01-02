@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/driusan/gob/css"
-	"github.com/driusan/gob/dom"
+	//	"github.com/driusan/gob/dom"
 	"github.com/driusan/gob/net"
 	"github.com/driusan/gob/parser"
 	"github.com/driusan/gob/renderer"
@@ -33,12 +33,17 @@ var (
 	//	background = color.RGBA{0xFF, 0xFF, 0xFF, 0xFF}
 )
 
-// for debugging
+// For debugging
 var hover *renderer.RenderableDomElement
+
+// For styling
 var activeEl *renderer.RenderableDomElement
 
+// For input
+var focusedEl *renderer.RenderableDomElement
+
 func debugelement(el *renderer.RenderableDomElement) {
-	cur := el.Element
+	cur := el //.Element
 	name := ""
 	for {
 		curname := cur.Data
@@ -56,10 +61,11 @@ func debugelement(el *renderer.RenderableDomElement) {
 		if cur.Parent == nil {
 			break
 		}
-		cur = (*dom.Element)(cur.Parent)
+		cur = cur.Parent
 	}
 	fmt.Printf("Hovering over: %v (%v)\n", name, el.GetTextContent())
 	fmt.Printf("Styles applied: %v\n", el.ConditionalStyles)
+	fmt.Printf("Value: %v\n", el.Element.Value)
 }
 
 type Viewport struct {
@@ -145,9 +151,19 @@ func main() {
 					return
 				}
 			case key.Event:
+				if e.Code == key.CodeEscape {
+					fmt.Println("Restart: ", os.Args[0], page.URL)
+					return
+				}
+
+				// Handle typing into an input element
+				if focusedEl != nil {
+					focusedEl.SendKey(e)
+					paintWindow(s, w, &v, page)
+					continue
+				}
 				switch e.Code {
 				case key.CodeEscape:
-					fmt.Println("Restart: ", os.Args[0], page.URL)
 					return
 				case key.CodeLeftArrow:
 					if e.Direction == key.DirPress {
@@ -249,13 +265,19 @@ func main() {
 					paintWindow(s, w, &v, page)
 				default:
 					if page.Content != nil && page.Content.ImageMap != nil {
-
 						el := page.Content.ImageMap.At(int(e.X)+v.Cursor.X, int(e.Y)+v.Cursor.Y)
 						if el != nil {
 							switch e.Direction {
 							case mouse.DirRelease:
 								el.OnClick()
-								if el.Type == html.ElementNode && el.Data == "a" {
+								if el.Type == html.ElementNode && el.Data == "input" {
+									if activeEl != nil {
+										activeEl.State.Active = false
+									}
+									activeEl = nil
+									focusedEl = el
+								} else if el.Type == html.ElementNode && el.Data == "a" {
+									focusedEl = nil
 									newContext()
 
 									p, err := loadNewPage(page.URL, el.GetAttribute("href"))
@@ -264,15 +286,19 @@ func main() {
 										page.Content.Layout(renderCtx, v.Size.Size())
 										renderNewPageIntoViewport(s, w, &v, p, true)
 									}
-								} else if activeEl != nil {
-									activeEl.State.Active = false
-									activeEl = nil
+								} else {
+									if activeEl != nil {
+										activeEl.State.Active = false
+										activeEl = nil
+									}
+									if focusedEl != nil {
+										focusedEl = nil
+									}
 									page.ReapplyStyles()
 									newContext()
 									page.Content.InvalidateLayout()
 									page.Content.Layout(context.TODO(), v.Size.Size())
 									renderNewPageIntoViewport(s, w, &v, page, false)
-
 								}
 							case mouse.DirPress:
 								if el.State.Link == true || el.State.Visited == true {
@@ -285,7 +311,7 @@ func main() {
 									renderNewPageIntoViewport(s, w, &v, page, false)
 								}
 							default:
-								if el.Type == html.ElementNode && el.Data == "a" {
+								if el.Type == html.ElementNode && el.Data == "a" || el.Data == "input" {
 									//fmt.Printf("Hovering over link %s\n", el.GetAttribute("href"))
 								}
 								if el != hover {
