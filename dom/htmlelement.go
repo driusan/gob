@@ -7,8 +7,12 @@ import (
 
 	"net/url"
 
+	"github.com/driusan/gob/net"
+
 	"golang.org/x/mobile/event/key"
 	"golang.org/x/net/html"
+
+	"golang.org/x/exp/shiny/screen"
 )
 
 type Element struct {
@@ -18,6 +22,10 @@ type Element struct {
 
 	// for Input elements
 	Value string
+
+	// The containing shiny window
+	Location *url.URL
+	Window   screen.Window
 }
 
 func (e Element) GetTextContent() string {
@@ -76,7 +84,9 @@ func (e *Element) SendKey(evt key.Event) {
 	case key.CodeReturnEnter:
 		form := e.getContainingForm()
 		if form != nil {
-			form.Submit()
+			if err := form.Submit(); err != nil {
+				panic(err)
+			}
 		}
 		return
 	}
@@ -102,10 +112,30 @@ func (e *Element) Submit() error {
 		return fmt.Errorf("Not a form")
 	}
 
+	// Get the named elements which are a child of this form.
 	values := make(url.Values)
 	e.addInputValues(values)
-	fmt.Printf("%v", values)
-	panic("Submit not implemented")
+
+	// Resolve action to the absolute URL to post to
+	var u *url.URL
+	if action := e.GetAttribute("action"); action != "" {
+		act, err := url.Parse(action)
+		if err != nil {
+			return err
+		}
+		u = e.Location.ResolveReference(act)
+	} else {
+		u = e.Location
+	}
+
+	// FIXME: Add get method
+	switch method := strings.ToLower(e.GetAttribute("method")); method {
+	case "post", "":
+		e.Window.Send(net.PostEvent{u, values})
+	default:
+		return fmt.Errorf("Unhandled form method %v", method)
+	}
+	return nil
 }
 
 func (e *Element) addInputValues(values url.Values) {

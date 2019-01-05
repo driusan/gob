@@ -117,24 +117,24 @@ func main() {
 		defer pprof.StopCPUProfile()
 	*/
 
-	filename := "file:test.html"
-	if len(os.Args) > 1 {
-		filename = os.Args[1]
-
-	}
-
-	page, err := loadNewPage(nil, filename)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %s\n", err.Error())
-		return
-	}
-
 	driver.Main(func(s screen.Screen) {
 		w, err := s.NewWindow(nil)
 		if err != nil {
 			panic(err)
 		}
 		defer w.Release()
+
+		filename := "file:test.html"
+		if len(os.Args) > 1 {
+			filename = os.Args[1]
+
+		}
+
+		page, err := loadNewPage(nil, filename, w)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %s\n", err.Error())
+			return
+		}
 
 		var v Viewport
 		defer func() {
@@ -280,7 +280,7 @@ func main() {
 									focusedEl = nil
 									newContext()
 
-									p, err := loadNewPage(page.URL, el.GetAttribute("href"))
+									p, err := loadNewPage(page.URL, el.GetAttribute("href"), w)
 									page = p
 									if err == nil {
 										page.Content.Layout(renderCtx, v.Size.Size())
@@ -327,14 +327,40 @@ func main() {
 						}
 					}
 				}
+			case net.PostEvent:
+				focusedEl = nil
+				activeEl = nil
+				newContext()
+
+				p, err := postNewPage(e.URL, e.Values, w)
+				if err != nil {
+					panic(err)
+				}
+				page = p
+				page.Content.Layout(renderCtx, v.Size.Size())
+				renderNewPageIntoViewport(s, w, &v, p, true)
 			default:
 				//	fmt.Printf("%s\n", e)
 			}
 		}
 	})
 }
+func postNewPage(u *url.URL, values url.Values, w screen.Window) (parser.Page, error) {
+	loader := net.DefaultReader{}
+	r, _, err := loader.PostForm(u, values)
+	if err != nil {
+		return parser.Page{}, err
+	}
+	defer r.Close()
 
-func loadNewPage(context *url.URL, path string) (parser.Page, error) {
+	p := parser.LoadPage(r, loader, u, w)
+	p.URL = u
+	p.Content.InvalidateLayout()
+	background = p.Background
+	return p, nil
+}
+
+func loadNewPage(context *url.URL, path string, w screen.Window) (parser.Page, error) {
 	u, err := url.Parse(path)
 	if err != nil {
 		return parser.Page{}, err
@@ -353,9 +379,7 @@ func loadNewPage(context *url.URL, path string) (parser.Page, error) {
 	}
 	defer r.Close()
 
-	// Add a slash to ensure that relative URLs get parsed relative to the
-	// URL, not relative to
-	p := parser.LoadPage(r, loader, newURL)
+	p := parser.LoadPage(r, loader, newURL, w)
 	p.URL = newURL
 	p.Content.InvalidateLayout()
 	background = p.Background

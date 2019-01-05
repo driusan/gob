@@ -3,19 +3,24 @@ package renderer
 import (
 	"strings"
 
+	"net/url"
+
 	"github.com/driusan/gob/css"
 	"github.com/driusan/gob/dom"
 	"github.com/driusan/gob/net"
+
 	"golang.org/x/net/html"
+
+	"golang.org/x/exp/shiny/screen"
 )
 
-func ConvertNodeToRenderableElement(root *html.Node, parent *RenderableDomElement, loader net.URLReader) (*RenderableDomElement, error) {
+func ConvertNodeToRenderableElement(root *html.Node, location *url.URL, window screen.Window, parent *RenderableDomElement, loader net.URLReader) (*RenderableDomElement, error) {
 	if root == nil {
 		return nil, nil
 	}
 
 	element := &RenderableDomElement{
-		Element:  &dom.Element{Node: root},
+		Element:  &dom.Element{Node: root, Window: window, Location: location},
 		Styles:   new(css.StyledElement),
 		resolver: loader,
 	}
@@ -38,8 +43,8 @@ func ConvertNodeToRenderableElement(root *html.Node, parent *RenderableDomElemen
 		}
 	}
 
-	fc, _ := ConvertNodeToRenderableElement(root.FirstChild, element, loader)
-	ns, _ := ConvertNodeToRenderableElement(root.NextSibling, parent, loader)
+	fc, _ := ConvertNodeToRenderableElement(root.FirstChild, location, window, element, loader)
+	ns, _ := ConvertNodeToRenderableElement(root.NextSibling, location, window, parent, loader)
 
 	element.setFirstChild(fc)
 	element.setNextSibling(ns)

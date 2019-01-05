@@ -6,6 +6,7 @@ import (
 	"github.com/driusan/gob/net"
 	"github.com/driusan/gob/renderer"
 
+	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/net/html"
 
 	"image/color"
@@ -15,7 +16,7 @@ import (
 	"strings"
 )
 
-func LoadPage(r io.Reader, loader net.URLReader, urlContext *url.URL) Page {
+func LoadPage(r io.Reader, loader net.URLReader, urlContext *url.URL, window screen.Window) Page {
 	parsedhtml, _ := html.Parse(r)
 	styles, cssOrder := css.ExtractStyles(parsedhtml, loader, urlContext, 0)
 
@@ -41,7 +42,7 @@ func LoadPage(r io.Reader, loader net.URLReader, urlContext *url.URL) Page {
 		panic("Couldn't find body HTML element")
 	}
 
-	renderable, _ := renderer.ConvertNodeToRenderableElement(body, nil, loader)
+	renderable, _ := renderer.ConvertNodeToRenderableElement(body, urlContext, window, nil, loader)
 
 	userAgentStyles, cssOrder := css.ParseStylesheet(css.DefaultCSS, css.UserAgentSrc, loader, urlContext, cssOrder)
 

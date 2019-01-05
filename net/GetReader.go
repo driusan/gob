@@ -38,6 +38,7 @@ func ParseURL(urlS string) (*url.URL, error) {
 
 type URLReader interface {
 	GetURL(u *url.URL) (body io.ReadCloser, statuscode int, err error)
+	PostForm(u *url.URL, vals url.Values) (body io.ReadCloser, statuscode int, err error)
 	HasVisited(u *url.URL) bool
 }
 
@@ -85,6 +86,16 @@ func (d DefaultReader) GetURL(u *url.URL) (body io.ReadCloser, statuscode int, e
 		return resp.Body, resp.StatusCode, nil
 	}
 }
+
+func (d DefaultReader) PostForm(u *url.URL, values url.Values) (body io.ReadCloser, statuscode int, err error) {
+	// Posting a form is only valid over HTTP and doesn't get cached, so this
+	// is a thin wrapper over net/http that simply adds a user agent
+	req, _ := http.NewRequest("POST", u.String(), nil)
+	req.Header.Add("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537..36 (KHTML, like Gecko) Chrome/39.0.2171.27 Safari/537.36")
+	resp, err := client.PostForm(u.String(), values)
+	return resp.Body, resp.StatusCode, err
+}
+
 func (d DefaultReader) HasVisited(u *url.URL) bool {
 	l := GetCacheLocation(u)
 	if l == "" {
