@@ -566,8 +566,10 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 					default:
 						fallthrough
 					case "inline", "inline-block":
-						if len(e.Parent.curLine) > 0 && e.BoxDrawRectangle.Max.X > containerWidth {
-							e.Parent.advanceLine(dot)
+						p := e.getContainingBlock()
+
+						if len(p.curLine) > 0 && e.BoxDrawRectangle.Max.X > containerWidth {
+							p.advanceLine(dot)
 							dot.X = 0
 							e.BoxDrawRectangle = image.Rectangle{
 								*dot,
@@ -585,8 +587,11 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 							"[img]",
 							e,
 						}
-						e.Parent.lineBoxes = append(e.Parent.lineBoxes, &lb)
-						e.Parent.curLine = append(e.Parent.curLine, &lb)
+						// The line block goes with the
+						// nearest block. The inline may
+						// be a child of another inline.
+						p.lineBoxes = append(p.lineBoxes, &lb)
+						p.curLine = append(p.curLine, &lb)
 						dot.X += sz.X
 					}
 				}
@@ -1443,6 +1448,20 @@ func (e *RenderableDomElement) drawInto(ctx context.Context, dst draw.Image, cur
 	return nil
 }
 
+func (e *RenderableDomElement) getContainingBlock() *RenderableDomElement {
+	for p := e.Parent; p != nil; p = p.Parent {
+		if p.Type != html.ElementNode {
+			continue
+		}
+		switch p.GetDisplayProp() {
+		case "inline", "inline-block":
+			continue
+		default:
+			return p
+		}
+	}
+	return nil
+}
 func (e *RenderableDomElement) advanceLine(dot *image.Point) {
 	e.Styles = e.ConditionalStyles.Unconditional
 	// If there was more than 1 element, re-adjust all their positions with respect to
@@ -1476,6 +1495,8 @@ func (e *RenderableDomElement) advanceLine(dot *image.Point) {
 			case "middle":
 				bl = height / 2
 			case "text-bottom":
+				bl = height
+			default:
 				bl = height
 			}
 		}
