@@ -14,13 +14,9 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-
-	"os"
-
 )
 
 func LoadPage(r io.Reader, loader net.URLReader, urlContext *url.URL, window screen.Window) Page {
-	r = io.TeeReader(r, os.Stderr)
 	parsedhtml, _ := html.Parse(r)
 	styles, cssOrder := css.ExtractStyles(parsedhtml, loader, urlContext, 0)
 

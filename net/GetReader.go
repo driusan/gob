@@ -95,7 +95,7 @@ func (d DefaultReader) PostForm(u *url.URL, values url.Values) (body io.ReadClos
 	req.Header.Add("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537..36 (KHTML, like Gecko) Chrome/39.0.2171.27 Safari/537.36")
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	// req.Header.Set("Content-Type", "multipart/form-data")
-	
+
 	resp, err := client.Do(req)
 	fmt.Printf("Code %v err: %v\n", resp.StatusCode, err)
 	fmt.Printf("Headers: %v", resp.Header)

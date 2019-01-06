@@ -873,7 +873,10 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 					dot.X = newDot.X
 				} else {
 					c.ContentOverlay = childContent
-					_, contentbox = c.calcCSSBox(childContent.Bounds().Size(), false, false)
+					var box image.Image
+					box, contentbox = c.calcCSSBox(childContent.Bounds().Size(), false, false)
+					c.BoxDrawRectangle = box.Bounds().Add(*dot)
+
 				}
 				overlayed.GrowBounds(r)
 
