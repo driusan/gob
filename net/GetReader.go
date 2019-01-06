@@ -90,9 +90,15 @@ func (d DefaultReader) GetURL(u *url.URL) (body io.ReadCloser, statuscode int, e
 func (d DefaultReader) PostForm(u *url.URL, values url.Values) (body io.ReadCloser, statuscode int, err error) {
 	// Posting a form is only valid over HTTP and doesn't get cached, so this
 	// is a thin wrapper over net/http that simply adds a user agent
-	req, _ := http.NewRequest("POST", u.String(), nil)
+	fmt.Printf("l %v %v values\n", u.String(), values)
+	req, _ := http.NewRequest("POST", u.String(), strings.NewReader(values.Encode()))
 	req.Header.Add("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537..36 (KHTML, like Gecko) Chrome/39.0.2171.27 Safari/537.36")
-	resp, err := client.PostForm(u.String(), values)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	// req.Header.Set("Content-Type", "multipart/form-data")
+	
+	resp, err := client.Do(req)
+	fmt.Printf("Code %v err: %v\n", resp.StatusCode, err)
+	fmt.Printf("Headers: %v", resp.Header)
 	return resp.Body, resp.StatusCode, err
 }
 

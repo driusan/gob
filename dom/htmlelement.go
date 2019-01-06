@@ -141,6 +141,7 @@ func (e *Element) Submit() error {
 func (e *Element) addInputValues(values url.Values) {
 	for cur := e.FirstChild; cur != nil; cur = cur.NextSibling {
 		if cur.Type == html.ElementNode && strings.ToLower(cur.Data) == "input" {
+			println(cur.Data, cur.GetAttribute("name"), cur.Value)
 			if name := cur.GetAttribute("name"); name != "" {
 				values.Add(name, cur.Value)
 			}
