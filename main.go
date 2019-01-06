@@ -6,7 +6,6 @@ import (
 	"github.com/driusan/gob/css"
 	"github.com/driusan/gob/dom"
 	"github.com/driusan/gob/net"
-	"github.com/driusan/gob/parser"
 	"github.com/driusan/gob/renderer"
 
 	"golang.org/x/exp/shiny/driver"
@@ -85,7 +84,7 @@ func newContext() {
 	}
 	renderCtx, cancelRender = context.WithCancel(context.Background())
 }
-func paintWindow(s screen.Screen, w screen.Window, v *Viewport, page parser.Page) {
+func paintWindow(s screen.Screen, w screen.Window, v *Viewport, page renderer.Page) {
 	if v.buffer == nil {
 		return
 	}
@@ -308,10 +307,10 @@ func main() {
 	})
 }
 
-func loadNewPage(context *url.URL, path string) (parser.Page, error) {
+func loadNewPage(context *url.URL, path string) (renderer.Page, error) {
 	u, err := url.Parse(path)
 	if err != nil {
-		return parser.Page{}, err
+		return renderer.Page{}, err
 	}
 	var newURL *url.URL
 	if context == nil {
@@ -323,20 +322,20 @@ func loadNewPage(context *url.URL, path string) (parser.Page, error) {
 	loader := net.DefaultReader{}
 	r, _, err := loader.GetURL(newURL)
 	if err != nil {
-		return parser.Page{}, err
+		return renderer.Page{}, err
 	}
 	defer r.Close()
 
 	// Add a slash to ensure that relative URLs get parsed relative to the
 	// URL, not relative to
-	p := parser.LoadPage(r, loader, newURL)
+	p := renderer.LoadPage(r, loader, newURL)
 	p.URL = newURL
 	p.Content.InvalidateLayout()
 	background = p.Background
 	return p, nil
 }
 
-func renderNewPageIntoViewport(s screen.Screen, w screen.Window, v *Viewport, page parser.Page, newpage bool) {
+func renderNewPageIntoViewport(s screen.Screen, w screen.Window, v *Viewport, page renderer.Page, newpage bool) {
 	page.Content.ViewportHeight = v.Size.HeightPx
 	if newpage {
 		newContext()

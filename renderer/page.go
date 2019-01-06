@@ -1,15 +1,15 @@
-package parser
+package renderer
 
 import (
 	"github.com/driusan/gob/css"
-	"github.com/driusan/gob/renderer"
 
 	"image/color"
 	"net/url"
 )
 
+// Represents a page to be rendered
 type Page struct {
-	Content    *renderer.RenderableDomElement
+	Content    *RenderableDomElement
 	Background color.Color
 	URL        *url.URL
 

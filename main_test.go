@@ -2,7 +2,7 @@ package main
 
 import (
 	"github.com/driusan/gob/net"
-	"github.com/driusan/gob/parser"
+	"github.com/driusan/gob/renderer"
 
 	"context"
 	"image"
@@ -90,7 +90,7 @@ func BenchmarkParseAndRender(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		dst := image.NewRGBA(image.Rectangle{image.ZP, image.Point{1024, 768}})
 		f := strings.NewReader(content)
-		parsedhtml := parser.LoadPage(f, loader, nil)
+		parsedhtml := renderer.LoadPage(f, loader, nil)
 		parsedhtml.Content.RenderInto(context.TODO(), dst, image.ZP)
 
 	}
@@ -100,7 +100,7 @@ func BenchmarkParseAndRenderInto(b *testing.B) {
 	dst := image.NewRGBA(image.Rectangle{image.ZP, image.Point{1024, 768}})
 	for i := 0; i < b.N; i++ {
 		f := strings.NewReader(content)
-		parsedhtml := parser.LoadPage(f, loader, nil)
+		parsedhtml := renderer.LoadPage(f, loader, nil)
 		parsedhtml.Content.RenderInto(context.TODO(), dst, image.ZP)
 	}
 }
@@ -109,13 +109,13 @@ func BenchmarkParseOnly(b *testing.B) {
 	loader := net.DefaultReader{}
 	for i := 0; i < b.N; i++ {
 		f := strings.NewReader(content)
-		parser.LoadPage(f, loader, nil)
+		renderer.LoadPage(f, loader, nil)
 	}
 }
 func BenchmarkRenderOnly(b *testing.B) {
 	loader := net.DefaultReader{}
 	f := strings.NewReader(content)
-	parsedhtml := parser.LoadPage(f, loader, nil)
+	parsedhtml := renderer.LoadPage(f, loader, nil)
 	dst := image.NewRGBA(image.Rectangle{image.ZP, image.Point{1024, 768}})
 	parsedhtml.Content.Layout(context.TODO(), image.Point{1024, 768})
 
@@ -128,7 +128,7 @@ func BenchmarkRenderOnly(b *testing.B) {
 func BenchmarkLayoutOnly(b *testing.B) {
 	loader := net.DefaultReader{}
 	f := strings.NewReader(content)
-	parsedhtml := parser.LoadPage(f, loader, nil)
+	parsedhtml := renderer.LoadPage(f, loader, nil)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		parsedhtml.Content.InvalidateLayout()

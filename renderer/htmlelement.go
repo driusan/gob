@@ -134,26 +134,42 @@ func (lb lineBox) Height() int {
 	return (lb.metrics.Ascent + lb.metrics.Descent).Ceil() + lb.el.GetMarginTopSize() + lb.el.GetMarginBottomSize()
 }
 
-func (lb lineBox) drawAt(ctx context.Context, dst draw.Image, dot image.Point) error {
-	if err := ctx.Err(); err != nil {
-		return err
+// Returns the width of this linebox. This is primarily used for testing.
+func (lb lineBox) width() int {
+	if lb.IsImage() {
+		return lb.BorderImage.Bounds().Size().Y
 	}
+	fntDrawer, fSize := lb.getFontDrawer(nil, image.ZP)
+	defer fntDrawer.Face.Close()
+	return lb.measureOrDraw(true, &fntDrawer, fSize).Ceil()
+}
 
+// Gets a font drawer for this linebox to draw into draw.Image at dot.
+// This opens a font.Face which it's the caller's responsibility to close.
+func (lb lineBox) getFontDrawer(dst draw.Image, dot image.Point) (drawer font.Drawer, fSize int) {
 	// Reapply the styles that were in effect when this was being laid out.
 	lb.el.Styles = lb.styles
-	smallcaps := lb.el.FontVariant() == "small-caps"
 
-	fSize := lb.el.GetFontSize()
+	fSize = lb.el.GetFontSize()
 	fontFace := lb.el.GetFontFace(fSize)
 	defer fontFace.Close()
 
 	clr := lb.el.GetColor()
-	fntDrawer := font.Drawer{
+	drawer = font.Drawer{
 		Dst:  dst,
 		Src:  &image.Uniform{clr},
 		Face: fontFace,
 		Dot:  fixed.P(dot.X, dot.Y+lb.metrics.Ascent.Ceil()),
 	}
+	return
+}
+
+func (lb lineBox) measureOrDraw(measure bool, fntDrawer *font.Drawer, fSize int) fixed.Int26_6 {
+	fontFace := fntDrawer.Face
+	defer fontFace.Close()
+
+	smallcaps := lb.el.FontVariant() == "small-caps"
+
 	var smallFace font.Face
 	if smallcaps {
 		smallFace = lb.el.GetFontFace(fSize * 8 / 10)
@@ -161,12 +177,20 @@ func (lb lineBox) drawAt(ctx context.Context, dst draw.Image, dot image.Point) e
 		defer smallFace.Close()
 	}
 
+	rv := fixed.I(0)
+
 	switch whitespace := lb.el.GetWhiteSpace(); whitespace {
 	case "pre-wrap", "no-wrap", "pre-line":
 		panic(whitespace + " not implemented")
 	case "pre":
-		fntDrawer.DrawString(lb.content)
+		if measure {
+			return fntDrawer.MeasureString(lb.content)
+		} else {
+			fntDrawer.DrawString(lb.content)
+		}
 	case "normal":
+		fallthrough
+	default:
 		words := strings.Fields(lb.content)
 		// layout ensured that it fit and did most necessary text
 		// transformations, so we just need to make sure we handle
@@ -184,29 +208,56 @@ func (lb lineBox) drawAt(ctx context.Context, dst draw.Image, dot image.Point) e
 						fntDrawer.Face = fontFace
 					}
 					chr = strings.ToUpper(chr)
-					fntDrawer.DrawString(chr)
+					if measure {
+						rv += fntDrawer.MeasureString(word)
+					} else {
+						fntDrawer.DrawString(chr)
+					}
 
 				}
 			} else {
-				fntDrawer.DrawString(word)
+				if measure {
+					rv += fntDrawer.MeasureString(word)
+				} else {
+					fntDrawer.DrawString(word)
+				}
 			}
 			if i == len(words)-1 {
 				break
 			}
 			// Add a three per em between words, an em-space after a period, and
 			// an en-space after any other punctuation.
+			space := fixed.I(0)
+
 			switch word[len(word)-1] {
 			case ',', ';', ':', '!', '?':
-				fntDrawer.Dot.X += fixed.Int26_6(fSize/2) << 6
+				space = fixed.Int26_6(fSize/2) << 6
 			case '.':
-				fntDrawer.Dot.X += fixed.Int26_6(fSize) << 6
+				space = fixed.Int26_6(fSize) << 6
 			default:
-				fntDrawer.Dot.X += fixed.Int26_6(fSize/3) << 6
+				space = fixed.Int26_6(fSize/3) << 6
+			}
+			if measure {
+				rv += space
+			} else {
+				fntDrawer.Dot.X += space
 			}
 		}
-		fallthrough
-	default:
 	}
+	return rv
+}
+
+func (lb lineBox) drawAt(ctx context.Context, dst draw.Image, dot image.Point) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	clr := lb.el.GetColor()
+	fntDrawer, fSize := lb.getFontDrawer(dst, dot)
+	defer fntDrawer.Face.Close()
+
+	lb.measureOrDraw(false, &fntDrawer, fSize)
+
 	if decoration := lb.el.GetTextDecoration(); decoration != "" && decoration != "none" && decoration != "blink" {
 		if strings.Contains(decoration, "underline") {
 			y := fntDrawer.Dot.Y.Floor() + 1
@@ -801,8 +852,10 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 					content:     consumed,
 					el:          c,
 				}
-				e.lineBoxes = append(e.lineBoxes, &lb)
-				e.curLine = append(e.curLine, &lb)
+
+				pc := c.getContainingBlock()
+				pc.lineBoxes = append(pc.lineBoxes, &lb)
+				pc.curLine = append(pc.curLine, &lb)
 
 				switch e.GetWhiteSpace() {
 				case "pre":
@@ -878,7 +931,10 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 					dot.X = newDot.X
 				} else {
 					c.ContentOverlay = childContent
-					_, contentbox = c.calcCSSBox(childContent.Bounds().Size(), false, false)
+					var box image.Image
+					box, contentbox = c.calcCSSBox(childContent.Bounds().Size(), false, false)
+					c.BoxDrawRectangle = box.Bounds().Add(*dot)
+
 				}
 				overlayed.GrowBounds(r)
 
@@ -1395,46 +1451,6 @@ func (e *RenderableDomElement) drawInto(ctx context.Context, dst draw.Image, cur
 						return err
 					}
 				}
-				for _, box := range c.lineBoxes {
-					var sr image.Rectangle
-					if box.BorderImage != nil {
-						sr = box.BorderImage.Bounds()
-					} else {
-						sr = box.Content.Bounds()
-					}
-					r := image.Rectangle{box.origin, box.origin.Add(sr.Size())}.Add(absrect.Min)
-					if c.GetDisplayProp() != "inline" {
-						r = r.Add(c.BoxContentRectangle.Min)
-					}
-					if box.BorderImage != nil {
-						sr := box.BorderImage.Bounds()
-						// ro := box.origin.Add(box.borigin).Add(absrect.Min)
-						ro := box.origin.Sub(box.borigin).Add(absrect.Min)
-						r := image.Rectangle{ro, ro.Add(sr.Size())}
-						draw.Draw(
-							dst,
-							r.Sub(cursor),
-							box.BorderImage,
-							sr.Min,
-							draw.Over,
-						)
-					}
-					if box.IsImage() {
-						// It was an inline image
-						draw.Draw(dst,
-							r.Sub(cursor),
-							box.Content,
-							sr.Min,
-							draw.Over,
-						)
-					} else {
-						// It was inline text that still needs to be drawn.
-						if err := box.drawAt(ctx, dst, r.Sub(cursor).Min); err != nil {
-							return err
-						}
-
-					}
-				}
 
 			}
 
@@ -1443,6 +1459,49 @@ func (e *RenderableDomElement) drawInto(ctx context.Context, dst draw.Image, cur
 			// (and possibly other inline things on the same line)
 			// so this was rendered by the parent.
 			continue
+		}
+	}
+
+	absrect := e.getAbsoluteDrawRectangle()
+
+	for _, box := range e.lineBoxes {
+		var sr image.Rectangle
+		if box.BorderImage != nil {
+			sr = box.BorderImage.Bounds()
+		} else {
+			sr = box.Content.Bounds()
+		}
+		r := image.Rectangle{box.origin, box.origin.Add(sr.Size())}.Add(absrect.Min)
+		if e.GetDisplayProp() != "inline" {
+			r = r.Add(e.BoxContentRectangle.Min)
+		}
+		if box.BorderImage != nil {
+			sr := box.BorderImage.Bounds()
+			// ro := box.origin.Add(box.borigin).Add(absrect.Min)
+			ro := box.origin.Sub(box.borigin).Add(absrect.Min)
+			r := image.Rectangle{ro, ro.Add(sr.Size())}
+			draw.Draw(
+				dst,
+				r.Sub(cursor),
+				box.BorderImage,
+				sr.Min,
+				draw.Over,
+			)
+		}
+		if box.IsImage() {
+			// It was an inline image
+			draw.Draw(dst,
+				r.Sub(cursor),
+				box.Content,
+				sr.Min,
+				draw.Over,
+			)
+		} else {
+			// It was inline text that still needs to be drawn.
+			if err := box.drawAt(ctx, dst, r.Sub(cursor).Min); err != nil {
+				return err
+			}
+
 		}
 	}
 	return nil

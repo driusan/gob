@@ -85,6 +85,7 @@ func (d DefaultReader) GetURL(u *url.URL) (body io.ReadCloser, statuscode int, e
 		return resp.Body, resp.StatusCode, nil
 	}
 }
+
 func (d DefaultReader) HasVisited(u *url.URL) bool {
 	l := GetCacheLocation(u)
 	if l == "" {

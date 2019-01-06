@@ -9,9 +9,9 @@ import (
 	"golang.org/x/net/html"
 )
 
-func ConvertNodeToRenderableElement(root *html.Node, loader net.URLReader) (*RenderableDomElement, error) {
+func convertNodeToRenderableElement(root *html.Node, loader net.URLReader) *RenderableDomElement {
 	if root == nil {
-		return nil, nil
+		return nil
 	}
 
 	element := &RenderableDomElement{
@@ -29,8 +29,8 @@ func ConvertNodeToRenderableElement(root *html.Node, loader net.URLReader) (*Ren
 		}
 	}
 
-	element.FirstChild, _ = ConvertNodeToRenderableElement(root.FirstChild, loader)
-	element.NextSibling, _ = ConvertNodeToRenderableElement(root.NextSibling, loader)
+	element.FirstChild = convertNodeToRenderableElement(root.FirstChild, loader)
+	element.NextSibling = convertNodeToRenderableElement(root.NextSibling, loader)
 
 	var prev *RenderableDomElement = nil
 	for c := element.FirstChild; c != nil; c = c.NextSibling {
@@ -38,5 +38,5 @@ func ConvertNodeToRenderableElement(root *html.Node, loader net.URLReader) (*Ren
 		c.Parent = element
 		prev = c
 	}
-	return element, nil
+	return element
 }

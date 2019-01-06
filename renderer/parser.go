@@ -1,10 +1,9 @@
-package parser
+package renderer
 
 import (
 	//	"fmt"
 	"github.com/driusan/gob/css"
 	"github.com/driusan/gob/net"
-	"github.com/driusan/gob/renderer"
 
 	"golang.org/x/net/html"
 
@@ -15,6 +14,7 @@ import (
 	"strings"
 )
 
+// Parses an io.Reader into a Page object.
 func LoadPage(r io.Reader, loader net.URLReader, urlContext *url.URL) Page {
 	parsedhtml, _ := html.Parse(r)
 	styles, cssOrder := css.ExtractStyles(parsedhtml, loader, urlContext, 0)
@@ -41,7 +41,7 @@ func LoadPage(r io.Reader, loader net.URLReader, urlContext *url.URL) Page {
 		panic("Couldn't find body HTML element")
 	}
 
-	renderable, _ := renderer.ConvertNodeToRenderableElement(body, loader)
+	renderable := convertNodeToRenderableElement(body, loader)
 
 	userAgentStyles, cssOrder := css.ParseStylesheet(css.DefaultCSS, css.UserAgentSrc, loader, urlContext, cssOrder)
 
@@ -57,7 +57,7 @@ func LoadPage(r io.Reader, loader net.URLReader, urlContext *url.URL) Page {
 
 func (p *Page) ReapplyStyles() {
 	cssOrder := uint(0)
-	p.Content.Walk(func(el *renderer.RenderableDomElement) {
+	p.Content.Walk(func(el *RenderableDomElement) {
 		el.Styles.ClearStyles()
 		el.ConditionalStyles = struct {
 			Unconditional *css.StyledElement
@@ -176,7 +176,7 @@ func (p *Page) ReapplyStyles() {
 	})
 }
 
-func fontSizeToPx(val string, parent *renderer.RenderableDomElement) int {
+func fontSizeToPx(val string, parent *RenderableDomElement) int {
 	DefaultFontSize := css.DefaultFontSize
 	if len(val) == 0 {
 		psize, err := parent.Styles.GetFontSize()
