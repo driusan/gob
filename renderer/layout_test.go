@@ -461,3 +461,96 @@ Supercalifragilisticexpialidotious Supercalifragilisticexpialidotious
 	}
 
 }
+
+// Test that a selector applying to the first line which changes the line
+// height advances the correct amount.
+func TestLayoutFirstline(t *testing.T) {
+	// This test makes similar assumptions to the multiline one. It
+	// creates a baseline, and then does a layout with a viewport which
+	// it sized based on that baseline.
+	page := parseHTML(
+		t,
+		`<html>
+		<head>
+		<style>
+		span {
+			display: inline;
+			line-height: 30px;
+		}
+		</style>
+		</head>
+		<body>
+			<span>TestTestTest</span>
+		</body>
+	</html>`,
+	)
+
+	page.Content.Layout(context.TODO(), image.Point{40000, 300})
+	if n := len(page.Content.lineBoxes); n != 1 {
+		t.Fatalf("Page did not have any line boxes: got %v want 1", n)
+	}
+	testwidth := page.Content.lineBoxes[0].width()
+	if testwidth <= 0 {
+		t.Fatal("Linebox did not have width")
+	}
+
+	// Now perform the actual test. We make sure there's at least 3 lines
+	// so that we can ensure the line-height property from first-line only
+	// got applied to the first line.
+	page = parseHTML(
+		t,
+		`<html>
+		<head>
+		<style>
+		span {
+			display: inline;
+			line-height: 30px;
+		}
+		span:first-line {
+			line-height: 40px;
+		}
+		</style>
+		</head>
+		<body>
+			<span>TestTestTest TestTestTest
+TestTestTest TestTestTest
+TestTestTest TestTestTest
+</span>
+		</body>
+	</html>`,
+	)
+
+	page.Content.InvalidateLayout()
+	page.Content.Layout(context.TODO(), image.Point{testwidth*2 + 40, 300})
+	if n := len(page.Content.lineBoxes); n != 3 {
+		t.Fatalf("Body had incorrect number of line boxes: got %v want 3", n)
+	}
+
+	for i, line := range page.Content.lineBoxes {
+		// FIXME: This test probably shouldn't be required to trim the
+		// space.
+		if strings.TrimSpace(line.content) != "TestTestTest TestTestTest" {
+			t.Fatalf("Unexpected content for line %v: got %v", i, line.content)
+		}
+		if line.origin.X != 0 {
+			t.Errorf("Unexpected X origin for line %v: got %v, want 0", i, line.origin.X)
+		}
+	}
+
+	if got := page.Content.lineBoxes[0].origin.Y; got != 0 {
+		t.Errorf("Unexpected Y origin for line 1: got %v, want 0", got)
+	}
+
+	// The firstline property should have set made the line advance by 40px
+	// to get to the second line.
+	if got := page.Content.lineBoxes[1].origin.Y; got != 40 {
+		t.Errorf("Unexpected Y origin for line 2: got %v, want 40", got)
+	}
+
+	// The last line should have only advanced by 30 (the default for span),
+	// not 40 (which should have only applied to the first line.)
+	if got := page.Content.lineBoxes[2].origin.Y; got != 40+30 {
+		t.Errorf("Unexpected Y origin for line 3: got %v, want 70", got)
+	}
+
+}

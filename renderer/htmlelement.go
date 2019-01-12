@@ -123,6 +123,11 @@ func (lb lineBox) Baseline() int {
 	return lb.Height()
 }
 
+func (lb lineBox) LineHeight() int {
+	lb.el.Styles = lb.styles
+	return lb.el.GetLineHeight()
+}
+
 func (lb lineBox) Height() int {
 	if lb.IsImage() {
 		if lb.BorderImage != nil {
@@ -152,7 +157,6 @@ func (lb lineBox) getFontDrawer(dst draw.Image, dot image.Point) (drawer font.Dr
 
 	fSize = lb.el.GetFontSize()
 	fontFace := lb.el.GetFontFace(fSize)
-	defer fontFace.Close()
 
 	clr := lb.el.GetColor()
 	drawer = font.Drawer{
@@ -251,6 +255,7 @@ func (lb lineBox) drawAt(ctx context.Context, dst draw.Image, dot image.Point) e
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	lb.el.Styles = lb.styles
 
 	clr := lb.el.GetColor()
 	fntDrawer, fSize := lb.getFontDrawer(dst, dot)
@@ -743,8 +748,6 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 				c.Styles = c.ConditionalStyles.FirstLetter
 			}
 			remainingTextContent := c.Data
-			// whitespace := e.GetWhiteSpace()
-			// forcenext := false
 			ws := e.GetWhiteSpace()
 		textdraw:
 			for strings.TrimSpace(remainingTextContent) != "" {
@@ -762,7 +765,6 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 					panic("No room for text")
 				}
 
-				// forcenext = false
 				// dot works differently for line boxes than for
 				// blocks. For a block, dot represents the top left
 				// corner of the border box. For a linebox, it represents
@@ -789,6 +791,8 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 					} else {
 						// Advance a line and try again.
 						e.advanceLine(dot)
+						e.Styles = e.ConditionalStyles.Unconditional
+						c.Styles = c.ConditionalStyles.Unconditional
 
 						lfWidth = e.leftFloats.WidthAt(*dot)
 						rfWidth = e.rightFloats.WidthAt(*dot)
@@ -883,7 +887,6 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 						if firstletter {
 							e.Styles = e.ConditionalStyles.FirstLine
 							c.Styles = c.ConditionalStyles.FirstLine
-
 						}
 					}
 				}
@@ -1522,7 +1525,6 @@ func (e *RenderableDomElement) getContainingBlock() *RenderableDomElement {
 	return nil
 }
 func (e *RenderableDomElement) advanceLine(dot *image.Point) {
-	e.Styles = e.ConditionalStyles.Unconditional
 	// If there was more than 1 element, re-adjust all their positions with respect to
 	// the vertical-align property.
 	baseline := 0
@@ -1531,14 +1533,24 @@ func (e *RenderableDomElement) advanceLine(dot *image.Point) {
 	texttop := 0
 
 	nextline := e.GetLineHeight()
-	// FIXME: This is a hack. The baseline/lineheight should be calculated in accordance with
-	// the CSS spec.
+
+	// Now the we've advanced a line, we can't possibly be at either
+	// the first letter or the first line, so just use the unconditional
+	// styles.
+	e.Styles = e.ConditionalStyles.Unconditional
 	// Step 1. Figure out how big the line really is and where the baseline is.
 	for _, l := range e.curLine {
 		height := l.Height()
 		if height > maxsize {
 			maxsize = height
 		}
+
+		// If there were multiple elements on this line, ensure that
+		// the largest lineheight is used for the whole line.
+		if lh := l.LineHeight(); lh > nextline {
+			nextline = lh
+		}
+
 		bl := l.Baseline()
 		if !l.IsImage() {
 			if dsc := l.metrics.Descent.Ceil(); dsc > textbottom {
