@@ -476,6 +476,8 @@ func TestLayoutFirstline(t *testing.T) {
 		span {
 			display: inline;
 			line-height: 30px;
+			margin: 0;
+			padding: 0;
 		}
 		</style>
 		</head>
@@ -505,9 +507,13 @@ func TestLayoutFirstline(t *testing.T) {
 		span {
 			display: inline;
 			line-height: 30px;
+			margin: 0;
+			padding: 0;
 		}
 		span:first-line {
 			line-height: 40px;
+			margin: 0;
+			padding: 0;
 		}
 		</style>
 		</head>

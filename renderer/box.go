@@ -3,6 +3,7 @@ package renderer
 import (
 	"image"
 	"image/color"
+
 	// the standard draw package doesn't have Copy, which we need for background Repeat.
 	"image/draw"
 	"net/url"
@@ -944,13 +945,12 @@ func (e *RenderableDomElement) marginCollapseOffset() int {
 	mbottom := prev.getEffectiveMarginBottom()
 	mtop := e.GetMarginTopSize()
 	if e.GetPaddingTop() != 0 || e.GetBorderTopWidth() != 0 {
-		// FIXME: Remove this hack.
 		rbottom := prev.GetMarginBottomSize()
 		if rbottom < 0 && mtop < 0 {
 			if mtop < rbottom {
-				return mtop
+				return rbottom
 			}
-			return rbottom
+			return mtop
 		}
 		return 0
 	}
@@ -961,11 +961,13 @@ func (e *RenderableDomElement) marginCollapseOffset() int {
 
 	if mbottom > 0 && mtop > 0 {
 		if mtop > mbottom {
-			return mtop
+			return mbottom
 		}
-		return mbottom
+		return mtop
 	} else if mbottom < 0 && mtop < 0 {
-		if mtop > mbottom {
+		// Negative margins collapse to the margin with the biggest
+		// absolute value.
+		if mtop < mbottom {
 			return mtop
 		}
 		return mbottom

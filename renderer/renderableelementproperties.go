@@ -83,8 +83,9 @@ func (e *RenderableDomElement) getLineHeight(fSize int) int {
 		fontFace := e.GetFontFace(fSize)
 		return getFontHeight(fontFace)
 	}
-	fontFace := e.GetFontFace(lHeightSize)
-	return getFontHeight(fontFace)
+	return lHeightSize
+	// fontFace := e.GetFontFace(lHeightSize)
+	// return getFontHeight(fontFace)
 }
 
 func (e *RenderableDomElement) GetFontSize() int {

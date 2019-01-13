@@ -1002,7 +1002,7 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 					c.rightFloats = make(FloatStack, len(e.rightFloats))
 					for _, lf := range e.leftFloats {
 						float := new(RenderableDomElement)
-						float.BoxDrawRectangle = lf.BoxDrawRectangle.Sub(image.Point{dot.X, dot.Y})
+						float.BoxDrawRectangle = lf.BoxDrawRectangle.Sub(image.Point{0, dot.Y})
 						if float.BoxDrawRectangle.Max.Y > 0 {
 							//if float.BoxDrawRectangle.Max.X > 0 && float.BoxDrawRectangle.Max.Y > 0 {
 							c.leftFloats = append(c.leftFloats, float)
@@ -1029,20 +1029,20 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 				switch float {
 				case "right":
 					sz := box.Bounds().Size()
-					sz.Y += e.GetMarginTopSize() //+ e.GetMarginBottomSize()
 					e.positionRightFloat(*dot, sz, c)
 					r = c.BoxDrawRectangle
-					//r.Min.Y -= c.GetMarginTopSize()
+					r.Min.Y -= c.GetMarginTopSize()
 					r.Max.Y += c.GetMarginBottomSize()
 					c.BoxContentRectangle = contentbox
 				case "left":
 					sz := box.Bounds().Size()
-					sz.Y += e.GetMarginTopSize() //+ e.GetMarginBottomSize()
-					e.positionLeftFloat(dot, sz, c)
+
+					e.positionLeftFloat(&fdot, sz, c)
 					r = c.BoxDrawRectangle
-					//r.Min.Y -= c.GetMarginTopSize()
+					r.Min.Y -= c.GetMarginTopSize()
 					r.Max.Y += c.GetMarginBottomSize()
 					c.BoxContentRectangle = contentbox
+
 				default:
 					r = image.Rectangle{*dot, dot.Add(sr.Size())}
 				}
@@ -1428,11 +1428,11 @@ func (e *RenderableDomElement) drawInto(ctx context.Context, dst draw.Image, cur
 				case "left", "right":
 					if !c.floatAdjusted {
 						mt := c.GetMarginTopSize()
-						mb := c.GetMarginBottomSize()
+						// mb := c.GetMarginBottomSize()
 						absrect.Min.Y += mt
-						absrect.Max.Y -= mb
+						//absrect.Max.Y -= mb
 						c.BoxDrawRectangle.Min.Y += mt
-						c.BoxDrawRectangle.Max.Y -= mb
+						// c.BoxDrawRectangle.Max.Y -= mb
 						c.floatAdjusted = true
 					}
 				default:
