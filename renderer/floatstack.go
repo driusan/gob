@@ -1,7 +1,6 @@
 package renderer
 
 import (
-	"fmt"
 	"image"
 )
 
@@ -65,11 +64,6 @@ func (f FloatStack) NextFloatHeight() int {
 		return 0
 	}
 	lastElem := f[len(f)-1]
-
-	//size := lastElem.CSSOuterBox.Bounds().Size().Y
 	size := lastElem.BoxDrawRectangle.Size().Y
-	if size == 0 {
-		fmt.Printf("Bounds size is 0?? %s %s %s", lastElem.CSSOuterBox.Bounds(), lastElem.Data, lastElem.GetTextContent())
-	}
 	return size
 }

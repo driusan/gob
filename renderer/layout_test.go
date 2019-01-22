@@ -1,8 +1,15 @@
 package renderer
 
 import (
-	"context"
+	"bytes"
 	"image"
+	"image/color"
+	"image/png"
+	"io"
+	"io/ioutil"
+
+	"context"
+
 	"net/url"
 	"strings"
 	"testing"
@@ -10,13 +17,48 @@ import (
 	"github.com/driusan/gob/net"
 )
 
+type testLoader struct {
+	net.DefaultReader
+}
+
+type colouredRect struct {
+	image.Rectangle
+	colour color.Color
+}
+
+func (r colouredRect) At(x, y int) color.Color {
+	if r.Rectangle.At(x, y) == color.Opaque {
+		return r.colour
+	}
+	return color.Transparent
+}
+func (t testLoader) GetURL(u *url.URL) (io.ReadCloser, int, error) {
+	// Fake some URLs used by the test suite.
+	switch u.Path {
+	case "/100x50.png":
+		img := colouredRect{
+			image.Rect(0, 0, 100, 50),
+			color.RGBA{255, 0, 0, 255},
+		}
+		b := &bytes.Buffer{}
+		if err := png.Encode(b, img); err != nil {
+			println(err.Error())
+			return nil, 500, err
+		}
+		reader := bytes.NewReader(b.Bytes())
+		return ioutil.NopCloser(reader), 200, nil
+	default:
+		panic("Unhandled test path: " + u.Path)
+	}
+}
+
 func parseHTML(t *testing.T, val string) Page {
 	t.Helper()
 	url, err := url.Parse("https://localhost")
 	if err != nil {
 		t.Fatal(err)
 	}
-	loader := net.DefaultReader{}
+	loader := testLoader{}
 	r := strings.NewReader(val)
 	return LoadPage(r, loader, url)
 }
