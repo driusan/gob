@@ -326,8 +326,6 @@ func loadNewPage(context *url.URL, path string) (renderer.Page, error) {
 	}
 	defer r.Close()
 
-	// Add a slash to ensure that relative URLs get parsed relative to the
-	// URL, not relative to
 	p := renderer.LoadPage(r, loader, newURL)
 	p.URL = newURL
 	p.Content.InvalidateLayout()
@@ -336,7 +334,6 @@ func loadNewPage(context *url.URL, path string) (renderer.Page, error) {
 }
 
 func renderNewPageIntoViewport(s screen.Screen, w screen.Window, v *Viewport, page renderer.Page, newpage bool) {
-	page.Content.ViewportHeight = v.Size.HeightPx
 	if newpage {
 		newContext()
 		v.Cursor = image.ZP

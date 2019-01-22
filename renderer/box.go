@@ -176,7 +176,7 @@ func (b *outerBoxDrawer) RGBA(hideleft, hideright bool) *image.RGBA {
 		image.Rectangle{
 			Min: image.Point{
 				X: b.Margin.Left.Width,
-				Y: bounds.Max.Y - b.Margin.Bottom.Width - b.Border.Bottom.Width,
+				Y: bounds.Max.Y - b.Border.Bottom.Width,
 			},
 			Max: image.Point{
 				X: bounds.Max.X - b.Margin.Right.Width,
@@ -830,8 +830,8 @@ func (e *RenderableDomElement) calcCSSBox(contentSize image.Point, hideleftborde
 	// Drawing RGBA images with image.Draw is faster than drawing custom
 	// images, but sometimes it's helpful to use the more accurate
 	// image.Image interface for debugging.
-	// e.CSSOuterBox = box.RGBA(hideleftborder, hiderightborder)
-	e.CSSOuterBox = box
+	e.CSSOuterBox = box.RGBA(hideleftborder, hiderightborder)
+	// e.CSSOuterBox = box
 	corigin := box.GetContentOrigin()
 	return e.CSSOuterBox, image.Rectangle{
 		Min: corigin,

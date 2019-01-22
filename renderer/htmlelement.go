@@ -61,10 +61,9 @@ type RenderableDomElement struct {
 	BoxContentRectangle image.Rectangle
 	floatAdjusted       bool
 
-	ImageMap       ImageMap
-	PageLocation   *url.URL
-	ViewportHeight int
-	contentWidth   int
+	ImageMap     ImageMap
+	PageLocation *url.URL
+	contentWidth int
 
 	containerWidth  int
 	containerHeight int
@@ -147,6 +146,14 @@ func (lb lineBox) width() int {
 	fntDrawer, fSize := lb.getFontDrawer(nil, image.ZP)
 	defer fntDrawer.Face.Close()
 	return lb.measureOrDraw(true, &fntDrawer, fSize).Ceil()
+}
+
+func (lb lineBox) Bounds() image.Rectangle {
+	if lb.BorderImage != nil {
+		return lb.BorderImage.Bounds().Add(lb.origin)
+	}
+	return lb.Content.Bounds().Add(lb.origin)
+
 }
 
 // Gets a font drawer for this linebox to draw into draw.Image at dot.
@@ -610,7 +617,7 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 				case "right":
 					e.Parent.positionRightFloat(*dot, box.Bounds().Size(), e)
 				case "left":
-					e.Parent.positionLeftFloat(dot, box.Bounds().Size(), e)
+					e.Parent.positionLeftFloat(dot, &fdot, box.Bounds().Size(), e)
 				default:
 					sz := box.Bounds().Size()
 					iheight = sz.Y + e.GetMarginTopSize() + e.GetMarginBottomSize()
@@ -659,11 +666,9 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 	overlayed = NewDynamicMemoryDrawer(image.Rectangle{image.ZP, image.Point{width, height}})
 
 	firstLine := true
-	firstletter := !e.inlineStart //true &&
+	firstletter := !e.inlineStart
 	imageMap := NewImageMap()
 
-	// The bottom margin of the last child, used for collapsing margins (where applicable)
-	//bottommargin := 0
 	for c := e.FirstChild; c != nil; c = c.NextSibling {
 		if ctx.Err() != nil {
 			return nil, image.ZP
@@ -671,7 +676,6 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 		if fdot.Y < dot.Y {
 			fdot = *dot
 		}
-		c.ViewportHeight = e.ViewportHeight
 		if dot.X < e.leftFloats.MaxX(*dot) {
 			dot.X = e.leftFloats.MaxX(*dot)
 		}
@@ -921,7 +925,7 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 				}
 
 				c.inlineStart = true
-				childContent, newDot := c.layoutPass(ctx, width, image.ZR, &image.Point{dot.X, dot.Y})
+				childContent, newDot := c.layoutPass(ctx, width, image.ZR, dot)
 
 				var contentbox image.Rectangle
 				if c.Data == "img" {
@@ -985,7 +989,6 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 				}
 
 				// draw the border, background, and CSS outer box.
-
 				cdot := image.Point{0, 0}
 
 				if c.GetDisplayProp() == "block" && float == "none" {
@@ -1014,8 +1017,7 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 					}
 				}
 				var childContent image.Image
-
-				childContent, _ = c.layoutPass(ctx, width, image.ZR, &cdot)
+				childContent, dotAdj := c.layoutPass(ctx, width, image.ZR, &cdot)
 				c.ContentOverlay = childContent
 				box, contentbox := c.calcCSSBox(childContent.Bounds().Size(), false, false)
 				c.BoxContentRectangle = contentbox.Sub(image.Point{dot.X, 0})
@@ -1037,12 +1039,13 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 				case "left":
 					sz := box.Bounds().Size()
 
-					e.positionLeftFloat(&fdot, sz, c)
+					e.positionLeftFloat(dot, &fdot, sz, c)
 					r = c.BoxDrawRectangle
 					r.Min.Y -= c.GetMarginTopSize()
 					r.Max.Y += c.GetMarginBottomSize()
 					c.BoxContentRectangle = contentbox
-
+					dot.X += dotAdj.X
+					fdot.X += dotAdj.X
 				default:
 					r = image.Rectangle{*dot, dot.Add(sr.Size())}
 				}
@@ -1134,6 +1137,14 @@ func (e *RenderableDomElement) listIndent() int {
 // positions child c, which has the size size as a right floating element.
 // dot is used to get the starting height to position the float.
 func (e *RenderableDomElement) positionRightFloat(dot image.Point, size image.Point, c *RenderableDomElement) {
+	// First make sure this hasn't already been positioned, since images layoutPass
+	// attempts to position images from both the image itself and the parent
+	for _, el := range e.rightFloats {
+		if el == c {
+			return
+		}
+	}
+
 	width := e.contentWidth
 
 	c.BoxDrawRectangle = image.Rectangle{
@@ -1159,22 +1170,28 @@ func (e *RenderableDomElement) positionRightFloat(dot image.Point, size image.Po
 // dot is used to get the starting height to position the float. If already
 // layed out text needs to be moved in order to place the float, it may also
 // adjust dot.
-func (e *RenderableDomElement) positionLeftFloat(dot *image.Point, size image.Point, c *RenderableDomElement) error {
+func (e *RenderableDomElement) positionLeftFloat(dot, fdot *image.Point, size image.Point, c *RenderableDomElement) error {
+	// First make sure this hasn't already been positioned, since images layoutPass
+	// attempts to position images from both the image itself and the parent
+	for _, el := range e.leftFloats {
+		if el == c {
+			return nil
+		}
+	}
 	// Default to floating at the leftmost side of the element.
 	c.BoxDrawRectangle = image.Rectangle{
 		image.Point{
 			0,
-			dot.Y,
+			fdot.Y,
 		},
 		image.Point{
 			size.X,
-			dot.Y + size.Y,
+			fdot.Y + size.Y,
 		},
 	}
 
-	fdot := *dot
 	for {
-		foundhome, movedot := e.handleFloatOverlap(&fdot, &c.BoxDrawRectangle, c, true)
+		foundhome, movedot := e.handleFloatOverlap(fdot, &c.BoxDrawRectangle, c, true)
 		if foundhome {
 			if movedot {
 				dot.X += c.BoxDrawRectangle.Size().X
@@ -1197,7 +1214,6 @@ func (e *RenderableDomElement) handleFloatOverlap(dot *image.Point, r *image.Rec
 	// Check if it overlaps anything and move it if necessary.
 	// (We pretend that it has an overlap at the start, so that we can be sure that the loop happens
 	// at least once to verify it.)
-
 	size := r.Size()
 
 	verifyAndMove := func(other *RenderableDomElement) bool {
@@ -1254,18 +1270,12 @@ func (e *RenderableDomElement) handleFloatOverlap(dot *image.Point, r *image.Rec
 	// If so, either move it down one last time, or move the lines over
 	// if they fit.
 	for _, line := range e.lineBoxes {
-		lineBounds := image.Rectangle{
-			line.origin,
-			line.origin.Add(line.Content.Bounds().Size()),
-		}
+		lineBounds := line.Bounds()
 		if r.Overlaps(lineBounds) {
 			if moveleft {
 				canMoveText := true
 				for _, line := range e.lineBoxes {
-					lineBounds := image.Rectangle{
-						line.origin,
-						line.origin.Add(line.Content.Bounds().Size()),
-					}
+					lineBounds := line.Bounds()
 					lsize := lineBounds.Size()
 					o := line.origin
 					if r.Max.X+lsize.X+e.rightFloats.WidthAt(o) >= width {
@@ -1341,8 +1351,6 @@ func (e *RenderableDomElement) getAbsoluteDrawRectangle() image.Rectangle {
 	return e.BoxDrawRectangle.Add(adj)
 }
 func (e *RenderableDomElement) drawInto(ctx context.Context, dst draw.Image, cursor image.Point) error {
-	//dstsize := dst.Bounds().Size()
-
 	if e.Type == html.ElementNode && strings.ToLower(e.Data) == "img" {
 		if e.GetDisplayProp() == "block" {
 			// Inlines are drawn as part of a lineBox, while blocks expected
@@ -1428,11 +1436,11 @@ func (e *RenderableDomElement) drawInto(ctx context.Context, dst draw.Image, cur
 				case "left", "right":
 					if !c.floatAdjusted {
 						mt := c.GetMarginTopSize()
-						// mb := c.GetMarginBottomSize()
+						mb := c.GetMarginBottomSize()
 						absrect.Min.Y += mt
-						//absrect.Max.Y -= mb
+						absrect.Max.Y -= mb
 						c.BoxDrawRectangle.Min.Y += mt
-						// c.BoxDrawRectangle.Max.Y -= mb
+						c.BoxDrawRectangle.Max.Y -= mb
 						c.floatAdjusted = true
 					}
 				default:
