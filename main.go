@@ -213,6 +213,7 @@ func main() {
 			case paint.Event:
 				paintWindow(s, w, &v, page)
 			case size.Event:
+				css.ClearFontCache()
 				v.Size = e
 				if e.PixelsPerPt != 0 {
 					css.PixelsPerPt = float64(e.PixelsPerPt)

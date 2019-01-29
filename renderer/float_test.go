@@ -496,7 +496,6 @@ func TestRegressionRightFloatInsufficientSpace(t *testing.T) {
 			image.Point{400 - 100, 20},
 			image.Point{400, 70},
 		}
-		println("float:", float.GetTextContent())
 		if float.BoxDrawRectangle != wantFloatRect {
 			t.Errorf("Test %d: Float not positioned in correct location. got %v want %v", i, float.BoxDrawRectangle, wantFloatRect)
 		}

@@ -140,7 +140,6 @@ func (p *Page) ReapplyStyles() {
 				base = size
 			}
 		default:
-			// el.Styles.SetFontSize(fontSizeToPx(strVal, el.Parent))
 			base = fontSizeToPx(strVal, el.Parent)
 			el.ConditionalStyles.Unconditional.SetFontSize(base)
 		}

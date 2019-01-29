@@ -437,11 +437,14 @@ func TestBasicLayoutMultilineInline(t *testing.T) {
 	// see how many pixels it is. We then double it, add a few pixels
 	// for a space character, and ensure that there's 2 lineboxes (the
 	// first having the word twice, and the second once.
+	// (We set an explicit line-height and equal font-size to make sure
+	// origin doesn't get a 1 added when half-leading calculating a half-leading
+	// due to rounding error, since that's not what we're testing for.)
 	page := parseHTML(
 		t,
 		`<html>
 		<body>
-			<span style="display: inline">Supergalifragilisticexpialidotious</span>
+			<span style="display: inline; font-size: 16px; line-height: 16px;">Supergalifragilisticexpialidotious</span>
 		</body>
 	</html>`,
 	)
@@ -461,7 +464,7 @@ func TestBasicLayoutMultilineInline(t *testing.T) {
 		t,
 		`<html>
 		<body>
-			<span style="display: inline">Supercalifragilisticexpialidotious
+			<span style="display: inline; font-size: 16px; line-height: 16px;">Supercalifragilisticexpialidotious
 Supercalifragilisticexpialidotious Supercalifragilisticexpialidotious
 	</span>
 		</body>
@@ -547,6 +550,7 @@ func TestLayoutFirstline(t *testing.T) {
 		<head>
 		<style>
 		span {
+			font-size: 16px;
 			display: inline;
 			line-height: 30px;
 			margin: 0;
@@ -585,20 +589,23 @@ TestTestTest TestTestTest
 		}
 	}
 
-	if got := page.Content.lineBoxes[0].origin.Y; got != 0 {
-		t.Errorf("Unexpected Y origin for line 1: got %v, want 0", got)
+	if got := page.Content.lineBoxes[0].origin.Y; got != 12 {
+		// The font size doesn't match the lineheight, so we need to add
+		// the half-leading to the origin.
+		t.Errorf("Unexpected Y origin for line 1: got %v, want 12", got)
 	}
 
-	// The firstline property should have set made the line advance by 40px
-	// to get to the second line.
-	if got := page.Content.lineBoxes[1].origin.Y; got != 40 {
-		t.Errorf("Unexpected Y origin for line 2: got %v, want 40", got)
+	// The firstline property should have made the line advance by 40px
+	// to get to the second line, and then add the half leading based on the
+	// non-firstline line height.
+	if got := page.Content.lineBoxes[1].origin.Y; got != 47 {
+		t.Errorf("Unexpected Y origin for line 2: got %v, want 47", got)
 	}
 
 	// The last line should have only advanced by 30 (the default for span),
 	// not 40 (which should have only applied to the first line.)
-	if got := page.Content.lineBoxes[2].origin.Y; got != 40+30 {
-		t.Errorf("Unexpected Y origin for line 3: got %v, want 70", got)
+	if got := page.Content.lineBoxes[2].origin.Y; got != 40+30+7 {
+		t.Errorf("Unexpected Y origin for line 3: got %v, want 77", got)
 	}
 
 }

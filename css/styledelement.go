@@ -26,9 +26,13 @@ type fontStyle struct {
 var parsedFontCache map[string]*truetype.Font
 var fontCache map[fontStyle]font.Face
 
-func init() {
+func ClearFontCache() {
 	fontCache = make(map[fontStyle]font.Face)
 	parsedFontCache = make(map[string]*truetype.Font)
+}
+
+func init() {
+	ClearFontCache()
 }
 
 type StyleSource uint8

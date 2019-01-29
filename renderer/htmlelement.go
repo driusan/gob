@@ -128,6 +128,7 @@ func (lb lineBox) LineHeight() int {
 }
 
 func (lb lineBox) Height() int {
+	lb.el.Styles = lb.styles
 	if lb.IsImage() {
 		if lb.BorderImage != nil {
 			// The border image already includes padding and border
@@ -1089,6 +1090,10 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 			}
 		}
 	}
+
+	if e.GetDisplayProp() == "block" && e.GetFloat() == "none" {
+		e.advanceLine(dot)
+	}
 	e.ImageMap = imageMap
 	return overlayed, *dot
 }
@@ -1328,6 +1333,7 @@ func (e *RenderableDomElement) handleFloatOverlap(dot *image.Point, r *image.Rec
 					width - rfWidth,
 					dot.Y + size.Y,
 				}
+				return true, false
 			}
 			return false, false
 		}
@@ -1446,8 +1452,10 @@ func (e *RenderableDomElement) drawInto(ctx context.Context, dst draw.Image, cur
 				default:
 				}
 				if !(c.Type == html.ElementNode && c.Data == "img" && c.GetDisplayProp() == "inline" && c.GetFloat() == "none") {
-					// Inline images get drawn as part of a lineBox
-					if c.CSSOuterBox != nil {
+					// Inline images get drawn as part of a lineBox,
+					// and borders get drawn as part of a linebox
+					// for all non-image inlines.
+					if c.CSSOuterBox != nil && c.GetDisplayProp() != "inline" {
 						sr := c.CSSOuterBox.Bounds()
 						draw.Draw(
 							dst,
@@ -1482,7 +1490,8 @@ func (e *RenderableDomElement) drawInto(ctx context.Context, dst draw.Image, cur
 		} else {
 			sr = box.Content.Bounds()
 		}
-		r := image.Rectangle{box.origin, box.origin.Add(sr.Size())}.Add(absrect.Min)
+		bo := box.origin
+		r := image.Rectangle{bo, bo.Add(sr.Size())}.Add(absrect.Min)
 		if e.GetDisplayProp() != "inline" {
 			r = r.Add(e.BoxContentRectangle.Min)
 		}
@@ -1555,7 +1564,8 @@ func (e *RenderableDomElement) advanceLine(dot *image.Point) {
 
 		// If there were multiple elements on this line, ensure that
 		// the largest lineheight is used for the whole line.
-		if lh := l.LineHeight(); lh > nextline {
+		lh := l.LineHeight()
+		if lh > nextline {
 			nextline = lh
 		}
 
@@ -1566,6 +1576,9 @@ func (e *RenderableDomElement) advanceLine(dot *image.Point) {
 			}
 			if asc := l.metrics.Ascent.Ceil(); asc > texttop {
 				texttop = asc
+			}
+			if h := l.metrics.Height.Ceil(); h != lh {
+				l.origin.Y += (lh - h) / 2
 			}
 		} else {
 			switch align := l.el.GetVerticalAlign(); align {
@@ -1587,6 +1600,7 @@ func (e *RenderableDomElement) advanceLine(dot *image.Point) {
 	// Step 2: Adjust the image origins with respect to the baseline.
 	for _, l := range e.curLine {
 		height := l.Height()
+
 		switch align := l.el.GetVerticalAlign(); align {
 		case "text-bottom":
 			l.origin.Y += baseline - height + textbottom
