@@ -47,6 +47,18 @@ func (t testLoader) GetURL(u *url.URL) (io.ReadCloser, int, error) {
 		}
 		reader := bytes.NewReader(b.Bytes())
 		return ioutil.NopCloser(reader), 200, nil
+	case "/15x15.png":
+		img := colouredRect{
+			image.Rect(0, 0, 15, 15),
+			color.RGBA{255, 0, 0, 255},
+		}
+		b := &bytes.Buffer{}
+		if err := png.Encode(b, img); err != nil {
+			println(err.Error())
+			return nil, 500, err
+		}
+		reader := bytes.NewReader(b.Bytes())
+		return ioutil.NopCloser(reader), 200, nil
 	default:
 		panic("Unhandled test path: " + u.Path)
 	}

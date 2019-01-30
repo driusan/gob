@@ -1610,7 +1610,6 @@ func (e *RenderableDomElement) advanceLine(dot *image.Point) {
 			l.origin.Y += baseline - (height / 2)
 		default:
 			l.origin.Y += baseline - l.Baseline()
-
 		}
 		if l.IsImage() {
 			l.origin.Y += l.el.GetPaddingTop() + l.el.GetBorderTopWidth() + l.el.GetMarginTopSize()
