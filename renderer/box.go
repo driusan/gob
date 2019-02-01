@@ -98,6 +98,12 @@ func (b *outerBoxDrawer) RGBA(hideleft, hideright bool) *image.RGBA {
 	//fmt.Println(size)
 	ri := image.NewRGBA(size)
 
+	if b.Margin.Left.Width < 0 {
+		b.Margin.Left.Width = 0
+	}
+	if b.Margin.Right.Width < 0 {
+		b.Margin.Right.Width = 0
+	}
 	// draw the background first, bounded by the margins
 	draw.Draw(
 		ri,

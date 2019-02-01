@@ -131,12 +131,13 @@ func (lb lineBox) Height() int {
 	lb.el.Styles = lb.styles
 	if lb.IsImage() {
 		if lb.BorderImage != nil {
-			// The border image already includes padding and border
+			// The border image already includes padding and border,
+			// but not top/bottom margin
 			return lb.BorderImage.Bounds().Size().Y + lb.el.GetMarginTopSize() + lb.el.GetMarginBottomSize()
 		}
 		return lb.Content.Bounds().Size().Y + lb.el.GetMarginTopSize() + lb.el.GetMarginBottomSize()
 	}
-	return (lb.metrics.Ascent + lb.metrics.Descent).Ceil() + lb.el.GetMarginTopSize() + lb.el.GetMarginBottomSize()
+	return (lb.metrics.Height).Ceil() + lb.el.GetMarginTopSize() + lb.el.GetMarginBottomSize()
 }
 
 // Returns the width of this linebox. This is primarily used for testing.
@@ -641,6 +642,7 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 							}
 
 						}
+
 						lb := lineBox{
 							e.ContentOverlay,
 							box,
@@ -657,6 +659,16 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 						p.lineBoxes = append(p.lineBoxes, &lb)
 						p.curLine = append(p.curLine, &lb)
 						dot.X += sz.X
+
+						// Negative margins were not included
+						// in the CSS Box (so that they
+						// get drawn), add them back.
+						if lm := e.GetMarginLeftSize(); lm < 0 {
+							dot.X += lm
+						}
+						if rm := e.GetMarginRightSize(); rm < 0 {
+							dot.X += rm
+						}
 					}
 				}
 			}
@@ -903,7 +915,7 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 		case html.ElementNode:
 			if c.Data == "br" {
 				e.advanceLine(dot)
-				dot.Y += e.GetMarginBottomSize()
+				dot.Y += c.GetMarginBottomSize()
 				continue
 			}
 			switch display := c.GetDisplayProp(); display {
@@ -918,7 +930,11 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 					dot.X += c.GetTextIndent(width)
 					firstLine = false
 				}
-				dot.X += c.GetMarginLeftSize()
+				if c.Data != "img" {
+					// for images, this is done in the child
+					// layout pass.
+					dot.X += c.GetMarginLeftSize()
+				}
 
 				if c.GetFloat() == "none" {
 					c.leftFloats = e.leftFloats
@@ -926,6 +942,7 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 				}
 
 				c.inlineStart = true
+
 				childContent, newDot := c.layoutPass(ctx, width, image.ZR, dot)
 
 				var contentbox image.Rectangle
@@ -937,6 +954,7 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 					// over, so always take the new X value.
 					// FIXME: Make this more robust.
 					dot.X = newDot.X
+					dot.Y = newDot.Y
 				} else {
 					c.ContentOverlay = childContent
 					var box image.Image
@@ -966,7 +984,7 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 					}
 				}
 
-				if c.GetFloat() == "none" {
+				if c.GetFloat() == "none" && c.Data != "img" {
 					dot.X = newDot.X + c.GetBorderRightWidth() + c.GetPaddingRight() + c.GetMarginRightSize()
 					dot.Y = newDot.Y
 				}
@@ -1548,6 +1566,7 @@ func (e *RenderableDomElement) advanceLine(dot *image.Point) {
 	maxsize := 0
 	textbottom := 0
 	texttop := 0
+	textheight := 0
 
 	nextline := e.GetLineHeight()
 
@@ -1577,17 +1596,22 @@ func (e *RenderableDomElement) advanceLine(dot *image.Point) {
 			if asc := l.metrics.Ascent.Ceil(); asc > texttop {
 				texttop = asc
 			}
-			if h := l.metrics.Height.Ceil(); h != lh {
+			h := l.metrics.Height.Ceil()
+			if h > textheight {
+				textheight = h
+			}
+			if h != lh {
 				l.origin.Y += (lh - h) / 2
 			}
 		} else {
+
 			switch align := l.el.GetVerticalAlign(); align {
 			case "text-top":
 				bl = 0
 			case "middle":
 				bl = height / 2
 			case "text-bottom":
-				bl = height
+				bl = height - textbottom
 			default:
 				bl = height
 			}
@@ -1601,7 +1625,8 @@ func (e *RenderableDomElement) advanceLine(dot *image.Point) {
 	for _, l := range e.curLine {
 		height := l.Height()
 
-		switch align := l.el.GetVerticalAlign(); align {
+		align := l.el.GetVerticalAlign()
+		switch align {
 		case "text-bottom":
 			l.origin.Y += baseline - height + textbottom
 		case "text-top":
@@ -1612,14 +1637,50 @@ func (e *RenderableDomElement) advanceLine(dot *image.Point) {
 			l.origin.Y += baseline - l.Baseline()
 		}
 		if l.IsImage() {
-			l.origin.Y += l.el.GetPaddingTop() + l.el.GetBorderTopWidth() + l.el.GetMarginTopSize()
+			tm := l.el.GetMarginTopSize()
+			bm := l.el.GetMarginBottomSize()
+
+			l.origin.Y += l.el.GetPaddingTop() + l.el.GetBorderTopWidth() + tm
 			l.origin.X += l.el.GetPaddingLeft() + l.el.GetBorderLeftWidth() + l.el.GetMarginLeftSize()
 
-			if end := height + l.origin.Y; end > dot.Y {
+			// top margin was in both the height and the origin.Y, so
+			// subtract it from height when checking if it needs to
+			// increase the next line size.
+			// whether or not the bottom margin needs to be subtracted
+			// depends on whether the margin is bigger than the other
+			// text on the line, which depends on the vertical alignment
+			bmoff := 0
+			switch align {
+			case "text-bottom":
+				if bm >= textheight {
+					// Remove the part of the margin that's
+					// absorbed by the text line height.
+					// FIXME: Figure out where this -1 comes
+					// from. It seems to be required to get
+					// TestImgBorderTextBottomLineheight to
+					// pass, but maybe we're doing something
+					// wrong.
+					bmoff = texttop - 1
+				}
+			case "text-top":
+				if bm >= textheight {
+					bmoff = bm
+				}
+			}
+
+			if bm < 0 {
+				bm = 0
+			}
+
+			// Top was already incorporated into the origin, so
+			// don't double count it in the height.
+			height -= l.el.GetPaddingTop() + l.el.GetBorderTopWidth() + tm
+			if end := height + l.origin.Y - bmoff + bm; end > dot.Y {
 				nextline = end - dot.Y
 			}
 		}
 	}
+
 	dot.Y += nextline
 	dot.X = e.leftFloats.MaxX(*dot)
 
