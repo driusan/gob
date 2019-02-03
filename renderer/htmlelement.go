@@ -1473,7 +1473,7 @@ func (e *RenderableDomElement) drawInto(ctx context.Context, dst draw.Image, cur
 					// Inline images get drawn as part of a lineBox,
 					// and borders get drawn as part of a linebox
 					// for all non-image inlines.
-					if c.CSSOuterBox != nil && c.GetDisplayProp() != "inline" {
+					if c.CSSOuterBox != nil && (c.GetDisplayProp() != "inline" || c.GetFloat() != "none") {
 						sr := c.CSSOuterBox.Bounds()
 						draw.Draw(
 							dst,
