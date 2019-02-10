@@ -38,12 +38,13 @@ func TestInlineImg(t *testing.T) {
 	size := image.Point{400, 300}
 	page.Content.Layout(context.TODO(), size)
 
-	if len(page.Content.lineBoxes) < 2 {
+	body := page.getBody()
+	if len(body.lineBoxes) < 2 {
 		t.Fatal("Unexpected number of lines")
 	}
 
-	img := page.Content.lineBoxes[0]
-	txt := page.Content.lineBoxes[1]
+	img := body.lineBoxes[0]
+	txt := body.lineBoxes[1]
 	if !img.IsImage() {
 		t.Fatal("Expected first line box to be an image")
 	}
@@ -73,11 +74,12 @@ func TestBlockImg(t *testing.T) {
 	size := image.Point{400, 300}
 	page.Content.Layout(context.TODO(), size)
 
-	if len(page.Content.lineBoxes) < 2 {
+	body := page.getBody()
+	if len(body.lineBoxes) < 2 {
 		t.Fatal("Unexpected number of lines")
 	}
 
-	firstchar := page.Content.lineBoxes[0]
+	firstchar := body.lineBoxes[0]
 	if firstchar.IsImage() {
 		t.Fatal("Block image generated line box")
 	}
@@ -86,7 +88,7 @@ func TestBlockImg(t *testing.T) {
 		t.Errorf("Unexpected origin for text: got %v want (0, 16)", firstchar.origin)
 	}
 
-	img := page.Content.FirstChild.NextSibling
+	img := body.FirstChild.NextSibling
 	if img.Data != "img" {
 		t.Fatal("Could not find image")
 	}
@@ -112,7 +114,7 @@ func TestCenteredBlockImg(t *testing.T) {
 	size := image.Point{400, 300}
 	page.Content.Layout(context.TODO(), size)
 
-	img := page.Content.FirstChild.NextSibling
+	img := page.getBody().FirstChild.NextSibling
 	if img.Data != "img" {
 		t.Fatal("Could not find image")
 	}
@@ -140,7 +142,7 @@ func TestResizedCenteredBlockImg(t *testing.T) {
 	size := image.Point{400, 300}
 	page.Content.Layout(context.TODO(), size)
 
-	img := page.Content.FirstChild.NextSibling
+	img := page.getBody().FirstChild.NextSibling
 	if img.Data != "img" {
 		t.Fatal("Could not find image")
 	}
@@ -168,7 +170,7 @@ func TestResizedRightAlignedBlockImg(t *testing.T) {
 	size := image.Point{400, 300}
 	page.Content.Layout(context.TODO(), size)
 
-	img := page.Content.FirstChild.NextSibling
+	img := page.getBody().FirstChild.NextSibling
 	if img.Data != "img" {
 		t.Fatal("Could not find image")
 	}

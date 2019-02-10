@@ -27,9 +27,10 @@ func TestLeftFloatRendering(t *testing.T) {
 	blackRGBA := color.RGBA{0, 0, 0, 255}
 	// background of the float (ie. padding colour)
 	blueRGBA := color.RGBA{0, 0, 255, 255}
-	// margins are transparent. We don't test that it's
-	// green, because drawing the body background is done
-	// by main(), not RenderInto.
+	// background of the body.
+	greenRGBA := color.RGBA{0, 128, 0, 255}
+
+	// margins are transparent.
 	transparentRGBA := color.RGBA{0, 0, 0, 0}
 
 	for i, f := range floaters {
@@ -51,7 +52,8 @@ func TestLeftFloatRendering(t *testing.T) {
 		page.Content.Layout(context.TODO(), size)
 		page.Content.RenderInto(context.TODO(), canvas, image.ZP)
 
-		float := page.Content.FirstChild.NextSibling
+		body := page.getBody()
+		float := body.FirstChild.NextSibling
 		switch i {
 		case 0:
 			// Only check that we got the right float for the
@@ -141,12 +143,11 @@ func TestLeftFloatRendering(t *testing.T) {
 				}
 			}
 		}
+
 		// Check that the right margin of the float is the body background.
-		// We check for transparency instead of green because func main()
-		// draws the body background to ensure it spans the entire window.
 		for x := 106; x < 109; x++ {
 			for y := 0; y < 59; y++ {
-				if clr := canvas.At(x, y); clr != transparentRGBA {
+				if clr := canvas.At(x, y); clr != greenRGBA {
 					t.Errorf("Test %d: Right margin is incorrect at %d, %d: got %v want: %v", i, x, y, clr, transparentRGBA)
 
 				}
@@ -182,7 +183,7 @@ func TestLeftFloatRendering(t *testing.T) {
 		// x >= 109 (the first line box is the first letter and the second is
 		// the rest of the first line, so we can't check for an exact match
 		found = false
-		for _, lb := range page.Content.lineBoxes {
+		for _, lb := range body.lineBoxes {
 			if lb.origin.Y >= 56+lb.Baseline() {
 				if lb.origin.X != 0 {
 					t.Errorf("Test %d: Text did not return to origin after float. got %v", i, lb.origin)
@@ -201,7 +202,7 @@ func TestLeftFloatRendering(t *testing.T) {
 
 		// Check for any intersection between the lines, or between the
 		// lines and the float
-		for j, lb1 := range page.Content.lineBoxes {
+		for j, lb1 := range body.lineBoxes {
 			// lines
 			for k, lb2 := range page.Content.lineBoxes {
 				if j == k {
@@ -239,10 +240,8 @@ func TestRightFloatRendering(t *testing.T) {
 	blackRGBA := color.RGBA{0, 0, 0, 255}
 	// background of the float (ie. padding colour)
 	blueRGBA := color.RGBA{0, 0, 255, 255}
-	// margins are transparent. We don't test that it's
-	// green, because drawing the body background is done
-	// by main(), not RenderInto.
-	transparentRGBA := color.RGBA{0, 0, 0, 0}
+	// body background
+	greenRGBA := color.RGBA{0, 128, 0, 255}
 
 	for i, f := range floaters {
 		page := parseHTML(
@@ -263,7 +262,8 @@ func TestRightFloatRendering(t *testing.T) {
 		page.Content.Layout(context.TODO(), size)
 		page.Content.RenderInto(context.TODO(), canvas, image.ZP)
 
-		float := page.Content.FirstChild.NextSibling
+		body := page.getBody()
+		float := body.FirstChild.NextSibling
 		switch i {
 		case 0:
 			// Only check that we got the right float for the
@@ -353,13 +353,12 @@ func TestRightFloatRendering(t *testing.T) {
 				}
 			}
 		}
+
 		// Check that the right margin of the float is the body background.
-		// We check for transparency instead of green because func main()
-		// draws the body background to ensure it spans the entire window.
 		for x := 400 - 100 - 9; x < 400-100-6; x++ {
 			for y := 0; y < 59; y++ {
-				if clr := canvas.At(x, y); clr != transparentRGBA {
-					t.Errorf("Test %d: Right margin is incorrect at %d, %d: got %v want: %v", i, x, y, clr, transparentRGBA)
+				if clr := canvas.At(x, y); clr != greenRGBA {
+					t.Errorf("Test %d: Right margin is incorrect at %d, %d: got %v want: %v", i, x, y, clr, greenRGBA)
 
 				}
 			}
@@ -390,9 +389,9 @@ func TestRightFloatRendering(t *testing.T) {
 
 		// Check for any intersection between the lines, or between the
 		// lines and the float
-		for j, lb1 := range page.Content.lineBoxes {
+		for j, lb1 := range body.lineBoxes {
 			// Lines
-			for k, lb2 := range page.Content.lineBoxes {
+			for k, lb2 := range body.lineBoxes {
 				if j == k {
 					continue
 				}
@@ -423,7 +422,7 @@ func TestTextBeforeLeftFloat(t *testing.T) {
 	for i, f := range floaters {
 		page := parseHTML(
 			t,
-			`<html>
+			`<html style="padding: 0; margin: 0">
 		<body style="background: green; padding: 0; margin: 0;">
 			Before `+f+`After
 		</body>
@@ -435,7 +434,8 @@ func TestTextBeforeLeftFloat(t *testing.T) {
 		page.Content.Layout(context.TODO(), size)
 		page.Content.RenderInto(context.TODO(), canvas, image.ZP)
 
-		float := page.Content.FirstChild.NextSibling
+		body := page.getBody()
+		float := body.FirstChild.NextSibling
 		wantFloatRect := image.Rectangle{
 			image.ZP,
 			image.Point{100, 50},
@@ -445,9 +445,9 @@ func TestTextBeforeLeftFloat(t *testing.T) {
 		}
 		// Check for any intersection between the lines, or between the
 		// lines and the float
-		for j, lb1 := range page.Content.lineBoxes {
+		for j, lb1 := range body.lineBoxes {
 			// Lines
-			for k, lb2 := range page.Content.lineBoxes {
+			for k, lb2 := range body.lineBoxes {
 				if j == k {
 					continue
 				}
@@ -491,7 +491,8 @@ func TestRegressionRightFloatInsufficientSpace(t *testing.T) {
 		page.Content.Layout(context.TODO(), size)
 		page.Content.RenderInto(context.TODO(), canvas, image.ZP)
 
-		float := page.Content.FirstChild.NextSibling.NextSibling.NextSibling
+		body := page.getBody()
+		float := body.FirstChild.NextSibling.NextSibling.NextSibling
 		wantFloatRect := image.Rectangle{
 			image.Point{400 - 100, 20},
 			image.Point{400, 70},

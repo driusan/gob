@@ -29,7 +29,8 @@ enough text.
 	)
 	size := image.Point{500, 300}
 	page.Content.Layout(context.TODO(), size)
-	p := page.Content.FirstChild.NextSibling
+	body := page.getBody()
+	p := body.FirstChild.NextSibling
 	// There wasn't much text before the image, so there should
 	// be the linebox for the firstchar, then the rest of the
 	// text, then the image
@@ -84,7 +85,7 @@ enough text.
 	)
 	size := image.Point{500, 300}
 	page.Content.Layout(context.TODO(), size)
-	p := page.Content.FirstChild.NextSibling
+	p := page.getBody().FirstChild.NextSibling
 	// There wasn't much text before the image, so there should
 	// be the linebox for the firstchar, then the rest of the
 	// text, then the image
@@ -134,7 +135,7 @@ func TestImgMixedVerticalAlign(t *testing.T) {
 	)
 	size := image.Point{600, 300}
 	page.Content.Layout(context.TODO(), size)
-	p := page.Content.FirstChild.NextSibling
+	p := page.getBody().FirstChild.NextSibling
 	// There wasn't much text before the image, so there should
 	// be the linebox for the firstchar, then the rest of the
 	// text, then the image
@@ -188,7 +189,7 @@ enough text.
 	)
 	size := image.Point{500, 300}
 	page.Content.Layout(context.TODO(), size)
-	p := page.Content.FirstChild.NextSibling
+	p := page.getBody().FirstChild.NextSibling
 	// There wasn't much text before the image, so there should
 	// be the linebox for the firstchar, then the rest of the
 	// text, then the image
@@ -248,7 +249,7 @@ enough text.
 	)
 	size := image.Point{500, 300}
 	page.Content.Layout(context.TODO(), size)
-	p := page.Content.FirstChild.NextSibling
+	p := page.getBody().FirstChild.NextSibling
 	// There wasn't much text before the image, so there should
 	// be the linebox for the firstchar, then the rest of the
 	// text, then the image
@@ -304,7 +305,7 @@ func TestImgBorderMixedVerticalAlign(t *testing.T) {
 	)
 	size := image.Point{900, 300}
 	page.Content.Layout(context.TODO(), size)
-	p := page.Content.FirstChild.NextSibling
+	p := page.getBody().FirstChild.NextSibling
 	// There wasn't much text before the image, so there should
 	// be the linebox for the firstchar, then the rest of the
 	// text, then the image
@@ -356,7 +357,7 @@ enough text.
 	)
 	size := image.Point{500, 300}
 	page.Content.Layout(context.TODO(), size)
-	p := page.Content.FirstChild.NextSibling
+	p := page.getBody().FirstChild.NextSibling
 	// There wasn't much text before the image, so there should
 	// be the linebox for the firstchar, then the rest of the
 	// text, then the image
@@ -413,7 +414,7 @@ func TestImgNegativeMargin(t *testing.T) {
 	)
 	size := image.Point{500, 300}
 	page.Content.Layout(context.TODO(), size)
-	p := page.Content.FirstChild.NextSibling
+	p := page.getBody().FirstChild.NextSibling
 	img := p.lineBoxes[2]
 
 	if !img.IsImage() {
@@ -451,7 +452,7 @@ func TestImgNegativeMarginBorder(t *testing.T) {
 	)
 	size := image.Point{500, 300}
 	page.Content.Layout(context.TODO(), size)
-	p := page.Content.FirstChild.NextSibling
+	p := page.getBody().FirstChild.NextSibling
 	img := p.lineBoxes[2]
 
 	if !img.IsImage() {

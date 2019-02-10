@@ -15,7 +15,7 @@ func TestLeftMargin(t *testing.T) {
 	page := parseHTML(
 		t,
 		`<html>
-		<body>
+		<body style="padding: 0; margin: 0">
 			<div style="display: block; width: 100px; height: 50px; margin-left: 10px;">Test</div>
 		</body>
 	</html>`,
@@ -34,7 +34,7 @@ func TestLeftMargin(t *testing.T) {
 	}{
 		{
 			// The first div should be at the origin.
-			page.Content.FirstChild.NextSibling,
+			page.getBody().FirstChild.NextSibling,
 			image.Rectangle{image.Point{0, 0}, image.Point{110, 50}},
 			image.Rectangle{image.Point{10, 0}, image.Point{110, 50}},
 		},
@@ -55,6 +55,9 @@ func TestEmbeddedLeftMargin(t *testing.T) {
 	page := parseHTML(
 		t,
 		`<html>
+		<head>
+			<style>html, body { padding: 0; margin: 0}</style>
+		</head>
 		<body>
 			<div style="display: block; margin-left: 10px;">
 				<div style="display: block; width: 100px; height: 50px; margin-left: 10px;">
@@ -67,7 +70,7 @@ func TestEmbeddedLeftMargin(t *testing.T) {
 
 	page.Content.Layout(context.TODO(), image.Point{400, 300})
 
-	target := page.Content.FirstChild.NextSibling.FirstChild.NextSibling
+	target := page.getBody().FirstChild.NextSibling.FirstChild.NextSibling
 
 	want := image.Rectangle{image.Point{10, 0}, image.Point{110, 50}}
 	if target.BoxContentRectangle != want {
@@ -98,7 +101,7 @@ func TestAutoRightMargin(t *testing.T) {
 
 	page.Content.Layout(context.TODO(), image.Point{400, 300})
 
-	target := page.Content.FirstChild.NextSibling
+	target := page.getBody().FirstChild.NextSibling
 
 	want := image.Rectangle{image.Point{0, 0}, image.Point{200, 100}}
 	if target.BoxContentRectangle != want {
@@ -128,7 +131,7 @@ func TestAutoLeftMargin(t *testing.T) {
 
 	page.Content.Layout(context.TODO(), image.Point{400, 300})
 
-	target := page.Content.FirstChild.NextSibling
+	target := page.getBody().FirstChild.NextSibling
 
 	want := image.Rectangle{image.Point{200, 0}, image.Point{400, 100}}
 	if target.BoxContentRectangle != want {
@@ -158,7 +161,7 @@ func TestAutoLeftAutoRightMargin(t *testing.T) {
 
 	page.Content.Layout(context.TODO(), image.Point{400, 300})
 
-	target := page.Content.FirstChild.NextSibling
+	target := page.getBody().FirstChild.NextSibling
 
 	want := image.Rectangle{image.Point{100, 0}, image.Point{300, 100}}
 	if target.BoxContentRectangle != want {
@@ -188,7 +191,7 @@ func TestAutoWidthLeft(t *testing.T) {
 
 	page.Content.Layout(context.TODO(), image.Point{400, 300})
 
-	target := page.Content.FirstChild.NextSibling
+	target := page.getBody().FirstChild.NextSibling
 
 	want := image.Rectangle{image.Point{0, 0}, image.Point{400, 100}}
 	if target.BoxContentRectangle != want {
@@ -218,7 +221,7 @@ func TestAutoWidthRight(t *testing.T) {
 
 	page.Content.Layout(context.TODO(), image.Point{400, 300})
 
-	target := page.Content.FirstChild.NextSibling
+	target := page.getBody().FirstChild.NextSibling
 
 	want := image.Rectangle{image.Point{0, 0}, image.Point{400, 100}}
 	if target.BoxContentRectangle != want {
@@ -248,7 +251,7 @@ func TestAutoWidthLeftRight(t *testing.T) {
 
 	page.Content.Layout(context.TODO(), image.Point{400, 300})
 
-	target := page.Content.FirstChild.NextSibling
+	target := page.getBody().FirstChild.NextSibling
 
 	want := image.Rectangle{image.Point{0, 0}, image.Point{400, 100}}
 	if target.BoxContentRectangle != want {
@@ -278,7 +281,7 @@ func TestFullWidthLeftRight(t *testing.T) {
 
 	page.Content.Layout(context.TODO(), image.Point{400, 300})
 
-	target := page.Content.FirstChild.NextSibling
+	target := page.getBody().FirstChild.NextSibling
 
 	want := image.Rectangle{image.Point{0, 0}, image.Point{400, 100}}
 	if target.BoxContentRectangle != want {
@@ -311,7 +314,7 @@ func TestInvalidPadding(t *testing.T) {
 
 	page.Content.Layout(context.TODO(), image.Point{400, 300})
 
-	target := page.Content.FirstChild.NextSibling
+	target := page.getBody().FirstChild.NextSibling
 
 	want := image.Rectangle{image.Point{0, 0}, image.Point{200, 100}}
 	if target.BoxContentRectangle != want {

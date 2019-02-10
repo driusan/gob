@@ -26,6 +26,7 @@ func init() {
 func NewPxValue(x int) StyleValue {
 	return StyleValue{fmt.Sprintf("%dpx", x), false}
 }
+
 func NewValue(val string) StyleValue {
 	return StyleValue{val, false}
 }
@@ -121,6 +122,7 @@ func hexToUint8(val string) uint8 {
 	}
 	return uint8(r[0])
 }
+
 func sHexToUint8(val byte) uint8 {
 	switch val {
 	case '0': // 0x00
@@ -160,7 +162,6 @@ func sHexToUint8(val byte) uint8 {
 }
 
 func ConvertColorToRGBA(cssString string) (*color.RGBA, error) {
-
 	black := &color.RGBA{0, 0, 0, 255}
 	if len(cssString) > 3 && cssString[0:3] == "rgb" {
 		tuple := cssString[4 : len(cssString)-1]
@@ -258,6 +259,7 @@ func IsColor(c string) bool {
 		return false
 	}
 }
+
 func IsURL(u string) bool {
 	u = strings.TrimSpace(u)
 	if len(u) <= 4 {
@@ -265,6 +267,7 @@ func IsURL(u string) bool {
 	}
 	return u[0:4] == "url("
 }
+
 func IsPercentage(p string) bool {
 	p = strings.TrimSpace(p)
 	if p == "" {

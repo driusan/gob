@@ -13,6 +13,9 @@ func TestInlineLineHeight(t *testing.T) {
 	page := parseHTML(
 		t,
 		`<html>
+		<head>
+			<style>html, body { padding: 0; margin 0; }</style>
+		</head>
 		<body style="line-height: 20px; font-size: 14px;">
 			This is inline text within the body. It has a line-height of 20px,
 and a font-size of 14px. This means that each line should be exactly 20px below
@@ -26,13 +29,14 @@ enough text.
 	size := image.Point{400, 300}
 	page.Content.Layout(context.TODO(), size)
 
+	body := page.getBody()
 	// "lineBox" 0 is the first character, so we need to be sure that
 	// there's 3 boxes to ensure multiple lines.
-	if len(page.Content.lineBoxes) < 3 {
+	if len(body.lineBoxes) < 3 {
 		t.Fatal("Not enough lines of text to test line height.")
 	}
 
-	for i, line := range page.Content.lineBoxes[1:] {
+	for i, line := range body.lineBoxes[1:] {
 		if want := i*20 + 3; line.origin.Y != want {
 			t.Errorf("Line %d at incorrect height. got %v want %v", i, line.origin.Y, want)
 		}
@@ -45,6 +49,9 @@ func TestInlineSmallLineHeight(t *testing.T) {
 	page := parseHTML(
 		t,
 		`<html>
+		<head>
+			<style>html, body { padding: 0; margin 0; }</style>
+		</head>
 		<body style="line-height: 14px; font-size: 20px;">
 			This is inline text within the body. It has a line-height of 14px,
 and a font-size of 20px. This means that each line should be exactly 14px below
@@ -58,13 +65,14 @@ enough text.
 	size := image.Point{400, 300}
 	page.Content.Layout(context.TODO(), size)
 
+	body := page.getBody()
 	// "lineBox" 0 is the first character, so we need to be sure that
 	// there's 3 boxes to ensure multiple lines.
-	if len(page.Content.lineBoxes) < 3 {
+	if len(body.lineBoxes) < 3 {
 		t.Fatal("Not enough lines of text to test line height.")
 	}
 
-	for i, line := range page.Content.lineBoxes[1:] {
+	for i, line := range body.lineBoxes[1:] {
 		if want := i*14 - 3; line.origin.Y != want {
 			t.Errorf("Line %d at incorrect height. got %v want %v", i, line.origin.Y, want)
 		}
@@ -77,6 +85,9 @@ func TestInlineBorder(t *testing.T) {
 	page := parseHTML(
 		t,
 		`<html>
+		<head>
+			<style>html, body { padding: 0; margin 0; }</style>
+		</head>
 		<body style="line-height: 20px; font-size: 12px">
 		before <span style="border: 1px solid green; padding: 1px;">
 			This is inline text within the body. It has a line-height of 20px,
@@ -109,11 +120,12 @@ should only be on the first and last line, respectively.</span>
 	// 2 is the first letter of the span. So we need to be sure that
 	// there's 6 boxes to ensure 3 lines (one with no left or right border,
 	// one with a left border, and one with a right border.)
-	if len(page.Content.lineBoxes) < 6 {
+	body := page.getBody()
+	if len(body.lineBoxes) < 6 {
 		t.Fatal("Not enough lines of text to test inline borders.")
 	}
 
-	lines := page.Content.lineBoxes[2:]
+	lines := body.lineBoxes[2:]
 	for i, line := range lines {
 		if want := i*20 + 4; line.origin.Y != want {
 			t.Errorf("Line %d at incorrect height. got %v want %v", i, line.origin.Y, want)
@@ -127,7 +139,7 @@ should only be on the first and last line, respectively.</span>
 			// that they're equal, since we don't know exactly where
 			// the line stops and ends.
 			topgreen := greenPx(line.origin.Y - 2)
-			if topgreen < 100 {
+			if topgreen < 50 {
 				t.Errorf("Line %d top border missing got %v green pixels want >= 100", i, topgreen)
 			}
 

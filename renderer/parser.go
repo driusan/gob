@@ -19,7 +19,7 @@ func LoadPage(r io.Reader, loader net.URLReader, urlContext *url.URL) Page {
 	parsedhtml, _ := html.Parse(r)
 	styles, cssOrder := css.ExtractStyles(parsedhtml, loader, urlContext, 0)
 
-	var body *html.Node
+	//	var body *html.Node
 	var root *html.Node
 	for c := parsedhtml.FirstChild; c != nil; c = c.NextSibling {
 		if c.Data == "html" && c.Type == html.ElementNode {
@@ -31,17 +31,20 @@ func LoadPage(r io.Reader, loader net.URLReader, urlContext *url.URL) Page {
 		panic("Couldn't find HTML element")
 	}
 
-	for c := root.FirstChild; c != nil; c = c.NextSibling {
-		if c.Type == html.ElementNode && c.Data == "body" {
-			body = c
-			break
+	/*
+		for c := root.FirstChild; c != nil; c = c.NextSibling {
+			if c.Type == html.ElementNode && c.Data == "body" {
+				body = c
+				break
+			}
 		}
-	}
-	if body == nil {
-		panic("Couldn't find body HTML element")
-	}
+		if body == nil {
+			panic("Couldn't find body HTML element")
+		}
 
-	renderable := convertNodeToRenderableElement(body, loader)
+		//renderable := convertNodeToRenderableElement(body, loader)
+	*/
+	renderable := convertNodeToRenderableElement(root, loader)
 
 	userAgentStyles, cssOrder := css.ParseStylesheet(css.DefaultCSS, css.UserAgentSrc, loader, urlContext, cssOrder)
 
@@ -57,6 +60,7 @@ func LoadPage(r io.Reader, loader net.URLReader, urlContext *url.URL) Page {
 
 func (p *Page) ReapplyStyles() {
 	cssOrder := uint(0)
+	p.Background = color.Transparent
 	p.Content.Walk(func(el *RenderableDomElement) {
 		el.Styles.ClearStyles()
 		el.ConditionalStyles = struct {
@@ -165,14 +169,28 @@ func (p *Page) ReapplyStyles() {
 
 		el.Styles = el.ConditionalStyles.FirstLine
 
-		if el.Type == html.ElementNode && strings.ToLower(el.Data) == "body" {
-			background := el.GetBackgroundColor()
-			if background == color.Transparent {
-				background = color.RGBA{0xE0, 0xE0, 0xE0, 0xFF}
+		if p.Background == color.Transparent {
+			if el.Type == html.ElementNode {
+				switch strings.ToLower(el.Data) {
+				case "html", "body":
+					// Since body is a child of HTML, html
+					// would have made the outer if false
+					// if both are set, so this should
+					// implicitly result in html having
+					// precedence over body.
+					bg := el.GetBackgroundColor()
+					if bg != color.Transparent {
+						p.Background = bg
+					}
+				}
 			}
-			p.Background = background
 		}
 	})
+
+	// There was no explicit background, so use grey.
+	if p.Background == color.Transparent {
+		p.Background = color.RGBA{0xE0, 0xE0, 0xE0, 0xFF}
+	}
 }
 
 func fontSizeToPx(val string, parent *RenderableDomElement) int {

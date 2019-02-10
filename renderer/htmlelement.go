@@ -1038,7 +1038,16 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 				var childContent image.Image
 				childContent, dotAdj := c.layoutPass(ctx, width, image.ZR, &cdot)
 				c.ContentOverlay = childContent
-				box, contentbox := c.calcCSSBox(childContent.Bounds().Size(), false, false)
+				boxsize := childContent.Bounds().Size()
+
+				// For images and white-space: pre it's possible
+				// that the child content goes farther than the
+				// available space. When that happens, we don't
+				// want the background to be expanded.
+				if boxsize.X > e.contentWidth {
+					boxsize.X = e.contentWidth
+				}
+				box, contentbox := c.calcCSSBox(boxsize, false, false)
 				c.BoxContentRectangle = contentbox.Sub(image.Point{dot.X, 0})
 				sr := box.Bounds()
 

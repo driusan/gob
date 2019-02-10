@@ -95,12 +95,12 @@ func TestBasicLayoutBlock(t *testing.T) {
 	}{
 		{
 			// First child = whitespace text node, second = div 1
-			page.Content.FirstChild.NextSibling,
+			page.getBody().FirstChild.NextSibling,
 			image.Rectangle{image.ZP, image.Point{100, 50}},
 		},
 		{
 			// Another whitespace before div 2
-			page.Content.FirstChild.NextSibling.NextSibling.NextSibling,
+			page.getBody().FirstChild.NextSibling.NextSibling.NextSibling,
 			image.Rectangle{image.Point{0, 50}, image.Point{100, 100}},
 		},
 	}
@@ -134,12 +134,12 @@ func TestBasicLayoutInlineBlock(t *testing.T) {
 	}{
 		{
 			// First child = whitespace text node, second = div 1
-			page.Content.FirstChild.NextSibling,
+			page.getBody().FirstChild.NextSibling,
 			image.Rectangle{image.ZP, image.Point{100, 50}},
 		},
 		{
 			// Another whitespace before div 2
-			page.Content.FirstChild.NextSibling.NextSibling.NextSibling,
+			page.getBody().FirstChild.NextSibling.NextSibling.NextSibling,
 			image.Rectangle{image.Point{100, 0}, image.Point{200, 50}},
 		},
 	}
@@ -175,12 +175,12 @@ func TestBasicLeftFloat(t *testing.T) {
 	}{
 		{
 			// First child = whitespace text node, second = div 1
-			page.Content.FirstChild.NextSibling,
+			page.getBody().FirstChild.NextSibling,
 			image.Rectangle{image.ZP, image.Point{100, 50}},
 		},
 		{
 			// Another whitespace before div 2
-			page.Content.FirstChild.NextSibling.NextSibling.NextSibling,
+			page.getBody().FirstChild.NextSibling.NextSibling.NextSibling,
 			image.Rectangle{image.Point{100, 0}, image.Point{200, 50}},
 		},
 	}
@@ -217,13 +217,13 @@ func TestBasicRightFloat(t *testing.T) {
 		{
 			// Draw rectangle for the float should be before the
 			// right edge.
-			page.Content.FirstChild.NextSibling,
+			page.getBody().FirstChild.NextSibling,
 			image.Rectangle{image.Point{400 - 100, 0}, image.Point{400, 50}},
 		},
 		{
 			// Draw rectangle for the non-float should be at the
 			// left edge.
-			page.Content.FirstChild.NextSibling.NextSibling.NextSibling,
+			page.getBody().FirstChild.NextSibling.NextSibling.NextSibling,
 			image.Rectangle{image.Point{0, 0}, image.Point{100, 50}},
 		},
 	}
@@ -257,13 +257,13 @@ func TestBasicLeftFloat2(t *testing.T) {
 		want image.Rectangle
 	}{
 		{
-			page.Content.FirstChild.NextSibling,
+			page.getBody().FirstChild.NextSibling,
 			image.Rectangle{image.Point{0, 0}, image.Point{100, 50}},
 		},
 		{
 			// Draw rectangle for the second float should touch the
 			// first.
-			page.Content.FirstChild.NextSibling.NextSibling.NextSibling,
+			page.getBody().FirstChild.NextSibling.NextSibling.NextSibling,
 			image.Rectangle{image.Point{100, 0}, image.Point{200, 50}},
 		},
 	}
@@ -299,13 +299,13 @@ func TestBasicRightFloat2(t *testing.T) {
 		{
 			// Draw rectangle for the float should be before the
 			// right edge.
-			page.Content.FirstChild.NextSibling,
+			page.getBody().FirstChild.NextSibling,
 			image.Rectangle{image.Point{400 - 100, 0}, image.Point{400, 50}},
 		},
 		{
 			// Draw rectangle for the second float should touch the
 			// first.
-			page.Content.FirstChild.NextSibling.NextSibling.NextSibling,
+			page.getBody().FirstChild.NextSibling.NextSibling.NextSibling,
 			image.Rectangle{image.Point{400 - 100 - 100, 0}, image.Point{400 - 100, 50}},
 		},
 	}
@@ -337,7 +337,8 @@ func TestBasicLayoutInline(t *testing.T) {
 
 	page.Content.Layout(context.TODO(), image.Point{400, 300})
 
-	span1 := page.Content.FirstChild.NextSibling
+	body := page.getBody()
+	span1 := body.FirstChild.NextSibling
 	span2 := span1.NextSibling
 
 	// Do some sanity checks.
@@ -358,12 +359,12 @@ func TestBasicLayoutInline(t *testing.T) {
 	}
 
 	// The body is the nearest block, it should have the line boxes.
-	if n := len(page.Content.lineBoxes); n != 2 {
+	if n := len(body.lineBoxes); n != 2 {
 		t.Errorf("Unexpected number of line boxes for body: got %v want 2", n)
 	}
 
-	testLineBox := page.Content.lineBoxes[0]
-	test2LineBox := page.Content.lineBoxes[1]
+	testLineBox := body.lineBoxes[0]
+	test2LineBox := body.lineBoxes[1]
 
 	if testLineBox.content != "Test" {
 		t.Fatalf("Unexpected content for first line box: got %v want 'Test'", testLineBox.content)
@@ -377,7 +378,7 @@ func TestBasicLayoutInline(t *testing.T) {
 		t.Fatalf("Negative or zero width for 'Test': got %v", tlbW)
 	}
 
-	if x := page.Content.lineBoxes[1].origin.X; x != tlbW {
+	if x := body.lineBoxes[1].origin.X; x != tlbW {
 		t.Errorf("Unexpected X origin for Test2. got %v want %v", x, tlbW)
 	}
 
@@ -395,7 +396,8 @@ func TestBasicLayoutInline(t *testing.T) {
 	page.Content.InvalidateLayout()
 	page.Content.Layout(context.TODO(), image.Point{400, 300})
 
-	span1 = page.Content.FirstChild.NextSibling
+	body = page.getBody()
+	span1 = body.FirstChild.NextSibling
 	span2 = span1.FirstChild.NextSibling
 
 	// Do some sanity checks.
@@ -418,12 +420,12 @@ func TestBasicLayoutInline(t *testing.T) {
 	}
 
 	// The body is the nearest block, it should have the line boxes.
-	if n := len(page.Content.lineBoxes); n != 2 {
+	if n := len(body.lineBoxes); n != 2 {
 		t.Errorf("Embedded inline: Unexpected number of line boxes for body: got %v want 2", n)
 	}
 
-	testLineBox = page.Content.lineBoxes[0]
-	test2LineBox = page.Content.lineBoxes[1]
+	testLineBox = body.lineBoxes[0]
+	test2LineBox = body.lineBoxes[1]
 
 	if testLineBox.content != "Test" {
 		t.Fatalf("Embedded inline: Unexpected content for first line box: got %v want 'Test'", testLineBox.content)
@@ -435,7 +437,7 @@ func TestBasicLayoutInline(t *testing.T) {
 	// we re-use the test linebox width from the first part of the test, to
 	// ensure that whether it's embedded or a sibling doesn't affect its
 	// positioning.
-	if x := page.Content.lineBoxes[1].origin.X; x != tlbW {
+	if x := body.lineBoxes[1].origin.X; x != tlbW {
 		t.Errorf("Unexpected X origin for Test2. got %v want %v", x, tlbW)
 	}
 
@@ -462,10 +464,11 @@ func TestBasicLayoutMultilineInline(t *testing.T) {
 	)
 
 	page.Content.Layout(context.TODO(), image.Point{40000, 300})
-	if n := len(page.Content.lineBoxes); n != 1 {
+	body := page.getBody()
+	if n := len(body.lineBoxes); n != 1 {
 		t.Fatalf("Page did not have any line boxes: got %v want 1", n)
 	}
-	superwidth := page.Content.lineBoxes[0].width()
+	superwidth := body.lineBoxes[0].width()
 	if superwidth <= 0 {
 		t.Fatal("Linebox did not have width")
 	}
@@ -485,7 +488,8 @@ Supercalifragilisticexpialidotious Supercalifragilisticexpialidotious
 
 	// Now do the real test.
 	page.Content.Layout(context.TODO(), image.Point{superwidth*2 + 20, 300})
-	if n := len(page.Content.lineBoxes); n != 2 {
+	body = page.getBody()
+	if n := len(body.lineBoxes); n != 2 {
 		t.Fatalf("Body had incorrect number of line boxes: got %v want 2", n)
 	}
 
@@ -493,11 +497,11 @@ Supercalifragilisticexpialidotious Supercalifragilisticexpialidotious
 	// 2 should be on the first line even though there's a new line in the
 	// source, and the last should be on the second line since we sized
 	// the window to ensure it didn't fit.
-	super1 := page.Content.lineBoxes[0]
+	super1 := body.lineBoxes[0]
 	if super1.content != "Supercalifragilisticexpialidotious Supercalifragilisticexpialidotious" {
 		t.Errorf("Unexpected content for first line box: got '%v' want 'Supercalifragilisticexpialidotious Supercalifragilisticexpialidotious'", super1.content)
 	}
-	super2 := page.Content.lineBoxes[1]
+	super2 := body.lineBoxes[1]
 	if super2.content != "Supercalifragilisticexpialidotious" {
 		t.Errorf("Unexpected content for first line box: got '%v' want 'Supercalifragilisticexpialidotious'", super2.content)
 	}
@@ -545,10 +549,11 @@ func TestLayoutFirstline(t *testing.T) {
 	)
 
 	page.Content.Layout(context.TODO(), image.Point{40000, 300})
-	if n := len(page.Content.lineBoxes); n != 1 {
+	body := page.getBody()
+	if n := len(body.lineBoxes); n != 1 {
 		t.Fatalf("Page did not have any line boxes: got %v want 1", n)
 	}
-	testwidth := page.Content.lineBoxes[0].width()
+	testwidth := body.lineBoxes[0].width()
 	if testwidth <= 0 {
 		t.Fatal("Linebox did not have width")
 	}
@@ -586,11 +591,12 @@ TestTestTest TestTestTest
 
 	page.Content.InvalidateLayout()
 	page.Content.Layout(context.TODO(), image.Point{testwidth*2 + 40, 300})
-	if n := len(page.Content.lineBoxes); n != 3 {
+	body = page.getBody()
+	if n := len(body.lineBoxes); n != 3 {
 		t.Fatalf("Body had incorrect number of line boxes: got %v want 3", n)
 	}
 
-	for i, line := range page.Content.lineBoxes {
+	for i, line := range body.lineBoxes {
 		// FIXME: This test probably shouldn't be required to trim the
 		// space.
 		if strings.TrimSpace(line.content) != "TestTestTest TestTestTest" {
@@ -601,7 +607,7 @@ TestTestTest TestTestTest
 		}
 	}
 
-	if got := page.Content.lineBoxes[0].origin.Y; got != 12 {
+	if got := body.lineBoxes[0].origin.Y; got != 12 {
 		// The font size doesn't match the lineheight, so we need to add
 		// the half-leading to the origin.
 		t.Errorf("Unexpected Y origin for line 1: got %v, want 12", got)
@@ -610,13 +616,13 @@ TestTestTest TestTestTest
 	// The firstline property should have made the line advance by 40px
 	// to get to the second line, and then add the half leading based on the
 	// non-firstline line height.
-	if got := page.Content.lineBoxes[1].origin.Y; got != 47 {
+	if got := body.lineBoxes[1].origin.Y; got != 47 {
 		t.Errorf("Unexpected Y origin for line 2: got %v, want 47", got)
 	}
 
 	// The last line should have only advanced by 30 (the default for span),
 	// not 40 (which should have only applied to the first line.)
-	if got := page.Content.lineBoxes[2].origin.Y; got != 40+30+7 {
+	if got := body.lineBoxes[2].origin.Y; got != 40+30+7 {
 		t.Errorf("Unexpected Y origin for line 3: got %v, want 77", got)
 	}
 
