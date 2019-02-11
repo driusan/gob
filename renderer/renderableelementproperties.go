@@ -448,7 +448,7 @@ func (e *RenderableDomElement) GetFontWeight() font.Weight {
 		if parent == font.WeightThin {
 			return font.WeightThin
 		}
-		return parent + 1
+		return parent - 1
 	case "inherit":
 		fallthrough
 	default:
