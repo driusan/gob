@@ -136,6 +136,14 @@ func ParseStylesheet(val string, src StyleSource, importLoader net.URLReader, ur
 			curSelector = CSSSelector{}
 			continue
 		}
+
+		// This logic is far more convoluted than it should be and should
+		// probably be rewritten. It would likely be much easier to
+		// understand if it was switching in context and then handling the
+		// token types for each context, rather than switching on token type
+		// and then handling the different contexts for each type of token,
+		// but for now we just rely on tests to ensure the behaviour is
+		// working as expected.
 		switch token.Type {
 		// Different kinds of comments
 		case scanner.TokenCDO, scanner.TokenCDC:
@@ -317,8 +325,15 @@ func ParseStylesheet(val string, src StyleSource, importLoader net.URLReader, ur
 		case scanner.TokenNumber:
 			switch context {
 			case startContext, matchingSelector, appendingSelector:
-				invalidSelector = true
-				continue
+				// ".1" is an invalid selector according to
+				// CSS. gorilla css treats ".1" as a number,
+				// not as a dot followed by a number, so we need
+				// to flag it as an error if we're in a context
+				// which implies the dot is a class selector.
+				if token.Value[0] == '.' {
+					invalidSelector = true
+					continue
+				}
 			}
 			fallthrough
 		case scanner.TokenHash:
