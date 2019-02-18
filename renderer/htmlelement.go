@@ -601,7 +601,7 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 					}
 				}
 			}
-			if iwidth != 0 || iheight != 0 {
+			if (iwidth != 0 || iheight != 0) && e.ContentOverlay != nil {
 				e.ContentOverlay = resize.Resize(uint(iwidth), uint(iheight), e.ContentOverlay, resize.NearestNeighbor)
 				sz := e.ContentOverlay.Bounds().Size()
 				iwidth = sz.X
@@ -988,7 +988,8 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 					dot.X = newDot.X + c.GetBorderRightWidth() + c.GetPaddingRight() + c.GetMarginRightSize()
 					dot.Y = newDot.Y
 				}
-			case "block", "inline-block", "table", "table-inline", "list-item":
+			case "block", "inline-block", "table", "table-inline", "list-item",
+				"table-row", "table-cell":
 				if dot.X != e.leftFloats.MaxX(*dot) && display != "inline-block" {
 					// This means the previous child was an inline item, and we should position dot
 					// as if there were an implicit box around it.
@@ -1118,7 +1119,7 @@ func (e *RenderableDomElement) layoutPass(ctx context.Context, containerWidth in
 		}
 	}
 
-	if e.GetDisplayProp() == "block" && e.GetFloat() == "none" {
+	if e.GetDisplayProp() != "inline" && e.GetFloat() == "none" {
 		e.advanceLine(dot)
 	}
 	e.ImageMap = imageMap
@@ -1385,7 +1386,8 @@ func (e *RenderableDomElement) getAbsoluteDrawRectangle() image.Rectangle {
 }
 func (e *RenderableDomElement) drawInto(ctx context.Context, dst draw.Image, cursor image.Point) error {
 	if e.Type == html.ElementNode && strings.ToLower(e.Data) == "img" {
-		if e.GetDisplayProp() == "block" {
+		//if e.GetDisplayProp() == "block" {
+		if e.GetDisplayProp() != "inline" {
 			// Inlines are drawn as part of a lineBox, while blocks expected
 			// drawInto to have drawn the image (but did the border itself).
 			absrect := e.getAbsoluteDrawRectangle()
@@ -1444,24 +1446,24 @@ func (e *RenderableDomElement) drawInto(ctx context.Context, dst draw.Image, cur
 			case "none":
 				continue
 			default:
-				/*				// Cull elements that don't fit onto dst.
-								if absrect.Max.X < cursor.X {
-									// the box is to the left of the viewport, don't draw it.
-									continue
-								}
-								if absrect.Min.X > dstsize.X+cursor.X {
-									// to the right of the viewport
-									continue
-								}
-								if absrect.Max.Y < cursor.Y {
-									// on top of the viewport
-									continue
-								}
-								if absrect.Min.Y > dstsize.Y+cursor.Y {
-									// below the viewport.
-									continue
-								}
-				*/
+				dstsize := dst.Bounds().Size()
+				// Cull elements that don't fit onto dst.
+				if absrect.Max.X < cursor.X {
+					// the box is to the left of the viewport, don't draw it.
+					continue
+				}
+				if absrect.Min.X > dstsize.X+cursor.X {
+					// to the right of the viewport
+					continue
+				}
+				if absrect.Max.Y < cursor.Y {
+					// on top of the viewport
+					continue
+				}
+				if absrect.Min.Y > dstsize.Y+cursor.Y {
+					// below the viewport.
+					continue
+				}
 				// when doing the layout the boxDrawRectangle was fudged
 				// for floats to make it easier to calculate intersections
 				// when doing the layout. Now we need to adjust.
@@ -1519,7 +1521,10 @@ func (e *RenderableDomElement) drawInto(ctx context.Context, dst draw.Image, cur
 		}
 		bo := box.origin
 		r := image.Rectangle{bo, bo.Add(sr.Size())}.Add(absrect.Min)
-		if e.GetDisplayProp() != "inline" {
+		switch e.GetDisplayProp() {
+		case "inline":
+		case "table-cell":
+		default:
 			r = r.Add(e.BoxContentRectangle.Min)
 		}
 		if box.BorderImage != nil {
